@@ -1,4 +1,5 @@
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastructure\bin\Debug\net10.0\Game.Infrastructure.deps.json
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastructure\bin\Debug\net10.0\Game.Infrastructure.runtimeconfig.json
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastructure\bin\Debug\net10.0\Game.Infrastructure.dll
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastructure\bin\Debug\net10.0\Game.Infrastructure.pdb
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastructure\bin\Debug\net10.0\Game.Core.dll
@@ -12,4 +13,5 @@ C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastr
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastructure\obj\Debug\net10.0\Game.Infrastructure.dll
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastructure\obj\Debug\net10.0\refint\Game.Infrastructure.dll
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastructure\obj\Debug\net10.0\Game.Infrastructure.pdb
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastructure\obj\Debug\net10.0\Game.Infrastructure.genruntimeconfig.cache
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\2.Infrastructure\Game.Infrastructure\obj\Debug\net10.0\ref\Game.Infrastructure.dll

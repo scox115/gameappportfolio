@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # Local Database Engine
   game-db:
-    image: ://microsoft.com
+    image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: game-sql-server
     environment:
       - ACCEPT_EULA=Y
@@ -15,23 +13,24 @@ services:
 
   # Azure Storage Emulator (Blob Storage)
   game-storage-emulator:
-    image: ://microsoft.com
+    image: mcr.microsoft.com/azure-storage/azurite:latest
     container_name: game-azurite
     ports:
-      - "10000:10000" # Blob Service
-      - "10001:10001" # Queue Service
-      - "10002:10002" # Table Service
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
     volumes:
       - azurite_data:/data
-    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    # Append the skip API version flag right here:
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
 
-  # Local Message Broker (Emulating Azure Service Bus)
+  # Local Message Broker
   game-messaging:
     image: rabbitmq:3-management-alpine
     container_name: game-rabbitmq
     ports:
-      - "5672:5672"   # RabbitMQ App Port
-      - "15672:15672" # Management UI dashboard (Username/Password: guest/guest)
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - rabbit_data:/var/lib/rabbitmq
 
