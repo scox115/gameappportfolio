@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # Local Database Engine
+  game-db:
+    image: ://microsoft.com
+    container_name: game-sql-server
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrong@Pass123!
+    ports:
+      - "1433:1433"
+    volumes:
+      - sql_data:/var/opt/mssql
+
+  # Azure Storage Emulator (Blob Storage)
+  game-storage-emulator:
+    image: ://microsoft.com
+    container_name: game-azurite
+    ports:
+      - "10000:10000" # Blob Service
+      - "10001:10001" # Queue Service
+      - "10002:10002" # Table Service
+    volumes:
+      - azurite_data:/data
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+
+  # Local Message Broker (Emulating Azure Service Bus)
+  game-messaging:
+    image: rabbitmq:3-management-alpine
+    container_name: game-rabbitmq
+    ports:
+      - "5672:5672"   # RabbitMQ App Port
+      - "15672:15672" # Management UI dashboard (Username/Password: guest/guest)
+    volumes:
+      - rabbit_data:/var/lib/rabbitmq
+
+volumes:
+  sql_data:
+  azurite_data:
+  rabbit_data:

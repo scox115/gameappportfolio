@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/1.Core/">
+    <Project Path="1.Core/Game.Core/Game.Core.csproj" />
+  </Folder>
+  <Folder Name="/2.Infrastructure/">
+    <Project Path="2.Infrastructure/Game.Infrastructure/Game.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/3.BackendAPI/">
+    <Project Path="3.BackendAPI/Game.Api/Game.Api.csproj" />
+  </Folder>
+  <Folder Name="/4.Frontend/">
+    <Project Path="4.Frontend/Game.Client/Game.Client.csproj" />
+  </Folder>
+</Solution>

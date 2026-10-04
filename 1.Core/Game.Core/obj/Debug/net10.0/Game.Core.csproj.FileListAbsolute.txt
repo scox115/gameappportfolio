@@ -1,0 +1,11 @@
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\bin\Debug\net10.0\Game.Core.deps.json
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\bin\Debug\net10.0\Game.Core.dll
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\bin\Debug\net10.0\Game.Core.pdb
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\obj\Debug\net10.0\Game.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\obj\Debug\net10.0\Game.Core.AssemblyInfoInputs.cache
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\obj\Debug\net10.0\Game.Core.AssemblyInfo.cs
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\obj\Debug\net10.0\Game.Core.csproj.CoreCompileInputs.cache
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\obj\Debug\net10.0\Game.Core.dll
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\obj\Debug\net10.0\refint\Game.Core.dll
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\obj\Debug\net10.0\Game.Core.pdb
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\1.Core\Game.Core\obj\Debug\net10.0\ref\Game.Core.dll
