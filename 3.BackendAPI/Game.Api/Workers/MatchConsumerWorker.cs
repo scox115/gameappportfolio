@@ -13,7 +13,7 @@ public class MatchConsumerWorker : BackgroundService
     private readonly ILogger<MatchConsumerWorker> _logger;
     private IConnection? _connection;
     private IChannel? _channel;
-    private const string QueueName = Endpoints.MatchEndpoints.MatchCompletedQueue;
+    private const string QueueName = Messaging.MatchTelemetryPublisher.MatchCompletedQueue;
 
     public MatchConsumerWorker(
         IConnectionFactory connectionFactory,
