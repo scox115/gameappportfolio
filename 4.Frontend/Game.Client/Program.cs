@@ -15,6 +15,10 @@ var apiBaseAddress = string.IsNullOrWhiteSpace(apiBaseUrl)
     : new Uri(apiBaseUrl);
 
 builder.Services.AddSingleton(new ApiEndpoint(apiBaseAddress));
+
+// Players are signed out after this many minutes without using the mouse, keyboard or touch screen.
+var idleTimeoutMinutes = builder.Configuration.GetValue("IdleTimeoutMinutes", 15.0);
+builder.Services.AddSingleton(new IdleTimeoutSettings(TimeSpan.FromMinutes(idleTimeoutMinutes)));
 builder.Services.AddScoped<GameState>();
 builder.Services.AddScoped(sp => new HttpClient(new AuthTokenHandler(sp.GetRequiredService<GameState>()))
 {

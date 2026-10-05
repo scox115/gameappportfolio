@@ -63,5 +63,6 @@ The lobby queue is kept in the API's memory, so it assumes one API instance. Sca
 | `RabbitMq:UserName` / `Password` | none | `guest` / `guest` (RabbitMQ's local default) | in cloud |
 | `Cors:AllowedOrigins` | empty (no cross-origin calls) | the client's local URLs | no |
 | Client `ApiBaseUrl` | empty (same origin) | `http://localhost:5005` | no |
+| Client `IdleTimeoutMinutes` | `15` (sign out after this long without activity) | inherited | no |
 
 Hosted environments supply the same keys as environment variables (for example `RabbitMq__Password`, `ConnectionStrings__DefaultConnection`) or from Azure Key Vault. The API refuses to start if a required value is missing.
