@@ -52,11 +52,11 @@ public class PveBattleTests
         Assert.Equal(20, result.DamageDealt);
         Assert.Equal(BossMove.Slash, result.BossMove);
         Assert.Equal(15, result.BossDamage);
-        Assert.Equal(110, battle.BossHp);
+        Assert.Equal(PveBattle.BossMaxHp - 20, battle.BossHp);
         Assert.Equal(85, battle.PlayerHp);
         Assert.Equal(2, battle.Turn);
         Assert.Equal(BossMove.Slash, battle.BossNextMove);
-        Assert.Equal(8 + (2 * 2), battle.BossNextAttack);
+        Assert.Equal(PveBattle.BossAttackBase + (2 * 2), battle.BossNextAttack);
     }
 
     [Theory]
@@ -108,8 +108,9 @@ public class PveBattleTests
         Assert.True(result.CardFailed);
         Assert.False(result.AttackBlocked);
         Assert.Equal(0, result.HealthRestored);
-        Assert.Equal(12, result.BossDamage);
-        Assert.Equal(85 - 12, battle.PlayerHp);
+        // The lucky move roll after the first turn is a plain Slash: base + 2 per turn.
+        Assert.Equal(PveBattle.BossAttackBase + 4, result.BossDamage);
+        Assert.Equal(85 - (PveBattle.BossAttackBase + 4), battle.PlayerHp);
     }
 
     [Fact]
@@ -125,10 +126,10 @@ public class PveBattleTests
     }
 
     [Theory]
-    [InlineData(54, 5, BossMove.Slash, 8 + 4 + 5)]
-    [InlineData(55, 5, BossMove.CrushingBlow, (8 + 4 + 5) * 8 / 5)]
-    [InlineData(79, 0, BossMove.CrushingBlow, (8 + 4) * 8 / 5)]
-    [InlineData(80, 0, BossMove.LifeDrain, (8 + 4) * 3 / 4)]
+    [InlineData(54, 5, BossMove.Slash, PveBattle.BossAttackBase + 4 + 5)]
+    [InlineData(55, 5, BossMove.CrushingBlow, (PveBattle.BossAttackBase + 4 + 5) * 8 / 5)]
+    [InlineData(79, 0, BossMove.CrushingBlow, (PveBattle.BossAttackBase + 4) * 8 / 5)]
+    [InlineData(80, 0, BossMove.LifeDrain, (PveBattle.BossAttackBase + 4) * 3 / 4)]
     public void PlayCard_TheBossVariesItsMoves(int moveRoll, int extraDamage, BossMove expectedMove, int expectedDamage)
     {
         var battle = PveBattle.Start(Guid.NewGuid(), Now);
@@ -148,9 +149,10 @@ public class PveBattleTests
         var result = battle.PlayCard(BattleCard.Fireball, Lucky(), Now);
 
         Assert.Equal(BossMove.LifeDrain, result.BossMove);
-        Assert.Equal(9, result.BossDamage);
-        Assert.Equal(9, result.BossHealed);
-        Assert.Equal(130 - 20 - 20 + 9, battle.BossHp);
+        const int drain = (PveBattle.BossAttackBase + 4) * 3 / 4;
+        Assert.Equal(drain, result.BossDamage);
+        Assert.Equal(drain, result.BossHealed);
+        Assert.Equal(PveBattle.BossMaxHp - 20 - 20 + drain, battle.BossHp);
     }
 
     [Fact]
@@ -163,7 +165,7 @@ public class PveBattleTests
 
         Assert.True(result.AttackBlocked);
         Assert.Equal(0, result.BossHealed);
-        Assert.Equal(110, battle.BossHp);
+        Assert.Equal(PveBattle.BossMaxHp - 20, battle.BossHp);
     }
 
     [Theory]
@@ -305,5 +307,34 @@ public class PveBattleLoadoutTests
     public void Start_RejectsACardLevelOutOfRange()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => PveBattle.Start(Guid.NewGuid(), Now, new PveLoadout(4, 1, 1, 0)));
+    }
+}
+
+public class PveBattleEnrageTests
+{
+    private static readonly DateTime Now = new(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+
+    private sealed class AlwaysMin : IBattleRandom
+    {
+        public int Next(int minInclusive, int maxExclusive) => minInclusive;
+    }
+
+    [Fact]
+    public void TheBossHitsHarderOnceBadlyHurt()
+    {
+        // Fully upgraded: Dragon Claw 45, Fireball 30. Every roll lands and the boss always Slashes.
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, new PveLoadout(3, 1, 3, 0));
+        battle.PlayCard(BattleCard.DragonClaw, new AlwaysMin(), Now);
+        battle.PlayCard(BattleCard.Fireball, new AlwaysMin(), Now);
+
+        Assert.False(battle.IsEnraged);
+        Assert.Equal(PveBattle.BossAttackBase + 3 * PveBattle.BossAttackGrowthPerTurn, battle.BossNextAttack);
+
+        battle.PlayCard(BattleCard.DragonClaw, new AlwaysMin(), Now);
+
+        Assert.True(battle.IsEnraged);
+        Assert.Equal(PveBattle.BossMaxHp - 120, battle.BossHp);
+        var normal = PveBattle.BossAttackBase + 4 * PveBattle.BossAttackGrowthPerTurn;
+        Assert.Equal(normal * PveBattle.EnrageDamagePercent / 100, battle.BossNextAttack);
     }
 }

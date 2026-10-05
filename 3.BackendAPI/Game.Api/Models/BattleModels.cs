@@ -10,6 +10,7 @@ public record BattleStateResponse(
     int PlayerMaxHp,
     int BossHp,
     int BossMaxHp,
+    bool BossEnraged,
     BossMove BossNextMove,
     string BossNextMoveName,
     int BossNextAttack,
@@ -19,7 +20,7 @@ public record BattleStateResponse(
     IReadOnlyList<BattleCardResponse> Cards)
 {
     public static BattleStateResponse From(PveBattle battle) =>
-        new(battle.Id, battle.PlayerHp, battle.PlayerMaxHp, battle.BossHp, PveBattle.BossMaxHp,
+        new(battle.Id, battle.PlayerHp, battle.PlayerMaxHp, battle.BossHp, PveBattle.BossMaxHp, battle.IsEnraged,
             battle.BossNextMove, BossMoves.NameOf(battle.BossNextMove), battle.BossNextAttack,
             battle.RechargingCard, battle.Turn, battle.Status,
             BattleCards.All.Select(c => BattleCardResponse.From(battle.CardFor(c.Card), battle.LevelOf(c.Card))).ToList());
