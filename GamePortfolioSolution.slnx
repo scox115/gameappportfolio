@@ -12,6 +12,7 @@
     <Project Path="4.Frontend/Game.Client/Game.Client.csproj" />
   </Folder>
   <Folder Name="/5.Tests/">
+    <Project Path="5.Tests/Game.Api.Tests/Game.Api.Tests.csproj" />
     <Project Path="5.Tests/Game.Core.Tests/Game.Core.Tests.csproj" />
   </Folder>
 </Solution>

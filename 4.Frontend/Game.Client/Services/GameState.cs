@@ -12,6 +12,9 @@ public class GameState
 {
     public GameScreen CurrentScreen { get; private set; } = GameScreen.LoginMenu;
     public Guid PlayerId { get; private set; }
+    // Kept in memory only, so a page refresh signs the player out.
+    public string? AccessToken { get; private set; }
+    public string? SignOutReason { get; private set; }
     public string Username { get; private set; } = string.Empty;
     public int Gold { get; private set; }
     public int Level { get; private set; }
@@ -25,8 +28,10 @@ public class GameState
         NotifyStateChanged();
     }
 
-    public void SetPlayerSession(Guid id, string username, int gold, int level, string? avatar)
+    public void SetPlayerSession(string accessToken, Guid id, string username, int gold, int level, string? avatar)
     {
+        AccessToken = accessToken;
+        SignOutReason = null;
         PlayerId = id;
         Username = username;
         Gold = gold;
@@ -46,6 +51,19 @@ public class GameState
     public void UpdateAvatar(string url)
     {
         AvatarUrl = url;
+        NotifyStateChanged();
+    }
+
+    public void SignOut(string? reason = null)
+    {
+        AccessToken = null;
+        SignOutReason = reason;
+        PlayerId = Guid.Empty;
+        Username = string.Empty;
+        Gold = 0;
+        Level = 0;
+        AvatarUrl = string.Empty;
+        CurrentScreen = GameScreen.LoginMenu;
         NotifyStateChanged();
     }
 
