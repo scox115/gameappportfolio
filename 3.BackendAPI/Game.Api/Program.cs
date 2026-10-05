@@ -9,6 +9,8 @@ using Game.Api.Workers; // Add this using statement to register background worke
 using Game.Api.Options;
 using Game.Api.Auth;
 using Game.Api.Battles;
+using Game.Api.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Game.Api.Messaging;
 using Game.Core.Battles;
 using System.Text.Json.Serialization;
@@ -129,6 +131,20 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30)
         };
+
+        // Browsers can't set headers on WebSocket requests, so SignalR sends the token in the query string.
+        bearer.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -138,6 +154,14 @@ builder.Services.AddScoped<TokenService>();
 // --- ⚔️ SERVER-AUTHORITATIVE BATTLES ---
 builder.Services.AddSingleton<IBattleRandom, SystemBattleRandom>();
 builder.Services.AddSingleton<MatchTelemetryPublisher>();
+
+// --- 🆚 REAL-TIME PVP ARENA (SignalR) ---
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options => options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
+builder.Services.AddSingleton<PvpMatchmaker>();
+builder.Services.AddScoped<PvpBattleService>();
+builder.Services.AddHostedService<PvpTurnTimeoutWorker>();
 
 // Enums such as battle cards and status travel as readable strings ("DragonClaw", "Won").
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -167,6 +191,8 @@ app.UseAuthorization();
 app.MapAuthEndpoints();
 app.MapPlayerEndpoints();
 app.MapBattleEndpoints();
+app.MapPvpEndpoints();
+app.MapHub<ArenaHub>(ArenaHub.Path);
 
 app.MapControllers();
 

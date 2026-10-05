@@ -1,0 +1,293 @@
+@using Game.Client.Services
+@using Microsoft.AspNetCore.SignalR.Client
+@inject GameState State
+@inject ApiEndpoint Api
+@implements IAsyncDisposable
+
+@* The live PvP arena: waits in the lobby for a real opponent, then plays turns over SignalR.
+   The server decides every result and pushes it to both players. *@
+<div style="max-width: 900px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
+    @if (battle is null)
+    {
+        <!-- LOBBY: WAITING FOR A SECOND PLAYER -->
+        <div style="text-align: center; padding: 30px 10px;">
+            <div style="font-size: 3rem;">🆚</div>
+            <h2 style="color: #22d3ee; margin: 10px 0;">PvP Lobby</h2>
+            @if (!string.IsNullOrEmpty(errorMsg))
+            {
+                <p style="color: #f87171;">@errorMsg</p>
+            }
+            else
+            {
+                <p style="color: #cbd5e1;">@(searching ? "Searching for an opponent..." : "Connecting to the arena...")</p>
+                <p style="color: #64748b; font-size: 0.9rem;">Tip: sign in as another hero in a second browser window to battle yourself.</p>
+            }
+            <button @onclick="LeaveLobby"
+                    style="background: #334155; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px;">🏰 Back to Town</button>
+        </div>
+    }
+    else
+    {
+        <!-- BOTH PLAYERS' HEALTH -->
+        <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px;">
+            @PlayerPanel(battle.You, "#3b82f6", "You")
+            @PlayerPanel(battle.Opponent, "#ef4444", "Opponent")
+        </div>
+
+        @if (battle.Status == "InProgress")
+        {
+            <!-- WHOSE TURN, WITH THE SERVER'S TURN TIMER -->
+            <div style="text-align: center; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-weight: bold;
+                        background: @(battle.YourTurn ? "rgba(34,197,94,0.1)" : "rgba(148,163,184,0.1)");
+                        color: @(battle.YourTurn ? "#4ade80" : "#94a3b8");">
+                @(battle.YourTurn ? "⚡ Your turn!" : $"⏳ Waiting for {battle.Opponent.Username}...")
+                <span style="margin-left: 10px; color: @(secondsLeft <= 10 ? "#f87171" : "inherit");">@secondsLeft s</span>
+            </div>
+        }
+
+        <!-- COMBAT LOG -->
+        <div style="height: 160px; background: #0f172a; border-radius: 8px; padding: 15px; overflow-y: auto; border: 1px solid #334155; font-family: monospace; color: #94a3b8; margin-bottom: 20px; line-height: 1.6;">
+            @foreach (var log in logs)
+            {
+                <div>@log</div>
+            }
+        </div>
+
+        @if (battle.Status == "InProgress")
+        {
+            <div style="display: flex; justify-content: center; gap: 15px;">
+                @foreach (var card in ArenaCards.Hand)
+                {
+                    var recharging = battle.RechargingCard == card.Id;
+                    var disabled = recharging || !battle.YourTurn || sending;
+                    <button @onclick="() => PlayCard(card.Id)" disabled="@disabled" title="@card.Hint"
+                            style="background: @(disabled ? "#475569" : card.Color); width: 150px; height: 110px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: @(disabled ? "not-allowed" : "pointer"); opacity: @(disabled ? "0.6" : "1");">
+                        @card.Icon @card.Label<br /><small>@card.Effect</small><br />
+                        <small style="font-weight: normal;">@(recharging ? "⏳ Recharging" : card.Risk)</small>
+                    </button>
+                }
+            </div>
+            <div style="text-align: center; margin-top: 15px;">
+                <button @onclick="Forfeit" style="background: transparent; color: #94a3b8; border: 1px solid #475569; padding: 6px 14px; border-radius: 8px; cursor: pointer;">🏳️ Forfeit</button>
+            </div>
+        }
+        else
+        {
+            <!-- RESULT PANEL -->
+            var won = battle.YouWon == true;
+            <div style="text-align: center; padding: 25px; border-radius: 12px; background: @(won ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)"); border: 2px solid @(won ? "#22c55e" : "#ef4444");">
+                <div style="font-size: 3rem; line-height: 1;">@(won ? "🏆" : "💀")</div>
+                <h2 style="margin: 10px 0 5px; color: @(won ? "#4ade80" : "#f87171"); letter-spacing: 2px;">@(won ? "VICTORY" : "DEFEAT")</h2>
+                <p style="color: #cbd5e1; margin: 0 0 20px;">@ResultText(won)</p>
+                @if (reward is not null)
+                {
+                    <div style="display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; font-weight: bold;">
+                        <span style="color: #fbbf24;">🪙 +@reward.GoldEarned Gold</span>
+                        <span style="color: #a78bfa;">✨ +@reward.ExperienceEarned XP</span>
+                    </div>
+                }
+                <div style="display: flex; justify-content: center; gap: 15px;">
+                    <button @onclick="LeaveLobby" style="background: #334155; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🏰 Return to Town</button>
+                    <button @onclick="FindAnother" style="background: #0891b2; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🆚 Find Another Opponent</button>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private HubConnection? hub;
+    private PvpBattleDto? battle;
+    private PvpRewardDto? reward;
+    private List<string> logs = new();
+    private bool searching;
+    private bool sending;
+    private string? errorMsg;
+    private int secondsLeft;
+    private System.Threading.Timer? countdown;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hub = new HubConnectionBuilder()
+            .WithUrl(new Uri(Api.BaseAddress, "hubs/arena"), options =>
+                options.AccessTokenProvider = () => Task.FromResult(State.AccessToken))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hub.On<PvpUpdateDto>("MatchFound", update => InvokeAsync(() => OnMatchFound(update)));
+        hub.On<PvpUpdateDto>("BattleUpdated", update => InvokeAsync(() => OnBattleUpdated(update)));
+
+        // After a dropped connection comes back, ask again so an unfinished battle is resumed.
+        hub.Reconnected += _ => InvokeAsync(FindOpponent);
+
+        countdown = new System.Threading.Timer(_ => InvokeAsync(Tick), null, 1000, 1000);
+
+        try
+        {
+            await hub.StartAsync();
+            await FindOpponent();
+        }
+        catch (Exception ex)
+        {
+            errorMsg = $"Could not reach the arena: {ex.Message}";
+        }
+    }
+
+    private async Task FindOpponent()
+    {
+        if (hub is null) return;
+        try
+        {
+            errorMsg = null;
+            searching = await hub.InvokeAsync<bool>("FindOpponent");
+        }
+        catch (Exception ex)
+        {
+            errorMsg = ex.Message;
+        }
+        StateHasChanged();
+    }
+
+    private void OnMatchFound(PvpUpdateDto update)
+    {
+        searching = false;
+        reward = null;
+        logs = new() { $"⚔️ Battle on! You face {update.Battle.Opponent.Username}." };
+        Apply(update);
+    }
+
+    private void OnBattleUpdated(PvpUpdateDto update)
+    {
+        if (battle is not null && update.Battle.Id != battle.Id) return;
+
+        if (update.LastTurn is { } turn)
+        {
+            var who = turn.YourCard ? "You" : turn.PlayerName;
+            if (turn.CardFailed)
+                logs.Add($"🌀 Turn {turn.Turn}: {who} played {turn.CardName}, but it was {turn.CardFailedReason}!");
+            else if (turn.AttackBlocked)
+                logs.Add($"🛡️ Turn {turn.Turn}: {who} played {turn.CardName}, but it was blocked by a shield!");
+            else if (turn.DamageDealt > 0)
+                logs.Add($"» Turn {turn.Turn}: {who} cast {turn.CardName} for {turn.DamageDealt} DMG.");
+            else
+                logs.Add($"» Turn {turn.Turn}: {who} raised {turn.CardName}, healing {turn.HealthRestored} HP.");
+        }
+
+        if (update.Battle.Status != "InProgress")
+        {
+            logs.Add(update.Battle.EndReason switch
+            {
+                "Timeout" => update.Battle.YouWon == true ? "⌛ Your opponent ran out of time." : "⌛ You ran out of time.",
+                "Forfeit" => update.Battle.YouWon == true ? "🏳️ Your opponent forfeited." : "🏳️ You forfeited.",
+                _ => update.Battle.YouWon == true ? "🏆 Knockout! You win." : "💀 You were knocked out."
+            });
+        }
+
+        Apply(update);
+    }
+
+    private void Apply(PvpUpdateDto update)
+    {
+        battle = update.Battle;
+        secondsLeft = update.Battle.TurnSecondsLeft;
+        if (update.Reward is { } earned)
+        {
+            reward = earned;
+            State.UpdateRewards(earned.Player.Gold, earned.Player.Level);
+        }
+        StateHasChanged();
+    }
+
+    private void Tick()
+    {
+        if (battle?.Status != "InProgress" || secondsLeft <= 0) return;
+        secondsLeft--;
+        StateHasChanged();
+    }
+
+    private async Task PlayCard(string card)
+    {
+        if (hub is null || battle is null || sending) return;
+        sending = true;
+        try
+        {
+            await hub.InvokeAsync("PlayCard", battle.Id, card);
+        }
+        catch (Exception ex)
+        {
+            logs.Add($"[Move rejected] {ex.Message}");
+        }
+        finally
+        {
+            sending = false;
+        }
+    }
+
+    private async Task Forfeit()
+    {
+        if (hub is null || battle is null) return;
+        try
+        {
+            await hub.InvokeAsync("Forfeit", battle.Id);
+        }
+        catch (Exception ex)
+        {
+            logs.Add($"[Forfeit failed] {ex.Message}");
+        }
+    }
+
+    private async Task FindAnother()
+    {
+        battle = null;
+        reward = null;
+        logs.Clear();
+        await FindOpponent();
+    }
+
+    private async Task LeaveLobby()
+    {
+        if (hub is not null && searching)
+        {
+            try { await hub.InvokeAsync("CancelSearch"); } catch { /* leaving anyway */ }
+        }
+        State.ChangeScreen(GameScreen.CharacterDashboard);
+    }
+
+    private string ResultText(bool won) => battle?.EndReason switch
+    {
+        "Timeout" => won ? $"{battle.Opponent.Username} ran out of time." : "You ran out of time.",
+        "Forfeit" => won ? $"{battle.Opponent.Username} forfeited." : "You forfeited the battle.",
+        _ => won ? $"You knocked out {battle?.Opponent.Username}!" : $"{battle?.Opponent.Username} knocked you out."
+    };
+
+    private RenderFragment PlayerPanel(PvpPlayerDto player, string color, string label) => __builder =>
+    {
+        <div style="flex: 1; background: #0f172a; border-radius: 12px; padding: 15px; border: 1px solid #334155;">
+            <div style="color: #94a3b8; font-size: 0.8rem;">@label</div>
+            <div style="font-weight: bold; font-size: 1.1rem; color: #f1f5f9;">@player.Username @(player.Shielded ? "🛡️" : "")</div>
+            <div style="background: #334155; border-radius: 6px; height: 12px; margin-top: 8px; overflow: hidden;">
+                <div style="background: @color; height: 100%; width: @(player.Hp * 100 / Math.Max(1, player.MaxHp))%;"></div>
+            </div>
+            <div style="color: @color; font-weight: bold; margin-top: 4px;">@player.Hp / @player.MaxHp HP</div>
+        </div>
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        countdown?.Dispose();
+        if (hub is not null)
+        {
+            await hub.DisposeAsync();
+        }
+    }
+
+    // Shapes of the messages the server pushes (see Game.Api.Models.PvpModels).
+    private record PvpPlayerDto(Guid Id, string Username, string? AvatarUrl, int Hp, int MaxHp, bool Shielded);
+    private record PvpBattleDto(Guid Id, PvpPlayerDto You, PvpPlayerDto Opponent, bool YourTurn, int Turn,
+        DateTime TurnDeadline, int TurnSecondsLeft, string? RechargingCard, string Status, bool? YouWon, string? EndReason);
+    private record PvpTurnDto(int Turn, bool YourCard, string PlayerName, string CardName, bool CardFailed,
+        string? CardFailedReason, int DamageDealt, int HealthRestored, bool AttackBlocked);
+    private record PvpProfileDto(Guid Id, string Username, int Gold, int Level);
+    private record PvpRewardDto(int GoldEarned, int ExperienceEarned, PvpProfileDto Player);
+    private record PvpUpdateDto(PvpBattleDto Battle, PvpTurnDto? LastTurn, PvpRewardDto? Reward);
+}

@@ -5,6 +5,7 @@ public enum GameScreen
     LoginMenu,
     CharacterDashboard,
     BattleArena,
+    PvpArena,
     Leaderboard 
 }
 

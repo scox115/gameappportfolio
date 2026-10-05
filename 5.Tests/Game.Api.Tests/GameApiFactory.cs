@@ -15,6 +15,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"game-api-tests-{Guid.NewGuid()}";
 
+    /// <summary>The API's clock; tests move it forward to run out a turn timer.</summary>
+    public TestClock Clock { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -40,6 +43,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
             // the boss always uses a plain Slash, so battle outcomes are predictable.
             services.RemoveAll<IBattleRandom>();
             services.AddSingleton<IBattleRandom>(new FixedBattleRandom());
+
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(Clock);
         });
     }
 }
@@ -48,6 +54,15 @@ public class GameApiFactory : WebApplicationFactory<Program>
 public class FixedBattleRandom(bool lucky = true) : IBattleRandom
 {
     public int Next(int minInclusive, int maxExclusive) => lucky ? minInclusive : maxExclusive - 1;
+}
+
+public class TestClock : TimeProvider
+{
+    private TimeSpan _offset;
+
+    public override DateTimeOffset GetUtcNow() => base.GetUtcNow() + _offset;
+
+    public void Advance(TimeSpan by) => _offset += by;
 }
 
 internal static class ServiceCollectionExtensions

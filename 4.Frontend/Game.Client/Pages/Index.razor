@@ -96,6 +96,10 @@
                                             style="width: 100%; background: #dc2626; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(220,38,38,0.3);">
                                         ⚔️ LAUNCH BATTLE ARENA
                                     </button>
+                                    <button @onclick="() => State.ChangeScreen(GameScreen.PvpArena)"
+                                            style="width: 100%; background: #0891b2; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(8,145,178,0.3);">
+                                        🆚 FIND AN OPPONENT
+                                    </button>
                                 </div>
 
                                 <!-- CLOUD UPLOADER BOX -->
@@ -122,6 +126,10 @@
                                 </div>
                                 break;
 
+
+        case GameScreen.PvpArena:
+                                <PvpArena />
+                                break;
 
         case GameScreen.Leaderboard:
                                 <!-- RENDERS DYNAMIC CARD ARENA ROSTER RANKINGS -->
@@ -215,7 +223,7 @@
                                         {
                                         <!-- DECK ACTION HAND CARD PANELS -->
                                         <div style="display: flex; justify-content: center; gap: 15px;">
-                                            @foreach (var card in HandCards)
+                                            @foreach (var card in ArenaCards.Hand)
                                             {
                                                 var recharging = rechargingCard == card.Id;
                                                 <button @onclick="() => PlayTurn(card.Id)" disabled="@recharging"
@@ -559,16 +567,6 @@
         battleResult = null;
         logs = new() { "⚔️ Match Initialized. Select an action card block." }; 
     }
-
-    private record HandCard(string Id, string Icon, string Label, string Effect, string Risk, string Hint, string Color);
-
-    // Mirrors the server's card rules (Game.Core BattleCards) for display only.
-    private static readonly HandCard[] HandCards =
-    [
-        new("Fireball", "🔥", "Fireball", "20 DMG", "10% resisted", "Reliable damage you can cast every turn.", "#ea580c"),
-        new("HolyShield", "🛡️", "Holy Shield", "15 HEAL + BLOCK", "20% interrupted", "Heals and blocks the boss's next move. Needs a turn to recharge.", "#2563eb"),
-        new("DragonClaw", "🐉", "Dragon Claw", "35 DMG", "25% dodged", "Big damage. Needs a turn to recharge.", "#7c3aed")
-    ];
 
     private static string BossMoveIcon(string move) => move switch
     {

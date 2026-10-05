@@ -14,6 +14,7 @@ var apiBaseAddress = string.IsNullOrWhiteSpace(apiBaseUrl)
     ? new Uri(builder.HostEnvironment.BaseAddress)
     : new Uri(apiBaseUrl);
 
+builder.Services.AddSingleton(new ApiEndpoint(apiBaseAddress));
 builder.Services.AddScoped<GameState>();
 builder.Services.AddScoped(sp => new HttpClient(new AuthTokenHandler(sp.GetRequiredService<GameState>()))
 {
