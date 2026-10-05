@@ -1,0 +1,66 @@
+@using Game.Client.Services
+@using Microsoft.AspNetCore.SignalR.Client
+@inject GameState State
+@inject ApiEndpoint Api
+@inject TokenRefresher Tokens
+@implements IAsyncDisposable
+
+@* Keeps a connection open while signed in, so signing in on another browser signs this one out
+   straight away instead of on its next click. *@
+
+@code {
+    private HubConnection? hub;
+    private Guid connectedPlayerId;
+
+    protected override void OnInitialized() => State.OnStateChanged += OnStateChanged;
+
+    private void OnStateChanged() => _ = InvokeAsync(SyncAsync);
+
+    private async Task SyncAsync()
+    {
+        var signedIn = !string.IsNullOrEmpty(State.AccessToken);
+
+        if (hub is not null && (!signedIn || connectedPlayerId != State.PlayerId))
+        {
+            await StopAsync();
+        }
+
+        if (signedIn && hub is null)
+        {
+            connectedPlayerId = State.PlayerId;
+            hub = new HubConnectionBuilder()
+                .WithUrl(new Uri(Api.BaseAddress, "hubs/session"), options =>
+                    options.AccessTokenProvider = Tokens.GetAccessTokenAsync)
+                .WithAutomaticReconnect()
+                .Build();
+
+            hub.On("SessionEnded", () => InvokeAsync(() => State.SignOut(GameState.SignedInElsewhereMessage)));
+
+            try
+            {
+                await hub.StartAsync();
+            }
+            catch (Exception)
+            {
+                // Not essential: the API still refuses the old session's tokens on the next request.
+                await StopAsync();
+            }
+        }
+    }
+
+    private async Task StopAsync()
+    {
+        var connection = hub;
+        hub = null;
+        if (connection is not null)
+        {
+            await connection.DisposeAsync();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        State.OnStateChanged -= OnStateChanged;
+        await StopAsync();
+    }
+}

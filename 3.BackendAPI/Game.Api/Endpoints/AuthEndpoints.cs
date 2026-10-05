@@ -1,4 +1,5 @@
 using Game.Api.Auth;
+using Game.Api.Hubs;
 using Game.Api.Models;
 using Game.Core.Entities;
 using Game.Infrastructure.Data;
@@ -24,7 +25,8 @@ public static class AuthEndpoints
             UserManager<ApplicationUser> userManager,
             AppDbContext dbContext,
             TokenService tokenService,
-            RefreshTokenService refreshTokens) =>
+            RefreshTokenService refreshTokens,
+            SessionNotifier notifier) =>
         {
             var username = request.Username?.Trim() ?? string.Empty;
             if (username.Length is < 3 or > 50)
@@ -55,7 +57,7 @@ public static class AuthEndpoints
                     : Results.ValidationProblem(ToValidationErrors(result));
             }
 
-            var session = await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext);
+            var session = await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier);
             return Results.Created("/api/players/me", session);
         });
 
@@ -65,7 +67,8 @@ public static class AuthEndpoints
             SignInManager<ApplicationUser> signInManager,
             AppDbContext dbContext,
             TokenService tokenService,
-            RefreshTokenService refreshTokens) =>
+            RefreshTokenService refreshTokens,
+            SessionNotifier notifier) =>
         {
             var user = string.IsNullOrWhiteSpace(request.Username)
                 ? null
@@ -94,11 +97,12 @@ public static class AuthEndpoints
                 return Results.Problem("This account has no player profile.", statusCode: StatusCodes.Status409Conflict);
             }
 
-            return Results.Ok(await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext));
+            return Results.Ok(await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier));
         });
 
         // Trades a refresh token for a new access token and a new refresh token.
         group.MapPost("/refresh", async (
+            HttpContext httpContext,
             RefreshRequest request,
             UserManager<ApplicationUser> userManager,
             AppDbContext dbContext,
@@ -107,6 +111,13 @@ public static class AuthEndpoints
         {
             if (await refreshTokens.RotateAsync(request.RefreshToken) is not { } rotated)
             {
+                return Results.Unauthorized();
+            }
+
+            if (rotated.Replacement is null)
+            {
+                // Tell the browser why, so it can say so instead of "your session expired".
+                httpContext.Response.Headers[SessionClaims.EndedHeader] = SessionClaims.SignedInElsewhere;
                 return Results.Unauthorized();
             }
 
@@ -136,10 +147,15 @@ public static class AuthEndpoints
         Player player,
         TokenService tokenService,
         RefreshTokenService refreshTokens,
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        SessionNotifier notifier)
     {
+        // One browser at a time: a new sign-in retires every earlier session's tokens.
+        user.CurrentSessionId = Guid.NewGuid();
+        await refreshTokens.RevokeAllAsync(user.Id);
         var refresh = refreshTokens.Issue(user.Id);
         await dbContext.SaveChangesAsync();
+        await notifier.EndOtherSessionsAsync(user.Id);
         var access = tokenService.CreateAccessToken(user);
         return new AuthResponse(access.Token, access.ExpiresAt, refresh.Token, refresh.ExpiresAt, PlayerProfileResponse.From(player));
     }
