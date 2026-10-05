@@ -15,6 +15,21 @@ public class PlayerTests
     }
 
     [Fact]
+    public void NewPlayer_CanShareItsIdWithASignInAccount()
+    {
+        var accountId = Guid.NewGuid();
+        var player = new Player(accountId, "hero", 500);
+
+        Assert.Equal(accountId, player.Id);
+    }
+
+    [Fact]
+    public void NewPlayer_RejectsEmptyId()
+    {
+        Assert.Throws<ArgumentException>(() => new Player(Guid.Empty, "hero", 500));
+    }
+
+    [Fact]
     public void AddGold_RejectsNegativeAmounts()
     {
         var player = new Player("hero", 500);

@@ -13,8 +13,15 @@ public class Player
     private Player() { }
 
     public Player(string username, int startingGold)
+        : this(Guid.NewGuid(), username, startingGold)
     {
-        Id = Guid.NewGuid();
+    }
+
+    // Used when the player profile shares its id with a sign-in account.
+    public Player(Guid id, string username, int startingGold)
+    {
+        if (id == Guid.Empty) throw new ArgumentException("Player id cannot be empty.", nameof(id));
+        Id = id;
         Username = username;
         Gold = startingGold;
         ExperiencePoints = 0;

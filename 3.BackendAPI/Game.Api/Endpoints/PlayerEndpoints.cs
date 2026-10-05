@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Game.Api.Auth;
 using Game.Api.Models;
 using Game.Core.Entities;
 using Game.Core.Interfaces;
@@ -23,41 +25,16 @@ public static class PlayerEndpoints
         var group = app.MapGroup("/api/players")
                        .WithTags("Players"); // Categories routes cleanly in Swagger
 
-        // POST Endpoint: Create a New Player
-        group.MapPost("/", async (CreatePlayerRequest request, AppDbContext dbContext) =>
+        // GET Endpoint: The signed-in player's own profile
+        group.MapGet("/me", async (ClaimsPrincipal user, AppDbContext dbContext) =>
         {
-            // 1. Validation check
-            if (string.IsNullOrWhiteSpace(request.Username))
-            {
-                return Results.BadRequest("Username cannot be empty.");
-            }
+            var player = await dbContext.Players.FindAsync(user.GetPlayerId());
 
-            // 2. Check if username is already taken (handling unique constraint gracefully)
-            bool usernameExists = await dbContext.Players
-                .AnyAsync(p => p.Username == request.Username);
-
-            if (usernameExists)
-            {
-                return Results.Conflict($"The username '{request.Username}' is already taken.");
-            }
-
-            // 3. Construct our Rich Domain Entity (starting with 500 gold)
-            var newPlayer = new Player(request.Username, startingGold: 500);
-
-            // 4. Save to database using EF Core
-            dbContext.Players.Add(newPlayer);
-            await dbContext.SaveChangesAsync();
-
-            // 5. Return a 201 Created status containing the unique route to locate the resource
-            return Results.Created($"/api/players/{newPlayer.Id}", new 
-            {
-                id = newPlayer.Id,
-                username = newPlayer.Username,
-                gold = newPlayer.Gold,
-                level = newPlayer.Level,
-                experiencePoints = newPlayer.ExperiencePoints
-            });
-        });
+            return player is not null
+                ? Results.Ok(PlayerProfileResponse.From(player))
+                : Results.NotFound("Player profile not found.");
+        })
+        .RequireAuthorization();
 
         // GET Endpoint: Retrieve a Player by ID
         group.MapGet("/{id:guid}", async (Guid id, AppDbContext dbContext) =>
@@ -78,14 +55,15 @@ public static class PlayerEndpoints
         });
             
         // POST Endpoint: Upload a Player Avatar
-        group.MapPost("/{id:guid}/avatar", async (
-            Guid id, 
+        // Players can only change their own avatar, so the id comes from the access token.
+        group.MapPost("/me/avatar", async (
+            ClaimsPrincipal user,
             [FromForm] AvatarUploadModel model, 
             AppDbContext dbContext,
             IStorageService storageService) =>
         {
             // Check if the player exists in the SQL database first
-            var player = await dbContext.Players.FindAsync(id);
+            var player = await dbContext.Players.FindAsync(user.GetPlayerId());
             if (player is null) 
             {
                 return Results.NotFound("Player profile not found.");
@@ -109,37 +87,10 @@ public static class PlayerEndpoints
             player.UpdateAvatar(uploadedBlobUrl);
             await dbContext.SaveChangesAsync();
 
-            return Results.Ok(new { PlayerId = id, AvatarUrl = uploadedBlobUrl });
+            return Results.Ok(new { PlayerId = player.Id, AvatarUrl = uploadedBlobUrl });
         })
+        .RequireAuthorization()
         .DisableAntiforgery();
-
-        // POST: /api/players/login
-        group.MapPost("/login", async (LoginRequest request, AppDbContext dbContext) =>
-        {
-            if (string.IsNullOrWhiteSpace(request.Username))
-            {
-                return Results.BadRequest("Username field cannot be left blank.");
-            }
-
-            // Use EF.Functions.Like to enforce a true case-insensitive lookup inside SQL Server
-            var player = await dbContext.Players
-                .FirstOrDefaultAsync(p => EF.Functions.Like(p.Username, request.Username));
-
-            if (player is null)
-            {
-                return Results.NotFound($"No character profile named '{request.Username}' was found.");
-            }
-
-            // Return the response data contract with exact property casing matching your Blazor DTOs
-            return Results.Ok(new 
-            {
-                id = player.Id,
-                username = player.Username,
-                gold = player.Gold,
-                level = player.Level,
-                avatarUrl = player.AvatarUrl
-            });
-        });
 
         // GET: /api/players/leaderboard
         group.MapGet("/leaderboard", async (AppDbContext dbContext) =>
@@ -163,5 +114,3 @@ public static class PlayerEndpoints
         });
     }
 }
-
-public record LoginRequest(string Username);
