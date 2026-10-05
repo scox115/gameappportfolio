@@ -1,3 +1,4 @@
+using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
@@ -16,6 +17,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
 
     public DbSet<Player> Players => Set<Player>();
     public DbSet<GameMatch> Matches => Set<GameMatch>();
+    public DbSet<PveBattle> PveBattles => Set<PveBattle>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

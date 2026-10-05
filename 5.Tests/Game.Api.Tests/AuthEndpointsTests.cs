@@ -5,12 +5,12 @@ using Game.Api.Models;
 
 namespace Game.Api.Tests;
 
-public class AuthAndMatchEndpointsTests : IClassFixture<GameApiFactory>
+public class AuthEndpointsTests : IClassFixture<GameApiFactory>
 {
     private const string Password = "Arena-Pass1";
     private readonly GameApiFactory _factory;
 
-    public AuthAndMatchEndpointsTests(GameApiFactory factory) => _factory = factory;
+    public AuthEndpointsTests(GameApiFactory factory) => _factory = factory;
 
     [Fact]
     public async Task Register_CreatesPlayerWithStartingGoldAndSignsIn()
@@ -91,48 +91,18 @@ public class AuthAndMatchEndpointsTests : IClassFixture<GameApiFactory>
 
     [Theory]
     [InlineData("GET", "/api/players/me")]
-    [InlineData("POST", "/api/matches/pve/complete")]
-    [InlineData("POST", "/api/matches/complete")]
+    [InlineData("POST", "/api/battles/pve")]
+    [InlineData("POST", "/api/battles/pve/00000000-0000-0000-0000-000000000001/turns")]
     public async Task GameEndpoints_RequireASignedInPlayer(string method, string url)
     {
         var client = _factory.CreateClient();
 
         var response = await client.SendAsync(new HttpRequestMessage(new HttpMethod(method), url)
         {
-            Content = method == "POST" ? JsonContent.Create(new { IsVictory = true }) : null
+            Content = method == "POST" ? JsonContent.Create(new { Card = "Fireball" }) : null
         });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task PveComplete_PaysTheSignedInPlayer()
-    {
-        var client = _factory.CreateClient();
-        var auth = await RegisterAsync(client, NewUsername());
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
-
-        var response = await client.PostAsJsonAsync("/api/matches/pve/complete", new { IsVictory = true });
-        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(auth.Player.Id, me!.Id);
-        Assert.Equal(600, me.Gold);
-    }
-
-    [Fact]
-    public async Task PvpComplete_ForbidsReportingAMatchYouWereNotIn()
-    {
-        var client = _factory.CreateClient();
-        var caller = await RegisterAsync(client, NewUsername());
-        var winner = await RegisterAsync(client, NewUsername());
-        var loser = await RegisterAsync(client, NewUsername());
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", caller.AccessToken);
-
-        var response = await client.PostAsJsonAsync("/api/matches/complete",
-            new { WinnerPlayerId = winner.Player.Id, LoserPlayerId = loser.Player.Id });
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

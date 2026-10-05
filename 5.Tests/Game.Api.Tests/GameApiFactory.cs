@@ -1,4 +1,5 @@
 using Game.Api.Workers;
+using Game.Core.Battles;
 using Game.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -34,8 +35,17 @@ public class GameApiFactory : WebApplicationFactory<Program>
             // The telemetry consumer needs a live broker; it isn't part of what these tests cover.
             var worker = services.Single(d => d.ImplementationType == typeof(MatchConsumerWorker));
             services.Remove(worker);
+
+            // Boss attacks always roll the minimum so battle outcomes are predictable.
+            services.RemoveAll<IBattleRandom>();
+            services.AddSingleton<IBattleRandom>(new FixedBattleRandom());
         });
     }
+}
+
+public class FixedBattleRandom : IBattleRandom
+{
+    public int Next(int minInclusive, int maxExclusive) => minInclusive;
 }
 
 internal static class ServiceCollectionExtensions

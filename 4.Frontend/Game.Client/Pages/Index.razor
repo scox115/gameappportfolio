@@ -92,7 +92,7 @@
                                     <h2 style="margin: 0; color: #f1f5f9;">@State.Username</h2>
                                     <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 5px;">Class: Full-Stack Sorcerer</p>
                     
-                                    <button @onclick="() => State.ChangeScreen(GameScreen.BattleArena)"
+                                    <button @onclick="EnterArena"
                                             style="width: 100%; background: #dc2626; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(220,38,38,0.3);">
                                         ⚔️ LAUNCH BATTLE ARENA
                                     </button>
@@ -201,13 +201,13 @@
 
                                         <!-- DECK ACTION HAND CARD PANELS -->
                                         <div style="display: flex; justify-content: center; gap: 15px;">
-                                            <button @onclick='() => PlayTurn("Fireball", 20, 0)'
+                                            <button @onclick='() => PlayTurn("Fireball")'
                                                     style="background: #ea580c; width: 140px; height: 100px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: pointer;">🔥
                                                 Fireball<br /><small>20 DMG</small></button>
-                                                <button @onclick='() => PlayTurn("Holy Shield", 0, 15)'
+                                                <button @onclick='() => PlayTurn("HolyShield")'
                                                         style="background: #2563eb; width: 140px; height: 100px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: pointer;">🛡️
                                                     Shield<br /><small>15 HEAL</small></button>
-                                                    <button @onclick='() => PlayTurn("Dragon Claw", 35, 0)'
+                                                    <button @onclick='() => PlayTurn("DragonClaw")'
                                                             style="background: #7c3aed; width: 140px; height: 100px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: pointer;">🐉
                                                         Dragon Fury<br /><small>35 DMG</small></button>
                                                     </div>
@@ -223,7 +223,8 @@
     private bool uploading = false;
     private IBrowserFile? selectedFile;
 
-    // Arena State
+    // Arena State (mirrors the server's battle; the server decides every outcome)
+    private Guid battleId;
     private int playerHp = 100;
     private int enemyHp = 120; // Increased boss max pool to survive initial burst
     private int enemyIntentAttack = 15; // Starting attack damage values
@@ -323,113 +324,125 @@
         finally { uploading = false; }
     }
 
-    // --- ⚔️ SOLID TURN-BASED COMBAT ENGINE ---
-    private async Task PlayTurn(string name, int dmg, int heal)
+    // --- ⚔️ SERVER-AUTHORITATIVE TURN-BASED COMBAT ---
+    // The API owns the battle: we send the chosen card and replay what the server decided.
+    private async Task EnterArena()
+    {
+        try
+        {
+            var res = await Http.PostAsync("/api/battles/pve", null);
+            if (!res.IsSuccessStatusCode)
+            {
+                statusMsg = "The arena gates are closed. Please try again.";
+                return;
+            }
+
+            var battle = await res.Content.ReadFromJsonAsync<BattleStateDto>();
+            if (battle is null) return;
+
+            ResetMatch();
+            ApplyBattleState(battle);
+            if (res.StatusCode == HttpStatusCode.OK)
+            {
+                logs.Add($"↩️ Resuming your battle on turn {battle.turn}.");
+            }
+            State.ChangeScreen(GameScreen.BattleArena);
+        }
+        catch { statusMsg = "API Network Link Offline."; }
+    }
+
+    private async Task PlayTurn(string card)
     {
         if (!isPlayerTurn || matchConcluding || enemyHp <= 0 || playerHp <= 0) return;
 
         isPlayerTurn = false; // Freeze spam-clicking path blocks
 
-        // 1. PROCESS PLAYER CARD CHOICE
-        if (dmg > 0) 
-        { 
-            enemyHp = Math.Max(0, enemyHp - dmg); 
-            logs.Add($"» Turn {turnCount}: You cast {name} dealing {dmg} DMG."); 
-        }
-        if (heal > 0) 
-        { 
-            playerHp = Math.Min(100, playerHp + heal); 
-            logs.Add($"» Turn {turnCount}: You use {name} and recover {heal} HP."); 
-        }
-
-        // 2. CHECK IMMEDIATE PLAYER VICTORY BOUNDARY
-        if (enemyHp <= 0)
-        {
-            await HandleMatchResolution(isVictory: true);
-            return;
-        }
-
-        StateHasChanged(); // Force update UI layout to show action freeze
-
-        // 3. ENEMY INTENT LOGGING & ARTIFICIAL COOLDOWN DELAY
-        logs.Add($"⏳ The Shadow Overlord winds up for a {enemyIntentAttack} DMG slash...");
-        await Task.Delay(1000); 
-
-        // 4. APPLY ENEMY STRIKE TO PLAYER
-        playerHp = Math.Max(0, playerHp - enemyIntentAttack); 
-        logs.Add($"💥 Enemy Boss hits you back dealing {enemyIntentAttack} damage!");
-
-        // 5. CHECK PLAYER DEFEAT BOUNDARY
-        if (playerHp <= 0)
-        {
-            await HandleMatchResolution(isVictory: false);
-            return;
-        }
-
-        // 6. ENEMY RAGE MECHANICS: Scale up boss damage parameters for the next turn
-        turnCount++;
-        var random = new Random();
-        
-        // Base attack increments by +4 every turn, plus a randomized wild modifier element (5 to 15)
-        enemyIntentAttack = (turnCount * 4) + random.Next(5, 15);
-        
-        logs.Add($"⚠️ Warning: Boss enters rage step. Next attack intent scaled up to {enemyIntentAttack} DMG!");
-
-        // 7. UNLOCK CONTROLS
-        isPlayerTurn = true;
-        StateHasChanged();
-    }
-    
-    private async Task HandleMatchResolution(bool isVictory)
-    {
-        matchConcluding = true; // Lock all inputs during API data saving
-
-        if (isVictory)
-        {
-            logs.Add("🏆 VICTORY! Submitting scorecard and distributing gold rewards...");
-        }
-        else
-        {
-            logs.Add("💀 DEFEAT! Submitting results to backend database panels...");
-        }
-        
-        StateHasChanged();
-
+        PlayCardResponseDto? result;
         try
         {
-            // --- 🛡️ PVE MATCH RESOLUTION ---
-            // The AI boss has no player profile, so we only send the outcome; the API knows who we are from the token.
-            // The API pays either the win reward or the consolation reward, never both.
-
-            // 1. Send match resolution through the API (Gold is processed synchronously)
-            var response = await Http.PostAsJsonAsync("/api/matches/pve/complete", new { IsVictory = isVictory });
-            
-            if (response.IsSuccessStatusCode)
+            var res = await Http.PostAsJsonAsync($"/api/battles/pve/{battleId}/turns", new { Card = card });
+            if (!res.IsSuccessStatusCode)
             {
-                // 2. RE-FETCH UPDATED PROFILE DATA (Instantly pulls the fresh gold count out of SQL Server)
-                var refresh = await Http.GetFromJsonAsync<PlayerProfileDto>("/api/players/me");
-                if (refresh != null) 
-                {
-                    // Sync the main UI header state container properties immediately
-                    State.UpdateRewards(refresh.gold, refresh.level); 
-                }
+                logs.Add($"[API Rejection] The move was not accepted: {await res.Content.ReadAsStringAsync()}");
+                isPlayerTurn = true;
+                return;
             }
-            else
-            {
-                var apiError = await response.Content.ReadAsStringAsync();
-                logs.Add($"[API Rejection] Database failed to save match parameters: {apiError}");
-            }
+            result = await res.Content.ReadFromJsonAsync<PlayCardResponseDto>();
         }
         catch (Exception ex)
         {
-            logs.Add($"[Network Error] Could not synchronize reward structures: {ex.Message}");
+            logs.Add($"[Network Error] Could not reach the arena: {ex.Message}");
+            isPlayerTurn = true;
+            return;
         }
-        finally
+        if (result is null) { isPlayerTurn = true; return; }
+
+        var turn = result.turnResult;
+
+        // 1. SHOW THE PLAYER'S CARD
+        if (turn.damageDealt > 0)
         {
-            // Reset match values and send player back to the main character panel
-            ResetMatch();
-            State.ChangeScreen(GameScreen.CharacterDashboard);
+            enemyHp = Math.Max(0, enemyHp - turn.damageDealt);
+            logs.Add($"» Turn {turn.turn}: You cast {turn.cardName} dealing {turn.damageDealt} DMG.");
         }
+        else if (card == "HolyShield")
+        {
+            playerHp += turn.healthRestored;
+            logs.Add($"» Turn {turn.turn}: You use {turn.cardName} and recover {turn.healthRestored} HP.");
+        }
+
+        // 2. SHOW THE BOSS'S COUNTER-ATTACK WITH A SHORT DRAMATIC PAUSE
+        if (turn.bossDamage is int bossDamage)
+        {
+            StateHasChanged();
+            logs.Add($"⏳ The Shadow Overlord winds up for a {enemyIntentAttack} DMG slash...");
+            await Task.Delay(1000);
+            logs.Add($"💥 Enemy Boss hits you back dealing {bossDamage} damage!");
+        }
+
+        ApplyBattleState(result.battle);
+
+        // 3. THE SERVER SAYS WHETHER THE FIGHT IS OVER
+        if (result.battle.status != "InProgress")
+        {
+            HandleMatchResolution(result);
+            return;
+        }
+
+        logs.Add($"⚠️ Warning: Boss enters rage step. Next attack intent scaled up to {enemyIntentAttack} DMG!");
+
+        // 4. UNLOCK CONTROLS
+        isPlayerTurn = true;
+        StateHasChanged();
+    }
+
+    private void ApplyBattleState(BattleStateDto battle)
+    {
+        battleId = battle.id;
+        playerHp = battle.playerHp;
+        enemyHp = battle.bossHp;
+        enemyIntentAttack = battle.bossNextAttack;
+        turnCount = battle.turn;
+    }
+
+    private void HandleMatchResolution(PlayCardResponseDto result)
+    {
+        matchConcluding = true; // Lock all inputs
+
+        logs.Add(result.battle.status == "Won"
+            ? "🏆 VICTORY! The server confirmed your win."
+            : "💀 DEFEAT! The Shadow Overlord prevails.");
+
+        if (result.reward is { } reward)
+        {
+            logs.Add($"🪙 +{reward.goldEarned} gold, +{reward.experienceEarned} XP.");
+            // Sync the header with the balances the server just saved
+            State.UpdateRewards(reward.player.gold, reward.player.level);
+        }
+
+        // Reset match values and send player back to the main character panel
+        ResetMatch();
+        State.ChangeScreen(GameScreen.CharacterDashboard);
     }
 
     private async Task LaunchLeaderboardView()
@@ -452,6 +465,7 @@
 
     private void ResetMatch() 
     { 
+        battleId = Guid.Empty;
         playerHp = 100; 
         enemyHp = 120; // Matches your scaling max pool definition fields
         enemyIntentAttack = 15;
@@ -489,6 +503,39 @@
     }
 
     public class UploadResponse { public string avatarUrl { get; set; } = ""; }
+
+    public class BattleStateDto
+    {
+        public Guid id { get; set; }
+        public int playerHp { get; set; }
+        public int bossHp { get; set; }
+        public int bossNextAttack { get; set; }
+        public int turn { get; set; }
+        public string status { get; set; } = "";
+    }
+
+    public class BattleTurnDto
+    {
+        public int turn { get; set; }
+        public string cardName { get; set; } = "";
+        public int damageDealt { get; set; }
+        public int healthRestored { get; set; }
+        public int? bossDamage { get; set; }
+    }
+
+    public class BattleRewardDto
+    {
+        public int goldEarned { get; set; }
+        public int experienceEarned { get; set; }
+        public PlayerProfileDto player { get; set; } = new();
+    }
+
+    public class PlayCardResponseDto
+    {
+        public BattleStateDto battle { get; set; } = new();
+        public BattleTurnDto turnResult { get; set; } = new();
+        public BattleRewardDto? reward { get; set; }
+    }
 
     public class AuthResponseDto
     {

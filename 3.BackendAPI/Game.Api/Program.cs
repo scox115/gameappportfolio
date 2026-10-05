@@ -8,6 +8,10 @@ using RabbitMQ.Client;
 using Game.Api.Workers; // Add this using statement to register background workers
 using Game.Api.Options;
 using Game.Api.Auth;
+using Game.Api.Battles;
+using Game.Api.Messaging;
+using Game.Core.Battles;
+using System.Text.Json.Serialization;
 using Game.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -131,6 +135,14 @@ builder.Services.AddAuthorization();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<TokenService>();
 
+// --- ⚔️ SERVER-AUTHORITATIVE BATTLES ---
+builder.Services.AddSingleton<IBattleRandom, SystemBattleRandom>();
+builder.Services.AddSingleton<MatchTelemetryPublisher>();
+
+// Enums such as battle cards and status travel as readable strings ("DragonClaw", "Won").
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
 // --- ⚙️ REGISTER NATIVE WORKER RUNTIME LOOPS ---
 builder.Services.AddHostedService<MatchConsumerWorker>();
 
@@ -154,7 +166,7 @@ app.UseAuthorization();
 // --- MAP MINIMAL ENDPOINTS HERE ---
 app.MapAuthEndpoints();
 app.MapPlayerEndpoints();
-app.MapMatchEndpoints();
+app.MapBattleEndpoints();
 
 app.MapControllers();
 
