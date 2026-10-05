@@ -33,20 +33,20 @@ build_property.EnableCodeStyleSeverity =
 build_metadata.AdditionalFiles.TargetPath = QXBwLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/scott/Repos/GitHub/GamePortfolioSolution/4.Frontend/Game.Client/Pages/Counter.razor]
-build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ291bnRlci5yYXpvcg==
-build_metadata.AdditionalFiles.CssScope = 
-
-[C:/Users/scott/Repos/GitHub/GamePortfolioSolution/4.Frontend/Game.Client/Pages/Home.razor]
-build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSG9tZS5yYXpvcg==
+[C:/Users/scott/Repos/GitHub/GamePortfolioSolution/4.Frontend/Game.Client/Pages/Index.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW5kZXgucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/scott/Repos/GitHub/GamePortfolioSolution/4.Frontend/Game.Client/Pages/NotFound.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTm90Rm91bmQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/scott/Repos/GitHub/GamePortfolioSolution/4.Frontend/Game.Client/Pages/Weather.razor]
-build_metadata.AdditionalFiles.TargetPath = UGFnZXNcV2VhdGhlci5yYXpvcg==
+[C:/Users/scott/Repos/GitHub/GamePortfolioSolution/4.Frontend/Game.Client/Pages/PlayerProfile.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUGxheWVyUHJvZmlsZS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/scott/Repos/GitHub/GamePortfolioSolution/4.Frontend/Game.Client/Pages/PlayGame.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUGxheUdhbWUucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/scott/Repos/GitHub/GamePortfolioSolution/4.Frontend/Game.Client/_Imports.razor]

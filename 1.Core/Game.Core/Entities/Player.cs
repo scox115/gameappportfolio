@@ -8,6 +8,8 @@ public class Player
     public int ExperiencePoints { get; private set; }
     public int Level { get; private set; } = 1;
 
+    public string? AvatarUrl { get; private set; }
+
     // Parameterless constructor required by Entity Framework Core
     private Player() { }
 
@@ -17,6 +19,12 @@ public class Player
         Username = username;
         Gold = startingGold;
         ExperiencePoints = 0;
+    }
+
+    public void UpdateAvatar(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) throw new ArgumentException("URL cannot be empty.");
+        AvatarUrl = url;
     }
 
     public void AddGold(int amount)

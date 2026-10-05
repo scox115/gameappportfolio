@@ -1,0 +1,277 @@
+@page "/"
+@using Game.Client.Services
+@using System.Net.Http.Headers
+@inject GameState State
+@inject HttpClient Http
+@implements IDisposable
+
+<div class="game-client-shell"
+     style="background: #0f172a; min-height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #f8fafc;">
+    
+    <!-- HEADER BAR: PERMANENTLY DISPLAYS GAME IDENTITY & STATUS ONCE LOGGED IN -->
+    <div
+        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #334155; padding-bottom: 15px; margin-bottom: 25px;">
+        <h2 style="margin: 0; color: #818cf8; font-weight: 800; tracking: wide;">⚔️ KINGS OF THE CARD ARENA v1.0</h2>
+        
+        @if (State.CurrentScreen != GameScreen.LoginMenu)
+        {
+            <div
+                style="display: flex; align-items: center; gap: 20px; background: #1e293b; padding: 8px 20px; border-radius: 30px; border: 1px solid #475569;">
+                <img src="@(string.IsNullOrEmpty(State.AvatarUrl) ? "https://dicebear.com" + State.Username : State.AvatarUrl)"
+                     style="width: 35px; height: 35px; border-radius: 50%; border: 2px solid #818cf8; object-fit: cover;" />
+                <span style="font-weight: bold; color: #f1f5f9;">@State.Username</span>
+                <span style="color: #fbbf24; font-weight: bold;">🪙 @State.Gold</span>
+                <span
+                    style="background: #6366f1; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;">LVL
+                    @State.Level</span>
+                    <button @onclick="Logout"
+                            style="background: transparent; color: #94a3b8; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold;">Logout</button>
+                </div>
+            }
+        </div>
+
+        <!-- DYNAMIC CORE CLIENT SCREEN SWITCH -->
+        @switch (State.CurrentScreen)
+        {
+            case GameScreen.LoginMenu:
+                <!-- RENDERS LOGIN / ACCOUNT CREATION SIMULTANEOUSLY -->
+                <div
+                    style="max-width: 450px; margin: 60px auto; background: #1e293b; padding: 35px; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+                    <h3 style="text-align: center; margin-top: 0; color: #f1f5f9;">Enter the Realm</h3>
+                
+                    <div style="margin-bottom: 20px; margin-top: 25px;">
+                        <label
+                            style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Character
+                            Name:</label>
+                            <input type="text" @bind="inputUsername" placeholder="Enter Character name..."
+                                   style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
+                        </div>
+
+                        <div style="display: flex; gap: 15px;">
+                            <button @onclick="HandleLogin"
+                                    style="flex: 1; background: #4f46e5; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Play
+                                Game</button>
+                                <button @onclick="HandleRegister"
+                                        style="flex: 1; background: #059669; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Register</button>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(statusMsg))
+                            {
+                                <div
+                                    style="margin-top: 20px; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 0.9rem; background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2);">
+                                    @statusMsg
+                                </div>
+                            }
+                        </div>
+                        break;
+
+        case GameScreen.CharacterDashboard:
+                            <!-- RENDERS TOWN INVENTORY AND AVATAR FILE UPLOADER -->
+                            <div style="display: flex; gap: 30px; max-width: 1100px; margin: 0 auto;">
+                
+                                <!-- CHARACTER CARD BOX -->
+                                <div
+                                    style="flex: 1; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155; text-align: center;">
+                                    <img src="@(string.IsNullOrEmpty(State.AvatarUrl) ? "https://dicebear.com" + State.Username : State.AvatarUrl)"
+                                         style="width: 160px; height: 160px; border-radius: 50%; border: 4px solid #6366f1; object-fit: cover; background: #0f172a; margin-bottom: 15px;" />
+                                    <h2 style="margin: 0; color: #f1f5f9;">@State.Username</h2>
+                                    <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 5px;">Class: Full-Stack Sorcerer</p>
+                    
+                                    <button @onclick="() => State.ChangeScreen(GameScreen.BattleArena)"
+                                            style="width: 100%; background: #dc2626; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(220,38,38,0.3);">
+                                        ⚔️ LAUNCH BATTLE ARENA
+                                    </button>
+                                </div>
+
+                                <!-- CLOUD UPLOADER BOX -->
+                                <div
+                                    style="flex: 1.5; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <h4 style="margin-top: 0; color: #f1f5f9; font-size: 1.2rem;">🛡️ Hero Customization</h4>
+                                        <p style="color: #94a3b8; font-size: 0.9rem; line-height: 1.5;">Upload a custom image file to set your
+                                            portrait banner card. This streams bytes directly to Azurite Cloud Storage emulation over port
+                                            10000.</p>
+                        
+                                            <div
+                                                style="border: 2px dashed #475569; padding: 25px; border-radius: 12px; text-align: center; margin-top: 20px; background: #0f172a;">
+                                                <InputFile OnChange="HandleFileSelected" accept=".png,.jpg,.jpeg" style="color: #94a3b8;" />
+                                            </div>
+                                        </div>
+
+                                        <button @onclick="ExecuteAvatarUpload" disabled="@(selectedFile == null || uploading)"
+                                                style="width: 100%; background: #6366f1; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 20px;">
+                                            @(uploading ? "Uploading Binary Blocks..." : "Commit Image to Cloud Storage")
+                                        </button>
+                                    </div>
+
+                                </div>
+                                break;
+
+        case GameScreen.BattleArena:
+                                    <!-- RENDERS THE INTERACTIVE TURN-BASED COMBAT GAME CANVAS -->
+                                    <div
+                                        style="max-width: 900px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                                            <h3 style="margin: 0; color: #ef4444;">😈 Boss: The Shadow Overlord</h3>
+                                            <div style="font-size: 1.2rem; font-weight: bold;">
+                                                <span style="color: #ef4444; margin-right: 20px;">Boss HP: @enemyHp</span>
+                                                <span style="color: #3b82f6;">Your HP: @playerHp</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- COMBAT EVENTS LOGGER FEED -->
+                                        <div
+                                            style="height: 180px; background: #0f172a; border-radius: 8px; padding: 15px; overflow-y: auto; border: 1px solid #334155; font-family: monospace; color: #94a3b8; margin-bottom: 25px; line-height: 1.6;">
+                                            @foreach (var log in logs)
+                                            {
+                                                <div>@log</div>
+                                            }
+                                        </div>
+
+                                        <!-- DECK ACTION HAND CARD PANELS -->
+                                        <div style="display: flex; justify-content: center; gap: 15px;">
+                                            <button @onclick='() => PlayTurn("Fireball", 20, 0)'
+                                                    style="background: #ea580c; width: 140px; height: 100px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: pointer;">🔥
+                                                Fireball<br /><small>20 DMG</small></button>
+                                                <button @onclick='() => PlayTurn("Holy Shield", 0, 15)'
+                                                        style="background: #2563eb; width: 140px; height: 100px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: pointer;">🛡️
+                                                    Shield<br /><small>15 HEAL</small></button>
+                                                    <button @onclick='() => PlayTurn("Dragon Claw", 35, 0)'
+                                                            style="background: #7c3aed; width: 140px; height: 100px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: pointer;">🐉
+                                                        Dragon Fury<br /><small>35 DMG</small></button>
+                                                    </div>
+                                                </div>
+                                                break;
+                                            }
+                                        </div>
+
+@code {
+    private string inputUsername = string.Empty;
+    private string statusMsg = string.Empty;
+    private bool uploading = false;
+    private IBrowserFile? selectedFile;
+
+    // Arena State
+    private int playerHp = 100;
+    private int enemyHp = 100;
+    private List<string> logs = new() { "⚔️ Match Initialized. Select an action card block." };
+
+    protected override void OnInitialized() => State.OnStateChanged += StateHasChanged;
+
+    private async Task HandleLogin()
+    {
+        if (string.IsNullOrWhiteSpace(inputUsername)) return;
+        try
+        {
+            var res = await Http.PostAsJsonAsync("/api/players/login", new { Username = inputUsername });
+            if (res.IsSuccessStatusCode)
+            {
+                var profile = await res.Content.ReadFromJsonAsync<PlayerProfileDto>();
+                if (profile != null) State.SetPlayerSession(profile.id, profile.username, profile.gold, profile.level, profile.avatarUrl);
+            }
+            else statusMsg = "Character profile entry not found.";
+        }
+        catch { statusMsg = "API Network Link Offline."; }
+    }
+
+    private async Task HandleRegister()
+    {
+        if (string.IsNullOrWhiteSpace(inputUsername)) return;
+        try
+        {
+            var res = await Http.PostAsJsonAsync("/api/players", new { Username = inputUsername });
+            if (res.IsSuccessStatusCode) statusMsg = "Hero Registered! Click Play Game to log in.";
+            else statusMsg = "Username already claimed inside database.";
+        }
+        catch { statusMsg = "API Network Link Offline."; }
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e) => selectedFile = e.File;
+
+    private async Task ExecuteAvatarUpload()
+    {
+        if (selectedFile == null) return;
+        try
+        {
+            uploading = true;
+            using var content = new MultipartFormDataContent();
+            var fileStream = selectedFile.OpenReadStream(maxAllowedSize: 1024 * 1024 * 5);
+            var streamContent = new StreamContent(fileStream);
+            streamContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType);
+            content.Add(streamContent, "File", selectedFile.Name);
+
+            var res = await Http.PostAsync($"/api/players/{State.PlayerId}/avatar", content);
+            if (res.IsSuccessStatusCode)
+            {
+                var result = await res.Content.ReadFromJsonAsync<UploadResponse>();
+                if (result != null) State.UpdateAvatar(result.avatarUrl);
+                selectedFile = null;
+            }
+        }
+        finally { uploading = false; }
+    }
+
+    private async Task PlayTurn(string name, int dmg, int heal)
+    {
+        if (dmg > 0) { enemyHp -= dmg; logs.Add($"» You cast {name} dealing {dmg} DMG."); }
+        if (heal > 0) { playerHp = Math.Min(100, playerHp + heal); logs.Add($"» You use {name} recovering {heal} HP."); }
+
+        if (enemyHp <= 0)
+        {
+            logs.Add("🏆 VICTORY! Submitting scorecard to Native RabbitMQ Background worker...");
+            StateHasChanged();
+            await Task.Delay(2000);
+            
+            // Fire match history transaction down to backend queue pipes
+            await Http.PostAsJsonAsync("/api/matches/complete", new { WinnerPlayerId = State.PlayerId, LoserPlayerId = Guid.NewGuid() });
+            
+            // Instantly pull newly awarded calculations out of database
+            var refresh = await Http.GetFromJsonAsync<PlayerProfileDto>($"/api/players/{State.PlayerId}");
+            if (refresh != null) State.UpdateRewards(refresh.gold, refresh.level);
+
+            ResetMatch();
+            State.ChangeScreen(GameScreen.CharacterDashboard);
+            return;
+        }
+
+        // AI turn counter attack logic
+        playerHp -= 15;
+        logs.Add("💥 Enemy Boss strikes back dealing 15 damage.");
+
+        if (playerHp <= 0)
+        {
+            logs.Add("💀 DEFEAT! Match recorded.");
+            StateHasChanged();
+            await Task.Delay(2000);
+            await Http.PostAsJsonAsync("/api/matches/complete", new { WinnerPlayerId = Guid.NewGuid(), LoserPlayerId = State.PlayerId });
+            ResetMatch();
+            State.ChangeScreen(GameScreen.CharacterDashboard);
+        }
+    }
+
+    private void ResetMatch() { playerHp = 100; enemyHp = 100; logs = new() { "⚔️ Match Initialized." }; }
+    private void Logout() => State.ChangeScreen(GameScreen.LoginMenu);
+
+    // --- FIXED DISPOSE SIGNATURE TO MATCH INTERFACE RULES ---
+    void IDisposable.Dispose() => State.OnStateChanged -= StateHasChanged;
+
+    public class PlayerProfileDto 
+    { 
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        public Guid id { get; set; } 
+
+        [System.Text.Json.Serialization.JsonPropertyName("username")]
+        public string username { get; set; } = ""; 
+
+        [System.Text.Json.Serialization.JsonPropertyName("gold")]
+        public int gold { get; set; } 
+
+        [System.Text.Json.Serialization.JsonPropertyName("level")]
+        public int level { get; set; } 
+
+        [System.Text.Json.Serialization.JsonPropertyName("avatarUrl")]
+        public string? avatarUrl { get; set; } 
+    }
+
+    public class UploadResponse { public string avatarUrl { get; set; } = ""; }
+}

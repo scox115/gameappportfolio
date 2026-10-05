@@ -3,13 +3,14 @@ using Game.Core.Entities;
 using Game.Core.Interfaces;
 using Game.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Game.Api.Endpoints;
 
 public static class PlayerEndpoints
 {
+    // TODO: move this
+    // 1. Declare a typed form container at the bottom of the file or in your Models folder
     private class AvatarUploadModel
     {
         [FromForm]
@@ -58,40 +59,88 @@ public static class PlayerEndpoints
             });
         });
 
-        // GET Endpoint: Fetch a specific player by ID
+        // GET Endpoint: Retrieve a Player by ID
         group.MapGet("/{id:guid}", async (Guid id, AppDbContext dbContext) =>
         {
             var player = await dbContext.Players.FindAsync(id);
 
             return player is not null 
-                ? Results.Ok(player) 
+                ? Results.Ok(new 
+                {
+                    id = player.Id,
+                    username = player.Username,
+                    gold = player.Gold,
+                    level = player.Level,
+                    experiencePoints = player.ExperiencePoints,
+                    avatarUrl = player.AvatarUrl // --- INCLUDE THIS FIELD IN THE JSON RETURN ---
+                }) 
                 : Results.NotFound($"Player with ID {id} was not found.");
         });
-    
-        // 1. Declare a typed form container at the bottom of the file or in your Models folder
-
-
-        // 2. Update the Minimal API routing signature
+            
+        // POST Endpoint: Upload a Player Avatar
         group.MapPost("/{id:guid}/avatar", async (
             Guid id, 
-            [FromForm] AvatarUploadModel model, // Maps the incoming multipart context parameters explicitly
+            [FromForm] AvatarUploadModel model, 
+            AppDbContext dbContext,
             IStorageService storageService) =>
         {
-            // Validate the encapsulated file payload instance safely
-            if (model?.File is null || model.File.Length == 0)
+            // Check if the player exists in the SQL database first
+            var player = await dbContext.Players.FindAsync(id);
+            if (player is null) 
             {
-                return Results.BadRequest("Invalid file upload package. Ensure an asset is attached.");
+                return Results.NotFound("Player profile not found.");
             }
 
-            // Open an execution byte read stream on the verified file asset
+            // Double check that a physical file was attached
+            if (model?.File is null || model.File.Length == 0)
+            {
+                return Results.BadRequest("Invalid upload request. File content is missing.");
+            }
+
+            // --- 🚀 THE CRITICAL PIECE: OPEN THE ACTUAL FILE FILE STREAM ---
+            // This reads the raw binary image bytes from the browser upload request
             using var stream = model.File.OpenReadStream();
 
-            // Stream the asset blocks directly to the local Azurite container storage disk
-            var fileUrl = await storageService.UploadFileAsync(stream, model.File.FileName, "player-avatars");
+            // Pass the raw byte stream and file name to the Azurite SDK client
+            // This physically saves the image inside your active Azurite Docker container
+            var uploadedBlobUrl = await storageService.UploadFileAsync(stream, model.File.FileName, "player-avatars");
 
-            // Return the successful cloud pointer URL link payload receipt
-            return Results.Ok(new { PlayerId = id, AvatarUrl = fileUrl });
+            // Save the resulting cloud address string back to our SQL database row
+            player.UpdateAvatar(uploadedBlobUrl);
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new { PlayerId = id, AvatarUrl = uploadedBlobUrl });
         })
-        .DisableAntiforgery(); // Bypasses anti-forgery token tracking verification steps for testing
+        .DisableAntiforgery();
+
+        // POST: /api/players/login
+        group.MapPost("/login", async (LoginRequest request, AppDbContext dbContext) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Username))
+            {
+                return Results.BadRequest("Username field cannot be left blank.");
+            }
+
+            // Use EF.Functions.Like to enforce a true case-insensitive lookup inside SQL Server
+            var player = await dbContext.Players
+                .FirstOrDefaultAsync(p => EF.Functions.Like(p.Username, request.Username));
+
+            if (player is null)
+            {
+                return Results.NotFound($"No character profile named '{request.Username}' was found.");
+            }
+
+            // Return the response data contract with exact property casing matching your Blazor DTOs
+            return Results.Ok(new 
+            {
+                id = player.Id,
+                username = player.Username,
+                gold = player.Gold,
+                level = player.Level,
+                avatarUrl = player.AvatarUrl
+            });
+        });
     }
 }
+
+public record LoginRequest(string Username);

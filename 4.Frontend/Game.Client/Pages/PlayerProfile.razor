@@ -1,0 +1,197 @@
+@page "/profile/{PlayerId:guid}"
+@using System.Net.Http.Headers
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Game Profile</PageTitle>
+
+<div class="profile-container" style="max-width: 500px; margin: 30px auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; font-family: sans-serif; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+    
+    @if (loading)
+    {
+        <p style="text-align: center; color: #4a5568;">Loading player profile details...</p>
+    }
+    else if (player == null)
+    {
+        <div style="color: #e53e3e; text-align: center; font-weight: bold;">@statusMessage</div>
+    }
+    else
+    {
+        <div style="text-align: center; margin-bottom: 20px;">
+            <!-- Render the dynamic Avatar URL from Azurite or a generic fallback profile card icon -->
+            <img src="@(string.IsNullOrEmpty(avatarUrl) ? "https://dicebear.com" + player.Username : avatarUrl)" 
+                 alt="Player Avatar" 
+                 style="width: 120px; height: 120px; border-radius: 50%; border: 3px solid #512bd4; object-fit: cover; background: #f7fafc;" />
+            
+            <h2 style="margin: 10px 0 5px 0; color: #1a202c;">@player.Username</h2>
+            <span style="background: #e9d5ff; color: #512bd4; padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; font-weight: bold;">
+                Level @player.Level
+            </span>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+
+        <div style="display: flex; justify-content: space-around; margin-bottom: 25px; text-align: center;">
+            <div>
+                <p style="margin: 0; color: #718096; font-size: 0.9rem;">Gold Reserves</p>
+                <h4 style="margin: 5px 0 0 0; color: #d69e2e; font-size: 1.4rem;">🪙 @player.Gold</h4>
+            </div>
+            <div>
+                <p style="margin: 0; color: #718096; font-size: 0.9rem;">Experience</p>
+                <h4 style="margin: 5px 0 0 0; color: #2b6cb0; font-size: 1.4rem;">⭐ @player.ExperiencePoints XP</h4>
+            </div>
+        </div>
+
+        <!-- ENTER GAME FIELD BUTTON -->
+        <div style="margin: 20px 0; text-align: center;">
+            <button @onclick="LaunchBattleArena" 
+                    style="width: 100%; background: #e53e3e; color: white; padding: 12px 15px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(229,62,62,0.4); transition: transform 0.1s;">
+                ⚔️ Enter Battle Arena Arena
+            </button>
+        </div>
+
+        <!-- FILE UPLOAD ENGINE WIDGET -->
+        <div style="background: #f7fafc; padding: 15px; border-radius: 8px; border: 1px dashed #cbd5e0;">
+            <label style="display: block; font-weight: bold; margin-bottom: 8px; color: #4a5568; font-size: 0.9rem;">
+                Upload Custom Avatar Image:
+            </label>
+            
+            <InputFile OnChange="HandleFileSelected" accept=".png,.jpg,.jpeg" style="font-size: 0.9rem; margin-bottom: 10px; display: block; width: 100%;" />
+
+            <button @onclick="UploadAvatar" 
+                    disabled="@(selectedFile == null || uploading)" 
+                    style="width: 100%; background: #512bd4; color: white; padding: 8px 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s;"
+                    onmouseover="this.style.background='#4322b0'" 
+                    onmouseout= "this.style.background='#512bd4'">
+                @(uploading ? "Uploading to Cloud..." : "Commit Image Upload")
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div style="margin-top: 15px; padding: 10px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; text-align: center;
+                        background: @(isError ? "#fff5f5" : "#f0fff4"); color: @(isError ? "#c53030" : "#2f855a"); border: 1px solid @(isError ? "#feb2b2" : "#c6f6d5");">
+                @statusMessage
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid PlayerId { get; set; }
+
+    private bool loading = true;
+    private bool uploading = false;
+    private bool isError = false;
+    private string statusMessage = string.Empty;
+    private string avatarUrl = string.Empty;
+    
+    private PlayerProfileDto? player;
+    private IBrowserFile? selectedFile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await FetchProfileData();
+    }
+
+    private async Task FetchProfileData()
+    {
+        try
+        {
+            loading = true;
+            player = await Http.GetFromJsonAsync<PlayerProfileDto>($"/api/players/{PlayerId}");
+
+            // --- MAP THE PERMANENT DATABASE LINK ON PAGE LOAD ---
+            avatarUrl = player?.AvatarUrl ?? string.Empty; 
+            
+            statusMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            isError = true;
+            statusMessage = $"Failed to fetch character sheet profile metadata: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        statusMessage = $"Selected file: {selectedFile.Name} ready for delivery.";
+        isError = false;
+    }
+
+    private async Task UploadAvatar()
+    {
+        if (selectedFile == null) return;
+
+        try
+        {
+            uploading = true;
+            statusMessage = "Streaming file chunks directly to backend api boundaries...";
+            isError = false;
+
+            // 1. Construct standard browser-native multipart form stream payloads
+            using var content = new MultipartFormDataContent();
+            var fileStream = selectedFile.OpenReadStream(maxAllowedSize: 1024 * 1024 * 5); // 5MB Limit cap validation
+            var streamContent = new StreamContent(fileStream);
+            
+            // Explicitly pass content-type header context elements to match form binding properties
+            streamContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType);
+            content.Add(streamContent, "File", selectedFile.Name);
+
+            // 2. Transmit the multipart package payload over HTTP to our Minimal API endpoint
+            var response = await Http.PostAsync($"/api/players/{PlayerId}/avatar", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<UploadResponseDto>();
+                avatarUrl = result?.AvatarUrl ?? string.Empty;
+                
+                isError = false;
+                statusMessage = "Image uploaded successfully to your local Azurite cloud emulator!";
+                selectedFile = null;
+            }
+            else
+            {
+                isError = true;
+                var rawError = await response.Content.ReadAsStringAsync();
+                statusMessage = $"Upload pipeline rejected: {rawError}";
+            }
+        }
+        catch (Exception ex)
+        {
+            isError = true;
+            statusMessage = $"Network interaction exception thrown: {ex.Message}";
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private void LaunchBattleArena()
+    {
+        Navigation.NavigateTo($"/play/{PlayerId}");
+    }
+
+    // Lightweight data blueprints to safely serialize JSON network communication blocks
+    public class PlayerProfileDto
+    {
+        public Guid Id { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public int Gold { get; set; }
+        public int Level { get; set; }
+        public int ExperiencePoints { get; set; }
+        public string? AvatarUrl { get; set; }
+    }
+
+    public class UploadResponseDto
+    {
+        public Guid PlayerId { get; set; }
+        public string AvatarUrl { get; set; } = string.Empty;
+    }
+}

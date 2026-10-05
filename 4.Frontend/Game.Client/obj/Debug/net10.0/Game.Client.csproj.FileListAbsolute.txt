@@ -207,9 +207,6 @@ C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Deb
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\icudt_EFIGS.tptq2av103.dat
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\icudt_no_CJK.lfu7j35m59.dat
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Microsoft.DotNet.HotReload.WebAssembly.Browser.mboztfuody.wasm
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Game.Client.0dtrhwegq7.wasm
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Game.Client.b8iz2iaan1.pdb
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\dotnet.5x19xcq9fh.js
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\blazor.webassembly.w3qd1tpl0e.js.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Microsoft.AspNetCore.Authorization.k17bz9ghvf.wasm.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Microsoft.AspNetCore.Components.aimal0hppb.wasm.gz
@@ -418,9 +415,6 @@ C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Deb
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\icudt_EFIGS.tptq2av103.dat.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\icudt_no_CJK.lfu7j35m59.dat.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Microsoft.DotNet.HotReload.WebAssembly.Browser.mboztfuody.wasm.gz
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Game.Client.0dtrhwegq7.wasm.gz
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Game.Client.b8iz2iaan1.pdb.gz
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\dotnet.5x19xcq9fh.js.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\Game.Client.staticwebassets.runtime.json
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\Game.Client.staticwebassets.endpoints.json
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\Game.Client.dll
@@ -900,7 +894,6 @@ C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Deb
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\yf69jnyubo-{0}-1a04cp842c-1a04cp842c.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\e3wqh92dqb-{0}-63fj8s7r0e-63fj8s7r0e.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\a2wrlfjpd6-{0}-ewbsjli576-ewbsjli576.gz
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\f7a3uaxk21-{0}-iag0ou56lh-iag0ou56lh.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\04ulikurb2-{0}-w3qd1tpl0e-w3qd1tpl0e.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\sp74am3xl8-{0}-z7pfpnxh80-z7pfpnxh80.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\2w5o21c4lo-{0}-z7pfpnxh80-z7pfpnxh80.gz
@@ -1111,10 +1104,6 @@ C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Deb
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\e7x8l7hq67-{0}-tptq2av103-tptq2av103.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\ylwvvf426o-{0}-lfu7j35m59-lfu7j35m59.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\whued4tqdy-{0}-mboztfuody-mboztfuody.gz
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\o4jzjgsjhn-{0}-0dtrhwegq7-0dtrhwegq7.gz
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\2k14m3jecu-{0}-b8iz2iaan1-b8iz2iaan1.gz
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\1s5lciulet-{0}-5x19xcq9fh-5x19xcq9fh.gz
-C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\ul4rjw0my3-{0}-jqziy2v3do-jqziy2v3do.gz
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\staticwebassets.build.json
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\staticwebassets.build.json.cache
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\staticwebassets.development.json
@@ -1125,3 +1114,13 @@ C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Deb
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\refint\Game.Client.dll
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\Game.Client.pdb
 C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\ref\Game.Client.dll
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Game.Client.8v4fzuonb7.wasm
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Game.Client.8duv27b5ji.pdb
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\dotnet.c18cekt4ih.js
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Game.Client.8v4fzuonb7.wasm.gz
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\Game.Client.8duv27b5ji.pdb.gz
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\bin\Debug\net10.0\wwwroot\_framework\dotnet.c18cekt4ih.js.gz
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\o4jzjgsjhn-{0}-8v4fzuonb7-8v4fzuonb7.gz
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\2k14m3jecu-{0}-8duv27b5ji-8duv27b5ji.gz
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\1s5lciulet-{0}-c18cekt4ih-c18cekt4ih.gz
+C:\Users\scott\Repos\GitHub\GamePortfolioSolution\4.Frontend\Game.Client\obj\Debug\net10.0\compressed\ul4rjw0my3-{0}-9cpu45313w-9cpu45313w.gz

@@ -1,0 +1,183 @@
+@page "/play/{PlayerId:guid}"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Battle Arena - Card Strategy</PageTitle>
+
+<div class="game-arena" style="background: #1a202c; min-height: 100vh; padding: 20px; color: white; font-family: sans-serif;">
+    
+    <!-- TOP BAR: ARENA STATUS -->
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4a5568; padding-bottom: 10px; margin-bottom: 20px;">
+        <h3>⚔️ Battle Arena</h3>
+        <div>
+            <span style="background: #e53e3e; padding: 5px 15px; border-radius: 4px; font-weight: bold; margin-right: 15px;">
+                Enemy Health: @enemyHealth HP
+            </span>
+            <span style="background: #3182ce; padding: 5px 15px; border-radius: 4px; font-weight: bold;">
+                Your Health: @playerHealth HP
+            </span>
+        </div>
+    </div>
+
+    @if (gameEnded)
+    {
+        <!-- MATCH FINISHED SCREEN -->
+        <div style="text-align: center; margin: 100px auto; max-width: 500px; background: #2d3748; padding: 4px; padding: 40px; border-radius: 12px; border: 3px solid @(playerHealth > 0 ? "#48bb78" : "#e53e3e");">
+            <h1 style="color: @(playerHealth > 0 ? "#48bb78" : "#e53e3e")">
+                @(playerHealth > 0 ? "🏆 VICTORY!" : "💀 DEFEAT")
+            </h1>
+            <p style="font-size: 1.2rem; margin: 20px 0;">
+                @(playerHealth > 0 
+                    ? "You defeated the enemy! Match history submitted to the RabbitMQ queue backend." 
+                    : "The enemy defeated you. Try upgrading your deck capabilities.")
+            </p>
+            <button @onclick="ReturnToProfile" style="background: #512bd4; color: white; padding: 12px 30px; border: none; border-radius: 6px; font-size: 1.1rem; font-weight: bold; cursor: pointer;">
+                Return to Character Profile
+            </button>
+        </div>
+    }
+    else
+    {
+        <!-- ACTIVE GAMEBOARD LAYOUT -->
+        <div style="display: flex; flex-direction: column; justify-content: space-between; height: 75vh;">
+            
+            <!-- ENEMY FIELD RENDER -->
+            <div style="text-align: center; background: rgba(229, 62, 62, 0.1); padding: 20px; border-radius: 8px; border: 1px solid #e53e3e;">
+                <h4 style="margin: 0 0 10px 0; color: #fc8181;">The Shadow Overlord (AI Boss)</h4>
+                <div style="font-size: 0.9rem; color: #cbd5e0;">Intent: Preparing a heavy @enemyIntentAttack damage strike!</div>
+            </div>
+
+            <!-- BATTLE LOG STATUS CHAT -->
+            <div style="height: 150px; background: #10141d; border-radius: 6px; padding: 15px; overflow-y: auto; border: 1px solid #4a5568; font-family: monospace; color: #a0aec0;">
+                <div style="color: #48bb78; font-weight: bold;">[System] Match started. Select a card from your hand to attack or defend.</div>
+                @foreach (var log in combatLogs)
+                {
+                    <div>@log</div>
+                }
+            </div>
+
+            <!-- PLAYER HAND SELECTION DECK -->
+            <div>
+                <h4 style="margin: 0 0 10px 0; color: #63b3ed; text-align: center;">Your Action Deck Hand (Click a card to play it)</h4>
+                <div style="display: flex; justify-content: center; gap: 15px;">
+                    @foreach (var card in playerHand)
+                    {
+                        <div @onclick="() => PlayCard(card)" 
+                             class="game-card"
+                             style="width: 130px; height: 180px; background: #2b6cb0; border-radius: 8px; padding: 12px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; border: 2px solid #63b3ed; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s;">
+                            <div style="font-weight: bold; font-size: 1.1rem; text-align: center;">@card.Name</div>
+                            <div style="font-size: 2.2rem; text-align: center;">@card.Icon</div>
+                            <div style="font-size: 0.85rem; text-align: center; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 4px;">
+                                @card.Description
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid PlayerId { get; set; }
+
+    private int playerHealth = 100;
+    private int enemyHealth = 80;
+    private int enemyIntentAttack = 12;
+    private bool gameEnded = false;
+    private List<string> combatLogs = new();
+    private List<CardInstance> playerHand = new();
+
+    protected override Task OnInitializedAsync()
+    {
+        InitializeDeckHand();
+        return Task.CompletedTask;
+    }
+
+    private void InitializeDeckHand()
+    {
+        playerHand = new List<CardInstance>
+        {
+            new("Fireball Strike", "🔥", 18, 0, "Deal 18 Damage"),
+            new("Holy Shield", "🛡️", 0, 15, "Gain 15 Block Shield"),
+            new("Life Drain", "⚡", 10, 5, "Deal 10, Heal 5 HP"),
+            new("Dragon Fury", "🐉", 25, 0, "Deal 25 massive Damage")
+        };
+    }
+
+    private async Task PlayCard(CardInstance card)
+    {
+        if (gameEnded) return;
+
+        // 1. Process player card move effects
+        if (card.Damage > 0)
+        {
+            enemyHealth -= card.Damage;
+            combatLogs.Add($"» You cast {card.Name} dealing {card.Damage} damage to the enemy!");
+        }
+        if (card.Heal > 0)
+        {
+            playerHealth = Math.Min(100, playerHealth + card.Heal);
+            combatLogs.Add($"» You active {card.Name} and regenerate {card.Heal} health points.");
+        }
+
+        // Check if enemy died
+        if (enemyHealth <= 0)
+        {
+            enemyHealth = 0;
+            combatLogs.Add("🎉 The Shadow Overlord has been defeated!");
+            await ConcludeGameMatch(isVictory: true);
+            return;
+        }
+
+        // 2. Enemy AI Turn Retaliation strike attack
+        playerHealth -= enemyIntentAttack;
+        combatLogs.Add($"💥 Enemy retaliates with shadow slice dealing {enemyIntentAttack} damage to you!");
+
+        // Dynamic change next turn enemy target values
+        var random = new Random();
+        enemyIntentAttack = random.Next(10, 22);
+
+        // Check if player died
+        if (playerHealth <= 0)
+        {
+            playerHealth = 0;
+            combatLogs.Add("❌ You have collapsed in battle.");
+            await ConcludeGameMatch(isVictory: false);
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task ConcludeGameMatch(bool isVictory)
+    {
+        gameEnded = true;
+
+        try
+        {
+            // Dummy user ID representing our AI enemy profile row entries
+            var enemyBossId = Guid.NewGuid(); 
+            
+            // Map the match reward outcomes based on victory state parameters
+            var winnerId = isVictory ? PlayerId : enemyBossId;
+            var loserId = isVictory ? enemyBossId : PlayerId;
+
+            var payload = new { WinnerPlayerId = winnerId, LoserPlayerId = loserId };
+            
+            // 🚀 FIRE MATCH RESOLUTION DIRECTLY TO THE FREE RABBITMQ PIPELINE
+            await Http.PostAsJsonAsync("/api/matches/complete", payload);
+        }
+        catch (Exception ex)
+        {
+            combatLogs.Add($"[Error] Could not submit score data payload packages: {ex.Message}");
+        }
+    }
+
+    private void ReturnToProfile()
+    {
+        Navigation.NavigateTo($"/profile/{PlayerId}");
+    }
+
+    public record CardInstance(string Name, string Icon, int Damage, int Heal, string Description);
+}
