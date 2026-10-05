@@ -45,6 +45,12 @@ dotnet run --project 4.Frontend/Game.Client --launch-profile http    # client on
 
 The API applies EF Core migrations on startup. Create a hero with **Register** (passwords need 8+ characters with upper case, lower case, a digit and a symbol). In Swagger (`/swagger`), call `/api/auth/login`, then paste the `accessToken` into **Authorize** to try the protected endpoints.
 
+### Trying PvP
+
+From the town screen, **Find an Opponent** puts you in the lobby. To play both sides yourself, register two heroes and sign in with each in separate browser windows (one of them private/incognito, so they don't share a session). Moves travel over the SignalR hub at `/hubs/arena`. Each turn has a 30-second timer; a player who runs out of time, or leaves, loses.
+
+The lobby queue is kept in the API's memory, so it assumes one API instance. Scaling out needs a shared queue and an Azure SignalR Service backplane.
+
 ## Where settings live
 
 | Setting | Base (`appsettings.json`) | Development | Secret? |
