@@ -14,8 +14,10 @@ var apiBaseAddress = string.IsNullOrWhiteSpace(apiBaseUrl)
     ? new Uri(builder.HostEnvironment.BaseAddress)
     : new Uri(apiBaseUrl);
 
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = apiBaseAddress });
-
 builder.Services.AddScoped<GameState>();
+builder.Services.AddScoped(sp => new HttpClient(new AuthTokenHandler(sp.GetRequiredService<GameState>()))
+{
+    BaseAddress = apiBaseAddress
+});
 
 await builder.Build().RunAsync();

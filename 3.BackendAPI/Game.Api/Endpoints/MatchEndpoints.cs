@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Game.Api.Auth;
 using Game.Core.Entities;
 using Game.Core.Events;
 using Game.Core.Services; // Brings in MatchRulesEngine!
@@ -18,11 +20,15 @@ public static class MatchEndpoints
 
     public static void MapMatchEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/matches").WithTags("Matches");
+        // Only signed-in players can report match results.
+        var group = app.MapGroup("/api/matches")
+                       .WithTags("Matches")
+                       .RequireAuthorization();
 
         // PvP: both participants are registered players.
         group.MapPost("/complete", async (
             CompleteMatchRequest request,
+            ClaimsPrincipal user,
             AppDbContext dbContext,
             IConnectionFactory connectionFactory) =>
         {
@@ -34,6 +40,13 @@ public static class MatchEndpoints
             if (request.WinnerPlayerId == request.LoserPlayerId)
             {
                 return Results.BadRequest("Winner and loser must be different players. Use /api/matches/pve/complete for boss fights.");
+            }
+
+            // A player can only report a match they took part in.
+            var callerId = user.GetPlayerId();
+            if (callerId != request.WinnerPlayerId && callerId != request.LoserPlayerId)
+            {
+                return Results.Forbid();
             }
 
             var winner = await dbContext.Players.FindAsync(request.WinnerPlayerId);
@@ -57,15 +70,12 @@ public static class MatchEndpoints
         // PvE: a registered player against an AI boss that has no Player row.
         group.MapPost("/pve/complete", async (
             CompletePveMatchRequest request,
+            ClaimsPrincipal user,
             AppDbContext dbContext,
             IConnectionFactory connectionFactory) =>
         {
-            if (request.PlayerId == Guid.Empty)
-            {
-                return Results.BadRequest("Player ID cannot be empty.");
-            }
-
-            var player = await dbContext.Players.FindAsync(request.PlayerId);
+            // The player is whoever is signed in; the request can't name someone else.
+            var player = await dbContext.Players.FindAsync(user.GetPlayerId());
             if (player is null) return Results.NotFound("Player profile entry missing.");
 
             var match = GameMatch.CreatePve(player.Id);
@@ -121,4 +131,4 @@ public static class MatchEndpoints
 
 public record CompleteMatchRequest(Guid WinnerPlayerId, Guid LoserPlayerId);
 
-public record CompletePveMatchRequest(Guid PlayerId, bool IsVictory);
+public record CompletePveMatchRequest(bool IsVictory);

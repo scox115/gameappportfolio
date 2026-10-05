@@ -1,5 +1,6 @@
 @page "/"
 @using Game.Client.Services
+@using System.Net
 @using System.Net.Http.Headers
 @inject GameState State
 @inject HttpClient Http
@@ -50,7 +51,14 @@
                         <label
                             style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Character
                             Name:</label>
-                            <input type="text" @bind="inputUsername" placeholder="Enter Character name..."
+                            <input type="text" @bind="inputUsername" placeholder="Enter Character name..." autocomplete="username"
+                                   style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
+                        </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <label
+                            style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Password:</label>
+                            <input type="password" @bind="inputPassword" placeholder="At least 8 characters..." autocomplete="current-password"
                                    style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
                         </div>
 
@@ -62,11 +70,11 @@
                                         style="flex: 1; background: #059669; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Register</button>
                             </div>
 
-                            @if (!string.IsNullOrEmpty(statusMsg))
+                            @if (!string.IsNullOrEmpty(statusMsg) || !string.IsNullOrEmpty(State.SignOutReason))
                             {
                                 <div
                                     style="margin-top: 20px; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 0.9rem; background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2);">
-                                    @statusMsg
+                                    @(string.IsNullOrEmpty(statusMsg) ? State.SignOutReason : statusMsg)
                                 </div>
                             }
                         </div>
@@ -210,6 +218,7 @@
 
 @code {
     private string inputUsername = string.Empty;
+    private string inputPassword = string.Empty;
     private string statusMsg = string.Empty;
     private bool uploading = false;
     private IBrowserFile? selectedFile;
@@ -231,30 +240,62 @@
 
     private async Task HandleLogin()
     {
-        if (string.IsNullOrWhiteSpace(inputUsername)) return;
+        if (string.IsNullOrWhiteSpace(inputUsername) || string.IsNullOrEmpty(inputPassword)) return;
         try
         {
-            var res = await Http.PostAsJsonAsync("/api/players/login", new { Username = inputUsername });
+            var res = await Http.PostAsJsonAsync("/api/auth/login", new { Username = inputUsername, Password = inputPassword });
             if (res.IsSuccessStatusCode)
             {
-                var profile = await res.Content.ReadFromJsonAsync<PlayerProfileDto>();
-                if (profile != null) State.SetPlayerSession(profile.id, profile.username, profile.gold, profile.level, profile.avatarUrl);
+                await StartSession(res);
             }
-            else statusMsg = "Character profile entry not found.";
+            else statusMsg = res.StatusCode switch
+            {
+                HttpStatusCode.Unauthorized => "Wrong character name or password.",
+                HttpStatusCode.Locked => "Too many failed attempts. Try again in a few minutes.",
+                _ => "Sign-in failed. Please try again."
+            };
         }
         catch { statusMsg = "API Network Link Offline."; }
     }
 
     private async Task HandleRegister()
     {
-        if (string.IsNullOrWhiteSpace(inputUsername)) return;
+        if (string.IsNullOrWhiteSpace(inputUsername) || string.IsNullOrEmpty(inputPassword)) return;
         try
         {
-            var res = await Http.PostAsJsonAsync("/api/players", new { Username = inputUsername });
-            if (res.IsSuccessStatusCode) statusMsg = "Hero Registered! Click Play Game to log in.";
-            else statusMsg = "Username already claimed inside database.";
+            var res = await Http.PostAsJsonAsync("/api/auth/register", new { Username = inputUsername, Password = inputPassword });
+            if (res.IsSuccessStatusCode)
+            {
+                // Registration signs the new hero straight in.
+                await StartSession(res);
+            }
+            else if (res.StatusCode == HttpStatusCode.Conflict) statusMsg = "Username already claimed inside database.";
+            else statusMsg = await ReadValidationMessage(res);
         }
         catch { statusMsg = "API Network Link Offline."; }
+    }
+
+    private async Task StartSession(HttpResponseMessage res)
+    {
+        var auth = await res.Content.ReadFromJsonAsync<AuthResponseDto>();
+        if (auth?.player is null) return;
+
+        statusMsg = string.Empty;
+        inputPassword = string.Empty;
+        State.SetPlayerSession(auth.accessToken, auth.player.id, auth.player.username, auth.player.gold, auth.player.level, auth.player.avatarUrl);
+    }
+
+    // Turns an ASP.NET Core validation problem (e.g. password rules) into one readable line.
+    private static async Task<string> ReadValidationMessage(HttpResponseMessage res)
+    {
+        try
+        {
+            var problem = await res.Content.ReadFromJsonAsync<ValidationProblemDto>();
+            var messages = problem?.errors?.SelectMany(e => e.Value).ToList();
+            if (messages is { Count: > 0 }) return string.Join(" ", messages);
+        }
+        catch (System.Text.Json.JsonException) { }
+        return "Registration failed. Please check your details.";
     }
 
     private void HandleFileSelected(InputFileChangeEventArgs e) => selectedFile = e.File;
@@ -271,7 +312,7 @@
             streamContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType);
             content.Add(streamContent, "File", selectedFile.Name);
 
-            var res = await Http.PostAsync($"/api/players/{State.PlayerId}/avatar", content);
+            var res = await Http.PostAsync("/api/players/me/avatar", content);
             if (res.IsSuccessStatusCode)
             {
                 var result = await res.Content.ReadFromJsonAsync<UploadResponse>();
@@ -357,16 +398,16 @@
         try
         {
             // --- 🛡️ PVE MATCH RESOLUTION ---
-            // The AI boss has no player profile, so we only send our own id plus the outcome.
+            // The AI boss has no player profile, so we only send the outcome; the API knows who we are from the token.
             // The API pays either the win reward or the consolation reward, never both.
 
             // 1. Send match resolution through the API (Gold is processed synchronously)
-            var response = await Http.PostAsJsonAsync("/api/matches/pve/complete", new { PlayerId = State.PlayerId, IsVictory = isVictory });
+            var response = await Http.PostAsJsonAsync("/api/matches/pve/complete", new { IsVictory = isVictory });
             
             if (response.IsSuccessStatusCode)
             {
                 // 2. RE-FETCH UPDATED PROFILE DATA (Instantly pulls the fresh gold count out of SQL Server)
-                var refresh = await Http.GetFromJsonAsync<PlayerProfileDto>($"/api/players/{State.PlayerId}");
+                var refresh = await Http.GetFromJsonAsync<PlayerProfileDto>("/api/players/me");
                 if (refresh != null) 
                 {
                     // Sync the main UI header state container properties immediately
@@ -420,7 +461,11 @@
         logs = new() { "⚔️ Match Initialized. Select an action card block." }; 
     }
 
-    private void Logout() => State.ChangeScreen(GameScreen.LoginMenu);
+    private void Logout()
+    {
+        statusMsg = string.Empty;
+        State.SignOut();
+    }
 
     // --- FIXED DISPOSE SIGNATURE TO MATCH INTERFACE RULES ---
     void IDisposable.Dispose() => State.OnStateChanged -= StateHasChanged;
@@ -444,4 +489,15 @@
     }
 
     public class UploadResponse { public string avatarUrl { get; set; } = ""; }
+
+    public class AuthResponseDto
+    {
+        public string accessToken { get; set; } = "";
+        public PlayerProfileDto? player { get; set; }
+    }
+
+    public class ValidationProblemDto
+    {
+        public Dictionary<string, string[]>? errors { get; set; }
+    }
 }

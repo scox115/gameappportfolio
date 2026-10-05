@@ -9,7 +9,7 @@ cp .env.example .env          # then edit MSSQL_SA_PASSWORD
 docker compose up -d          # SQL Server :1433, Azurite :10000, RabbitMQ :5672
 ```
 
-## 2. Give the API its SQL connection string
+## 2. Give the API its secrets
 
 Secrets are kept out of the repo with [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets). Use the same password you put in `.env`:
 
@@ -19,6 +19,18 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
   --project 3.BackendAPI/Game.Api
 ```
 
+The API also needs a key to sign login tokens (any random string of 32+ characters):
+
+```bash
+# macOS / Linux
+dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)" --project 3.BackendAPI/Game.Api
+```
+
+```powershell
+# Windows PowerShell
+dotnet user-secrets set "Jwt:SigningKey" ([Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))) --project 3.BackendAPI/Game.Api
+```
+
 ## 3. Run
 
 ```bash
@@ -26,7 +38,7 @@ dotnet run --project 3.BackendAPI/Game.Api --launch-profile http     # API on ht
 dotnet run --project 4.Frontend/Game.Client --launch-profile http    # client on http://localhost:5091
 ```
 
-The API applies EF Core migrations on startup.
+The API applies EF Core migrations on startup. Create a hero with **Register** (passwords need 8+ characters with upper case, lower case, a digit and a symbol). In Swagger (`/swagger`), call `/api/auth/login`, then paste the `accessToken` into **Authorize** to try the protected endpoints.
 
 ## Where settings live
 
@@ -34,6 +46,8 @@ The API applies EF Core migrations on startup.
 |---|---|---|---|
 | `ConnectionStrings:DefaultConnection` | none | user-secrets | yes |
 | `ConnectionStrings:AzureBlobStorage` | none | `UseDevelopmentStorage=true` (Azurite) | in cloud |
+| `Jwt:SigningKey` | none | user-secrets | yes |
+| `Jwt:Issuer` / `Audience` / `AccessTokenMinutes` | set | inherited | no |
 | `RabbitMq:HostName` / `Port` / `VirtualHost` | `localhost` / `5672` / `/` | inherited | no |
 | `RabbitMq:UserName` / `Password` | none | `guest` / `guest` (RabbitMQ's local default) | in cloud |
 | `Cors:AllowedOrigins` | empty (no cross-origin calls) | the client's local URLs | no |

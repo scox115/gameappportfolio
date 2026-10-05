@@ -7,14 +7,34 @@ using Game.Infrastructure.Storage;
 using RabbitMQ.Client;
 using Game.Api.Workers; // Add this using statement to register background workers
 using Game.Api.Options;
+using Game.Api.Auth;
+using Game.Infrastructure.Identity;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    // Adds an "Authorize" button to Swagger UI that sends the JWT as a bearer token.
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Description = "Paste the accessToken returned by /api/auth/login."
+    });
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
+});
 
 // --- 🛡️ REGISTER CORS SECURITY POLICY ---
 // Allowed origins come from the "Cors:AllowedOrigins" setting for each environment.
@@ -70,6 +90,47 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     //options.UseInMemoryDatabase("GamePortfolioDb");
 });
 
+// --- 🔐 IDENTITY + JWT BEARER AUTHENTICATION ---
+// ASP.NET Core Identity stores accounts and hashes passwords; the API issues short-lived JWTs.
+builder.Services.AddIdentityCore<ApplicationUser>(options =>
+    {
+        options.Password.RequiredLength = 8;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+    })
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddSignInManager();
+
+builder.Services.AddOptions<JwtOptions>()
+    .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer();
+
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IOptions<JwtOptions>>((bearer, jwtOptions) =>
+    {
+        var jwt = jwtOptions.Value;
+        bearer.MapInboundClaims = false; // keep "sub" as-is instead of the legacy SOAP claim names
+        bearer.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidIssuer = jwt.Issuer,
+            ValidAudience = jwt.Audience,
+            IssuerSigningKey = TokenService.CreateSigningKey(jwt.SigningKey),
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateIssuerSigningKey = true,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+
+builder.Services.AddAuthorization();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<TokenService>();
+
 // --- ⚙️ REGISTER NATIVE WORKER RUNTIME LOOPS ---
 builder.Services.AddHostedService<MatchConsumerWorker>();
 
@@ -87,9 +148,11 @@ app.UseHttpsRedirection();
 // This must be placed precisely before MapPlayerEndpoints or UseAuthorization
 app.UseCors("BlazorFrontendPolicy");
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 // --- MAP MINIMAL ENDPOINTS HERE ---
+app.MapAuthEndpoints();
 app.MapPlayerEndpoints();
 app.MapMatchEndpoints();
 
@@ -105,7 +168,11 @@ using (var scope = app.Services.CreateScope())
         
         // This checks if the database exists; if not, it automatically runs 
         // all pending migrations and builds your tables instantly inside Docker
-        await dbContext.Database.MigrateAsync();
+        // Migrations only apply to a relational provider (tests swap in the in-memory one).
+        if (dbContext.Database.IsRelational())
+        {
+            await dbContext.Database.MigrateAsync();
+        }
     }
     catch (Exception ex)
     {
@@ -122,3 +189,6 @@ static string GetRequiredConnectionString(IConfiguration configuration, string n
         ? value
         : throw new InvalidOperationException(
             $"Connection string '{name}' is not configured. For local development, see docs/local-development.md.");
+
+// Lets the integration tests reference the entry point with WebApplicationFactory<Program>.
+public partial class Program;
