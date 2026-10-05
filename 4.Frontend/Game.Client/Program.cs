@@ -7,7 +7,14 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("http://localhost:5005") });
+// "ApiBaseUrl" comes from wwwroot/appsettings.{Environment}.json. When it is empty the client
+// calls its own origin, which suits hosts that proxy /api to the backend.
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"];
+var apiBaseAddress = string.IsNullOrWhiteSpace(apiBaseUrl)
+    ? new Uri(builder.HostEnvironment.BaseAddress)
+    : new Uri(apiBaseUrl);
+
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = apiBaseAddress });
 
 builder.Services.AddScoped<GameState>();
 

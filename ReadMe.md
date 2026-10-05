@@ -1,5 +1,7 @@
 [![CI](https://github.com/scox115/gameappportfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/scox115/gameappportfolio/actions/workflows/ci.yml)
 
+**Run it locally:** see [docs/local-development.md](docs/local-development.md).
+
 ========================================================================
 🤖 AI COLLABORATION RESUME CHECKLIST: CLOUD-BACKED CARD ARENA APPS
 ========================================================================
