@@ -4,7 +4,8 @@ public enum GameScreen
 {
     LoginMenu,
     CharacterDashboard,
-    BattleArena
+    BattleArena,
+    Leaderboard 
 }
 
 public class GameState

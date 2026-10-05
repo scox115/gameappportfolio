@@ -140,6 +140,27 @@ public static class PlayerEndpoints
                 avatarUrl = player.AvatarUrl
             });
         });
+
+        // GET: /api/players/leaderboard
+        group.MapGet("/leaderboard", async (AppDbContext dbContext) =>
+        {
+            // Fetch the top 10 players ranked primarily by level, then by experience points
+            var topPlayers = await dbContext.Players
+                .OrderByDescending(p => p.Level)
+                .ThenByDescending(p => p.ExperiencePoints)
+                .Take(10)
+                .Select(p => new
+                {
+                    id = p.Id,
+                    username = p.Username,
+                    level = p.Level,
+                    gold = p.Gold,
+                    avatarUrl = p.AvatarUrl
+                })
+                .ToListAsync();
+
+            return Results.Ok(topPlayers);
+        });
     }
 }
 

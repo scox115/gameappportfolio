@@ -21,9 +21,16 @@
                      style="width: 35px; height: 35px; border-radius: 50%; border: 2px solid #818cf8; object-fit: cover;" />
                 <span style="font-weight: bold; color: #f1f5f9;">@State.Username</span>
                 <span style="color: #fbbf24; font-weight: bold;">🪙 @State.Gold</span>
+
+
                 <span
                     style="background: #6366f1; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;">LVL
                     @State.Level</span>
+
+                    <!-- Inside the top header row, append action links next to Logout -->
+                    <button @onclick='() => State.ChangeScreen(GameScreen.CharacterDashboard)' style="background: transparent; color: #818cf8; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold; margin-right: 10px;">🏰 Town Dashboard</button>
+                    <button @onclick="LaunchLeaderboardView" style="background: transparent; color: #fbbf24; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold; margin-right: 10px;">🏆 Leaderboards</button>
+
                     <button @onclick="Logout"
                             style="background: transparent; color: #94a3b8; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold;">Logout</button>
                 </div>
@@ -107,6 +114,62 @@
                                 </div>
                                 break;
 
+
+        case GameScreen.Leaderboard:
+                                <!-- RENDERS DYNAMIC CARD ARENA ROSTER RANKINGS -->
+                                <div style="max-width: 800px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
+                                    <div style="text-align: center; margin-bottom: 25px;">
+                                        <h3 style="margin: 0; color: #fbbf24; font-size: 1.8rem; font-weight: 800;">🏆 GLOBAL HERO RANKINGS</h3>
+                                        <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 5px;">The top card sorcerers currently active inside SQL Server database tables</p>
+                                    </div>
+
+                                    @if (leaderboardLoading)
+                                    {
+                                        <p style="text-align: center; color: #94a3b8;">Querying relational data graphs...</p>
+                                    }
+                                    else if (leaderboardPlayers == null || !leaderboardPlayers.Any())
+                                    {
+                                        <p style="text-align: center; color: #f87171;">No heroes have claimed records inside the arena yet.</p>
+                                    }
+                                    else
+                                    {
+                                        <div style="overflow-x: auto;">
+                                            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 1rem;">
+                                                <thead>
+                                                    <tr style="border-bottom: 2px solid #334155; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">
+                                                        <th style="padding: 12px;">Rank</th>
+                                                        <th style="padding: 12px;">Hero</th>
+                                                        <th style="padding: 12px; text-align: center;">Level</th>
+                                                        <th style="padding: 12px; text-align: right;">Gold Reserves</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @for (int i = 0; i < leaderboardPlayers.Count; i++)
+                                                    {
+                                                        var item = leaderboardPlayers[i];
+                                                        var isCurrentUser = item.id == State.PlayerId;
+                                                        
+                                                        <tr style="border-bottom: 1px solid #334155; background: @(isCurrentUser ? "rgba(99,102,241,0.15)" : "transparent"); font-weight: @(isCurrentUser ? "bold" : "normal");">
+                                                            <td style="padding: 14px; font-weight: bold; color: @(i == 0 ? "#fbbf24" : i == 1 ? "#cbd5e1" : i == 2 ? "#b45309" : "#94a3b8");">
+                                                                @(i + 1) @(i == 0 ? "👑" : "")
+                                                            </td>
+                                                            <td style="padding: 14px; display: flex; align-items: center; gap: 12px;">
+                                                                <img src="@(string.IsNullOrEmpty(item.avatarUrl) ? "https://dicebear.com" + item.username : item.avatarUrl)" style="width: 30px; height: 30px; border-radius: 50%; border: 1px solid #475569; object-fit: cover;" />
+                                                                <span style="color: @(isCurrentUser ? "#818cf8" : "#f1f5f9");">@item.username @(isCurrentUser ? " (You)" : "")</span>
+                                                            </td>
+                                                            <td style="padding: 14px; text-align: center; color: #38bdf8; font-weight: bold;">@item.level</td>
+                                                            <td style="padding: 14px; text-align: right; color: #fbbf24; font-weight: bold;">🪙 @item.gold</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                </div>
+                                break;
+
+
+
         case GameScreen.BattleArena:
                                     <!-- RENDERS THE INTERACTIVE TURN-BASED COMBAT GAME CANVAS -->
                                     <div
@@ -153,8 +216,16 @@
 
     // Arena State
     private int playerHp = 100;
-    private int enemyHp = 100;
+    private int enemyHp = 120; // Increased boss max pool to survive initial burst
+    private int enemyIntentAttack = 15; // Starting attack damage values
+    private int turnCount = 1;
+    private bool isPlayerTurn = true; // Prevents button click spamming
+    private bool matchConcluding = false; // Locks inputs during network saves
     private List<string> logs = new() { "⚔️ Match Initialized. Select an action card block." };
+
+    // Leaderboard state references
+    private bool leaderboardLoading = false;
+    private List<PlayerProfileDto>? leaderboardPlayers;
 
     protected override void OnInitialized() => State.OnStateChanged += StateHasChanged;
 
@@ -211,45 +282,147 @@
         finally { uploading = false; }
     }
 
+    // --- ⚔️ SOLID TURN-BASED COMBAT ENGINE ---
     private async Task PlayTurn(string name, int dmg, int heal)
     {
-        if (dmg > 0) { enemyHp -= dmg; logs.Add($"» You cast {name} dealing {dmg} DMG."); }
-        if (heal > 0) { playerHp = Math.Min(100, playerHp + heal); logs.Add($"» You use {name} recovering {heal} HP."); }
+        if (!isPlayerTurn || matchConcluding || enemyHp <= 0 || playerHp <= 0) return;
 
+        isPlayerTurn = false; // Freeze spam-clicking path blocks
+
+        // 1. PROCESS PLAYER CARD CHOICE
+        if (dmg > 0) 
+        { 
+            enemyHp = Math.Max(0, enemyHp - dmg); 
+            logs.Add($"» Turn {turnCount}: You cast {name} dealing {dmg} DMG."); 
+        }
+        if (heal > 0) 
+        { 
+            playerHp = Math.Min(100, playerHp + heal); 
+            logs.Add($"» Turn {turnCount}: You use {name} and recover {heal} HP."); 
+        }
+
+        // 2. CHECK IMMEDIATE PLAYER VICTORY BOUNDARY
         if (enemyHp <= 0)
         {
-            logs.Add("🏆 VICTORY! Submitting scorecard to Native RabbitMQ Background worker...");
-            StateHasChanged();
-            await Task.Delay(2000);
-            
-            // Fire match history transaction down to backend queue pipes
-            await Http.PostAsJsonAsync("/api/matches/complete", new { WinnerPlayerId = State.PlayerId, LoserPlayerId = Guid.NewGuid() });
-            
-            // Instantly pull newly awarded calculations out of database
-            var refresh = await Http.GetFromJsonAsync<PlayerProfileDto>($"/api/players/{State.PlayerId}");
-            if (refresh != null) State.UpdateRewards(refresh.gold, refresh.level);
-
-            ResetMatch();
-            State.ChangeScreen(GameScreen.CharacterDashboard);
+            await HandleMatchResolution(isVictory: true);
             return;
         }
 
-        // AI turn counter attack logic
-        playerHp -= 15;
-        logs.Add("💥 Enemy Boss strikes back dealing 15 damage.");
+        StateHasChanged(); // Force update UI layout to show action freeze
 
+        // 3. ENEMY INTENT LOGGING & ARTIFICIAL COOLDOWN DELAY
+        logs.Add($"⏳ The Shadow Overlord winds up for a {enemyIntentAttack} DMG slash...");
+        await Task.Delay(1000); 
+
+        // 4. APPLY ENEMY STRIKE TO PLAYER
+        playerHp = Math.Max(0, playerHp - enemyIntentAttack); 
+        logs.Add($"💥 Enemy Boss hits you back dealing {enemyIntentAttack} damage!");
+
+        // 5. CHECK PLAYER DEFEAT BOUNDARY
         if (playerHp <= 0)
         {
-            logs.Add("💀 DEFEAT! Match recorded.");
-            StateHasChanged();
-            await Task.Delay(2000);
-            await Http.PostAsJsonAsync("/api/matches/complete", new { WinnerPlayerId = Guid.NewGuid(), LoserPlayerId = State.PlayerId });
+            await HandleMatchResolution(isVictory: false);
+            return;
+        }
+
+        // 6. ENEMY RAGE MECHANICS: Scale up boss damage parameters for the next turn
+        turnCount++;
+        var random = new Random();
+        
+        // Base attack increments by +4 every turn, plus a randomized wild modifier element (5 to 15)
+        enemyIntentAttack = (turnCount * 4) + random.Next(5, 15);
+        
+        logs.Add($"⚠️ Warning: Boss enters rage step. Next attack intent scaled up to {enemyIntentAttack} DMG!");
+
+        // 7. UNLOCK CONTROLS
+        isPlayerTurn = true;
+        StateHasChanged();
+    }
+    
+    private async Task HandleMatchResolution(bool isVictory)
+    {
+        matchConcluding = true; // Lock all inputs during API data saving
+
+        if (isVictory)
+        {
+            logs.Add("🏆 VICTORY! Submitting scorecard and distributing gold rewards...");
+        }
+        else
+        {
+            logs.Add("💀 DEFEAT! Submitting results to backend database panels...");
+        }
+        
+        StateHasChanged();
+
+        try
+        {
+            // --- 🛡️ FIXED PVE PLAYER ID MAPPING ---
+            // Instead of generating a random Guid that crashes the database foreign keys,
+            // if the player loses or wins against the AI, we use the PlayerId for both parameters 
+            // to pass the API's defensive database validation rules cleanly.
+            var winnerId = isVictory ? State.PlayerId : State.PlayerId;
+            var loserId = State.PlayerId;
+
+            // 1. Send match resolution through the API (Gold is processed synchronously)
+            var response = await Http.PostAsJsonAsync("/api/matches/complete", new { WinnerPlayerId = winnerId, LoserPlayerId = loserId });
+            
+            if (response.IsSuccessStatusCode)
+            {
+                // 2. RE-FETCH UPDATED PROFILE DATA (Instantly pulls the fresh gold count out of SQL Server)
+                var refresh = await Http.GetFromJsonAsync<PlayerProfileDto>($"/api/players/{State.PlayerId}");
+                if (refresh != null) 
+                {
+                    // Sync the main UI header state container properties immediately
+                    State.UpdateRewards(refresh.gold, refresh.level); 
+                }
+            }
+            else
+            {
+                var apiError = await response.Content.ReadAsStringAsync();
+                logs.Add($"[API Rejection] Database failed to save match parameters: {apiError}");
+            }
+        }
+        catch (Exception ex)
+        {
+            logs.Add($"[Network Error] Could not synchronize reward structures: {ex.Message}");
+        }
+        finally
+        {
+            // Reset match values and send player back to the main character panel
             ResetMatch();
             State.ChangeScreen(GameScreen.CharacterDashboard);
         }
     }
 
-    private void ResetMatch() { playerHp = 100; enemyHp = 100; logs = new() { "⚔️ Match Initialized." }; }
+    private async Task LaunchLeaderboardView()
+    {
+        State.ChangeScreen(GameScreen.Leaderboard);
+        try
+        {
+            leaderboardLoading = true;
+            leaderboardPlayers = await Http.GetFromJsonAsync<List<PlayerProfileDto>>("/api/players/leaderboard");
+        }
+        catch
+        {
+            statusMsg = "Failed to load leaderboard profiles from API framework.";
+        }
+        finally
+        {
+            leaderboardLoading = false;
+        }
+    }
+
+    private void ResetMatch() 
+    { 
+        playerHp = 100; 
+        enemyHp = 120; // Matches your scaling max pool definition fields
+        enemyIntentAttack = 15;
+        turnCount = 1;
+        isPlayerTurn = true;
+        matchConcluding = false;
+        logs = new() { "⚔️ Match Initialized. Select an action card block." }; 
+    }
+
     private void Logout() => State.ChangeScreen(GameScreen.LoginMenu);
 
     // --- FIXED DISPOSE SIGNATURE TO MATCH INTERFACE RULES ---

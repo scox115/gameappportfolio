@@ -5,7 +5,7 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
   "mainAssemblyName": "Game.Client",
   "applicationEnvironment": "Development",
   "resources": {
-    "hash": "sha256-ui7Y2GfKvpwk58lYMMahbXBYGOFZ9vK28AOavuMB0SU=",
+    "hash": "sha256-3WGwR/EpMZnvBkYzChPCll3O/Ut79fm3TlMKURfzWAk=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.b6l13xorvf.js"
@@ -1242,16 +1242,16 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
       },
       {
         "virtualPath": "Game.Client.wasm",
-        "name": "Game.Client.8v4fzuonb7.wasm",
-        "hash": "sha256-nL68ZCsOuQrTMeqwhkaGj3HzY4XepFZ1Ten/ykSEwsc=",
+        "name": "Game.Client.4rgrdjrzsj.wasm",
+        "hash": "sha256-kFbsYR1v+slcQZO59M8s9mfDx+RTM2Px5RDbj8g8YFE=",
         "cache": "force-cache"
       }
     ],
     "pdb": [
       {
         "virtualPath": "Game.Client.pdb",
-        "name": "Game.Client.8duv27b5ji.pdb",
-        "hash": "sha256-fFk8hMzR5QNrHAkIo6Ch0PjIjUnDAVT6WvNPjHCmVrA=",
+        "name": "Game.Client.otlptj1xoq.pdb",
+        "hash": "sha256-RAyHgHvs5C+52TiHjYozhu8/IKrxv/CQdh2/LnA296c=",
         "cache": "force-cache"
       }
     ],

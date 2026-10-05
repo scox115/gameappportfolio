@@ -7,7 +7,6 @@ public class Player
     public int Gold { get; private set; }
     public int ExperiencePoints { get; private set; }
     public int Level { get; private set; } = 1;
-
     public string? AvatarUrl { get; private set; }
 
     // Parameterless constructor required by Entity Framework Core
@@ -40,14 +39,17 @@ public class Player
         Gold -= amount;
     }
 
+    // --- ⭐ MUTATOR METHOD: INCREMENT EXPERIENCE & HANDLE LEVEL UPS ---
     public void AddExperience(int amount)
     {
+        if (amount < 0) return;
         ExperiencePoints += amount;
-        // Simple logic rule: 100 XP per level
-        int newLevel = (ExperiencePoints / 100) + 1;
-        if (newLevel > Level)
+
+        // Simple RPG leveling formula: every 100 XP grants a Level Up
+        if (ExperiencePoints >= Level * 100)
         {
-            Level = newLevel;
+            ExperiencePoints -= (Level * 100);
+            Level++;
         }
     }
 }
