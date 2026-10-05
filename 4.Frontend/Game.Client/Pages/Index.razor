@@ -210,10 +210,10 @@
                                             </div>
                                         }
 
-                                        <!-- COMBAT EVENTS LOGGER FEED -->
+                                        <!-- COMBAT EVENTS LOGGER FEED (column-reverse keeps the scroll pinned to the newest line, so the lines are rendered in reverse) -->
                                         <div
-                                            style="height: 180px; background: #0f172a; border-radius: 8px; padding: 15px; overflow-y: auto; border: 1px solid #334155; font-family: monospace; color: #94a3b8; margin-bottom: 25px; line-height: 1.6;">
-                                            @foreach (var log in logs)
+                                            style="height: 180px; background: #0f172a; border-radius: 8px; padding: 15px; overflow-y: auto; display: flex; flex-direction: column-reverse; border: 1px solid #334155; font-family: monospace; color: #94a3b8; margin-bottom: 25px; line-height: 1.6;">
+                                            @foreach (var log in Enumerable.Reverse(logs))
                                             {
                                                 <div>@log</div>
                                             }
