@@ -1,3 +1,5 @@
+[![CI](https://github.com/scox115/gameappportfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/scox115/gameappportfolio/actions/workflows/ci.yml)
+
 ========================================================================
 🤖 AI COLLABORATION RESUME CHECKLIST: CLOUD-BACKED CARD ARENA APPS
 ========================================================================

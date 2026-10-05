@@ -12,3 +12,8 @@ appsettings.Development.json
 sql_data/
 azurite_data/
 rabbit_data/
+
+# User-specific and test output
+*.user
+*.suo
+TestResults/
