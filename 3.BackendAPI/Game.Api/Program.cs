@@ -52,7 +52,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(corsSettings.AllowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials(); // Essential if you handle secure cookies later
+              .AllowCredentials() // Essential if you handle secure cookies later
+              .WithExposedHeaders(SessionClaims.EndedHeader); // lets the browser read why it was signed out
     });
 });
 
@@ -143,6 +144,26 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
                     context.Token = accessToken;
                 }
                 return Task.CompletedTask;
+            },
+
+            // A valid signature isn't enough: the token must also belong to the account's latest sign-in.
+            OnTokenValidated = async context =>
+            {
+                var sessions = context.HttpContext.RequestServices.GetRequiredService<ActiveSessionValidator>();
+                if (!await sessions.IsCurrentAsync(context.Principal!, context.HttpContext.RequestAborted))
+                {
+                    context.HttpContext.Items[SessionClaims.EndedHeader] = true;
+                    context.Fail("The session was replaced by a newer sign-in.");
+                }
+            },
+
+            OnChallenge = context =>
+            {
+                if (context.HttpContext.Items.ContainsKey(SessionClaims.EndedHeader))
+                {
+                    context.Response.Headers[SessionClaims.EndedHeader] = SessionClaims.SignedInElsewhere;
+                }
+                return Task.CompletedTask;
             }
         };
     });
@@ -151,13 +172,15 @@ builder.Services.AddAuthorization();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<RefreshTokenService>();
+builder.Services.AddScoped<ActiveSessionValidator>();
+builder.Services.AddScoped<SessionNotifier>();
 
 // --- ⚔️ SERVER-AUTHORITATIVE BATTLES ---
 builder.Services.AddSingleton<IBattleRandom, SystemBattleRandom>();
 builder.Services.AddSingleton<MatchTelemetryPublisher>();
 
 // --- 🆚 REAL-TIME PVP ARENA (SignalR) ---
-builder.Services.AddSignalR()
+builder.Services.AddSignalR(options => options.AddFilter<ActiveSessionHubFilter>())
     .AddJsonProtocol(options => options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
 builder.Services.AddSingleton<PvpMatchmaker>();
@@ -194,6 +217,7 @@ app.MapPlayerEndpoints();
 app.MapBattleEndpoints();
 app.MapPvpEndpoints();
 app.MapHub<ArenaHub>(ArenaHub.Path);
+app.MapHub<SessionHub>(SessionHub.Path);
 
 app.MapControllers();
 

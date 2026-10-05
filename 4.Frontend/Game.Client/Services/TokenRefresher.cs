@@ -31,7 +31,9 @@ public class TokenRefresher(GameState state, ApiEndpoint api)
             var renewed = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<RefreshResponse>() : null;
             if (renewed is null)
             {
-                state.SignOut("Your session expired. Please sign in again.");
+                state.SignOut(response.Headers.Contains(GameState.SessionEndedHeader)
+                    ? GameState.SignedInElsewhereMessage
+                    : "Your session expired. Please sign in again.");
                 return null;
             }
 

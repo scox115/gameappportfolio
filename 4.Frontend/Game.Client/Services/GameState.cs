@@ -13,6 +13,12 @@ public record SessionTokens(string AccessToken, DateTimeOffset ExpiresAt, string
 
 public class GameState
 {
+    /// <summary>Shown when signing in on another browser ended this one's session.</summary>
+    public const string SignedInElsewhereMessage = "You signed in on another browser, so you were signed out here.";
+
+    // Set by the API on a 401 when the token was retired by a newer sign-in.
+    public const string SessionEndedHeader = "X-Session-Ended";
+
     public GameScreen CurrentScreen { get; private set; } = GameScreen.LoginMenu;
     public Guid PlayerId { get; private set; }
     // Tokens are kept in memory only, so a page refresh signs the player out.

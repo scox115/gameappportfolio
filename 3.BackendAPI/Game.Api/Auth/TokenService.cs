@@ -23,7 +23,8 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(SessionClaims.SessionId, user.CurrentSessionId?.ToString() ?? string.Empty)
         };
 
         var token = new JwtSecurityToken(
