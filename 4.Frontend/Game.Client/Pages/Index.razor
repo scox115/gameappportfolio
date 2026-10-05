@@ -356,15 +356,12 @@
 
         try
         {
-            // --- 🛡️ FIXED PVE PLAYER ID MAPPING ---
-            // Instead of generating a random Guid that crashes the database foreign keys,
-            // if the player loses or wins against the AI, we use the PlayerId for both parameters 
-            // to pass the API's defensive database validation rules cleanly.
-            var winnerId = isVictory ? State.PlayerId : State.PlayerId;
-            var loserId = State.PlayerId;
+            // --- 🛡️ PVE MATCH RESOLUTION ---
+            // The AI boss has no player profile, so we only send our own id plus the outcome.
+            // The API pays either the win reward or the consolation reward, never both.
 
             // 1. Send match resolution through the API (Gold is processed synchronously)
-            var response = await Http.PostAsJsonAsync("/api/matches/complete", new { WinnerPlayerId = winnerId, LoserPlayerId = loserId });
+            var response = await Http.PostAsJsonAsync("/api/matches/pve/complete", new { PlayerId = State.PlayerId, IsVictory = isVictory });
             
             if (response.IsSuccessStatusCode)
             {
