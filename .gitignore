@@ -1,0 +1,14 @@
+# .NET Core Build Artifacts
+**/bin/
+**/obj/
+.vs/
+.idea/
+
+# Local Environment Secrets
+.env
+appsettings.Development.json
+
+# Docker Storage Volumes (Ignore raw database files)
+sql_data/
+azurite_data/
+rabbit_data/
