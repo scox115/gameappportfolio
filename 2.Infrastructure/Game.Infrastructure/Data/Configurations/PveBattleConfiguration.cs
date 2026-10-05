@@ -17,6 +17,15 @@ public class PveBattleConfiguration : IEntityTypeConfiguration<PveBattle>
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(b => b.BossNextMove)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(b => b.LastCardPlayed)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         // Two turns submitted at once must not both apply to the same battle state.
         builder.Property(b => b.Version)
             .IsConcurrencyToken();

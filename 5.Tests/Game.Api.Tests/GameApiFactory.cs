@@ -36,16 +36,18 @@ public class GameApiFactory : WebApplicationFactory<Program>
             var worker = services.Single(d => d.ImplementationType == typeof(MatchConsumerWorker));
             services.Remove(worker);
 
-            // Boss attacks always roll the minimum so battle outcomes are predictable.
+            // Every roll is the minimum, which always favours the player: cards always land and
+            // the boss always uses a plain Slash, so battle outcomes are predictable.
             services.RemoveAll<IBattleRandom>();
             services.AddSingleton<IBattleRandom>(new FixedBattleRandom());
         });
     }
 }
 
-public class FixedBattleRandom : IBattleRandom
+// Lucky rolls the minimum (best for the player); unlucky rolls the maximum (every card fails).
+public class FixedBattleRandom(bool lucky = true) : IBattleRandom
 {
-    public int Next(int minInclusive, int maxExclusive) => minInclusive;
+    public int Next(int minInclusive, int maxExclusive) => lucky ? minInclusive : maxExclusive - 1;
 }
 
 internal static class ServiceCollectionExtensions

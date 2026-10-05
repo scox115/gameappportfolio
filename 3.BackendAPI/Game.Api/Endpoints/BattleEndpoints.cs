@@ -77,6 +77,14 @@ public static class BattleEndpoints
                 });
             }
 
+            if (!battle.CanPlay(request.Card))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(PlayCardRequest.Card)] = [$"{BattleCards.Get(request.Card).Name} is still recharging."]
+                });
+            }
+
             var turn = battle.PlayCard(request.Card, random, timeProvider.GetUtcNow().UtcDateTime);
 
             BattleRewardResponse? reward = null;
@@ -119,8 +127,7 @@ public static class BattleEndpoints
                 await telemetry.PublishAsync(new MatchCompletedEvent(match.Id, winnerId, loserId));
             }
 
-            var turnResponse = new BattleTurnResponse(turn.Turn, turn.Card.Name, turn.DamageDealt, turn.HealthRestored, turn.BossDamage);
-            return Results.Ok(new PlayCardResponse(BattleStateResponse.From(battle), turnResponse, reward));
+            return Results.Ok(new PlayCardResponse(BattleStateResponse.From(battle), BattleTurnResponse.From(turn), reward));
         });
     }
 }
