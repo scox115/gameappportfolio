@@ -1,0 +1,158 @@
+@using Game.Client.Services
+@using System.Net.Http.Json
+@inject GameState State
+@inject HttpClient Http
+@inject SoundEffects Sounds
+
+@* The Gold Shop: spend battle winnings on card upgrades and Battle Elixirs.
+   The server sets every price and checks the player's gold; this page only shows the offers. *@
+<div style="max-width: 1000px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h2 style="margin: 0; color: #fbbf24;">🪙 Gold Shop</h2>
+        <span style="color: #fbbf24; font-weight: bold; font-size: 1.2rem;">You have @State.Gold gold</span>
+    </div>
+    <p style="color: #94a3b8; margin: 0 0 20px;">
+        Upgrades make your cards stronger against the Shadow Overlord. PvP duels stay even, so every opponent fights with the same cards.
+    </p>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div role="status" style="padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold;
+             background: @(messageIsError ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)");
+             border: 1px solid @(messageIsError ? "#7f1d1d" : "#166534");
+             color: @(messageIsError ? "#fca5a5" : "#86efac");">@message</div>
+    }
+
+    @if (offers is null)
+    {
+        <p style="color: #94a3b8;">@(loadFailed ? "The shop is closed right now. Please try again." : "Opening the shop...")</p>
+    }
+    else
+    {
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 15px;">
+            @foreach (var offer in offers)
+            {
+                var look = Look(offer.item);
+                var soldOut = offer.price is null;
+                var affordable = offer.price is int price && price <= State.Gold;
+                <div style="background: #0f172a; border: 1px solid @(soldOut ? "#334155" : look.Color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="font-size: 2rem;">@look.Icon</div>
+                    <div style="font-weight: bold; color: #f1f5f9;">@offer.name</div>
+                    <div style="color: #94a3b8; font-size: 0.9rem; flex: 1;">@offer.description</div>
+                    <div style="color: #cbd5e1; font-size: 0.9rem;">
+                        @if (offer.item == "BattleElixir")
+                        {
+                            <span>Carrying @offer.owned of @offer.maxOwned</span>
+                        }
+                        else
+                        {
+                            <span>Level @offer.owned of @offer.maxOwned (@look.Stat(offer.owned))</span>
+                        }
+                    </div>
+                    <button @onclick="() => Buy(offer)" disabled="@(soldOut || !affordable || buying)"
+                            aria-label="@($"Buy {offer.name}")"
+                            style="background: @(soldOut || !affordable ? "#475569" : look.Color); color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: @(soldOut || !affordable ? "not-allowed" : "pointer");">
+                        @(soldOut ? (offer.item == "BattleElixir" ? "Pouch full" : "Max level") : $"Buy for {offer.price} 🪙")
+                    </button>
+                </div>
+            }
+        </div>
+    }
+
+    <button @onclick="() => State.ChangeScreen(GameScreen.CharacterDashboard)"
+            style="margin-top: 25px; background: #334155; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🏰 Back to Town</button>
+</div>
+
+@code {
+    private List<ShopOfferDto>? offers;
+    private bool loadFailed;
+    private bool buying;
+    private string? message;
+    private bool messageIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var shop = await Http.GetFromJsonAsync<ShopDto>("/api/shop");
+            if (shop is not null) Show(shop);
+        }
+        catch (Exception)
+        {
+            loadFailed = true;
+        }
+    }
+
+    private async Task Buy(ShopOfferDto offer)
+    {
+        buying = true;
+        message = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/shop/purchases", new { Item = offer.item });
+            if (response.IsSuccessStatusCode && await response.Content.ReadFromJsonAsync<ShopDto>() is { } shop)
+            {
+                Show(shop);
+                message = offer.item == "BattleElixir"
+                    ? "Bought a Battle Elixir. You'll drink it at the start of your next boss fight."
+                    : $"{offer.name.Replace(" Upgrade", "")} is now level {offer.owned + 1}!";
+                messageIsError = false;
+                await Sounds.PlayAsync(Sound.Purchase);
+            }
+            else
+            {
+                var problem = await response.Content.ReadFromJsonAsync<ProblemDto>();
+                message = problem?.detail ?? problem?.message ?? "The shopkeeper refused that sale.";
+                messageIsError = true;
+            }
+        }
+        catch (Exception)
+        {
+            message = "Couldn't reach the shop. Please try again.";
+            messageIsError = true;
+        }
+        finally
+        {
+            buying = false;
+        }
+    }
+
+    private void Show(ShopDto shop)
+    {
+        offers = shop.offers;
+        State.UpdateGold(shop.gold);
+    }
+
+    private record ItemLook(string Icon, string Color, Func<int, string> Stat);
+
+    // Matches the battle cards: each level above 1 adds 5 damage or healing.
+    private static ItemLook Look(string item) => item switch
+    {
+        "FireballUpgrade" => new("🔥", "#ea580c", level => $"{20 + (level - 1) * 5} DMG"),
+        "HolyShieldUpgrade" => new("🛡️", "#2563eb", level => $"{15 + (level - 1) * 5} HEAL"),
+        "DragonClawUpgrade" => new("🐉", "#7c3aed", level => $"{35 + (level - 1) * 5} DMG"),
+        _ => new("🧪", "#059669", _ => "")
+    };
+
+    private class ShopDto
+    {
+        public int gold { get; set; }
+        public List<ShopOfferDto> offers { get; set; } = new();
+    }
+
+    private class ShopOfferDto
+    {
+        public string item { get; set; } = "";
+        public string name { get; set; } = "";
+        public string description { get; set; } = "";
+        public int? price { get; set; }
+        public int owned { get; set; }
+        public int maxOwned { get; set; }
+    }
+
+    private class ProblemDto
+    {
+        public string? detail { get; set; }
+        public string? message { get; set; }
+    }
+}

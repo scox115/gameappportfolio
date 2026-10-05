@@ -15,12 +15,21 @@ public record BattleStateResponse(
     int BossNextAttack,
     BattleCard? RechargingCard,
     int Turn,
-    BattleStatus Status)
+    BattleStatus Status,
+    IReadOnlyList<BattleCardResponse> Cards)
 {
     public static BattleStateResponse From(PveBattle battle) =>
-        new(battle.Id, battle.PlayerHp, PveBattle.PlayerMaxHp, battle.BossHp, PveBattle.BossMaxHp,
+        new(battle.Id, battle.PlayerHp, battle.PlayerMaxHp, battle.BossHp, PveBattle.BossMaxHp,
             battle.BossNextMove, BossMoves.NameOf(battle.BossNextMove), battle.BossNextAttack,
-            battle.RechargingCard, battle.Turn, battle.Status);
+            battle.RechargingCard, battle.Turn, battle.Status,
+            BattleCards.All.Select(c => BattleCardResponse.From(battle.CardFor(c.Card), battle.LevelOf(c.Card))).ToList());
+}
+
+/// <summary>A card as the player holds it in this battle, with any Gold Shop upgrade applied.</summary>
+public record BattleCardResponse(BattleCard Card, string Name, int Level, int Damage, int Heal, int FailChance)
+{
+    public static BattleCardResponse From(BattleCardDefinition card, int level) =>
+        new(card.Card, card.Name, level, card.Damage, card.Heal, card.FailChance);
 }
 
 public record BattleTurnResponse(

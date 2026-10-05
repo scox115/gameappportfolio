@@ -56,7 +56,9 @@ public class SingleSessionTests : IClassFixture<GameApiFactory>
         var username = NewUsername();
         var first = await RegisterAsync(username);
         var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using var connection = BuildConnection(SessionHub.Path, first.AccessToken);
+        // WebSockets, as browsers use: with long polling the old token can be refused on the next
+        // poll before the message is picked up, which made this test flaky.
+        await using var connection = BuildWebSocketConnection(SessionHub.Path, first.AccessToken);
         connection.On(nameof(ISessionClient.SessionEnded), () => ended.TrySetResult());
         await connection.StartAsync();
 
@@ -97,16 +99,6 @@ public class SingleSessionTests : IClassFixture<GameApiFactory>
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
     }
-
-    private HubConnection BuildConnection(string path, string accessToken) =>
-        new HubConnectionBuilder()
-            .WithUrl(new Uri(_factory.Server.BaseAddress, path), options =>
-            {
-                options.HttpMessageHandlerFactory = _ => _factory.Server.CreateHandler();
-                options.Transports = HttpTransportType.LongPolling;
-                options.AccessTokenProvider = () => Task.FromResult<string?>(accessToken);
-            })
-            .Build();
 
     private HubConnection BuildWebSocketConnection(string path, string accessToken) =>
         new HubConnectionBuilder()

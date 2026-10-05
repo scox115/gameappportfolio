@@ -26,7 +26,7 @@ public class PveBattleTests
         var battle = PveBattle.Start(playerId, Now);
 
         Assert.Equal(playerId, battle.PlayerId);
-        Assert.Equal(PveBattle.PlayerMaxHp, battle.PlayerHp);
+        Assert.Equal(PveBattle.BasePlayerMaxHp, battle.PlayerHp);
         Assert.Equal(PveBattle.BossMaxHp, battle.BossHp);
         Assert.Equal(BossMove.Slash, battle.BossNextMove);
         Assert.Equal(PveBattle.OpeningBossAttack, battle.BossNextAttack);
@@ -94,7 +94,7 @@ public class PveBattleTests
 
         Assert.True(result.AttackBlocked);
         Assert.Equal(0, result.BossDamage);
-        Assert.Equal(PveBattle.PlayerMaxHp, battle.PlayerHp);
+        Assert.Equal(PveBattle.BasePlayerMaxHp, battle.PlayerHp);
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class PveBattleTests
         var result = battle.PlayCard(BattleCard.HolyShield, Lucky(), Now);
 
         Assert.Equal(15, result.HealthRestored);
-        Assert.Equal(PveBattle.PlayerMaxHp, battle.PlayerHp);
+        Assert.Equal(PveBattle.BasePlayerMaxHp, battle.PlayerHp);
     }
 
     [Theory]
@@ -264,4 +264,46 @@ public class PveBattleTests
 
     private static BattleTurnResult PlayUntilFinished(PveBattle battle, Func<int[], IBattleRandom> random) =>
         PlayUntilFinished(battle, () => random([]));
+}
+
+public class PveBattleLoadoutTests
+{
+    private static readonly DateTime Now = new(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+
+    private sealed class AlwaysMin : IBattleRandom
+    {
+        public int Next(int minInclusive, int maxExclusive) => minInclusive;
+    }
+
+    [Fact]
+    public void AnUpgradedCardHitsHarder()
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, new PveLoadout(3, 1, 1, 0));
+
+        var turn = battle.PlayCard(BattleCard.Fireball, new AlwaysMin(), Now);
+
+        Assert.Equal(30, turn.DamageDealt);
+        Assert.Equal(PveBattle.BossMaxHp - 30, battle.BossHp);
+    }
+
+    [Fact]
+    public void AnElixirRaisesStartingAndMaximumHealth()
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, new PveLoadout(1, 2, 1, 25));
+
+        Assert.Equal(125, battle.PlayerHp);
+        Assert.Equal(125, battle.PlayerMaxHp);
+
+        // Holy Shield heals 20 at level 2, but never above the raised maximum.
+        battle.PlayCard(BattleCard.Fireball, new AlwaysMin(), Now); // boss hits for 15 -> 110
+        var turn = battle.PlayCard(BattleCard.HolyShield, new AlwaysMin(), Now);
+        Assert.Equal(15, turn.HealthRestored);
+        Assert.Equal(125, battle.PlayerHp);
+    }
+
+    [Fact]
+    public void Start_RejectsACardLevelOutOfRange()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => PveBattle.Start(Guid.NewGuid(), Now, new PveLoadout(4, 1, 1, 0)));
+    }
 }

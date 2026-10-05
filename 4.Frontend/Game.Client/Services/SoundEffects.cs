@@ -14,7 +14,8 @@ public enum Sound
     Victory,
     Defeat,
     MatchFound,
-    YourTurn
+    YourTurn,
+    Purchase
 }
 
 /// <summary>

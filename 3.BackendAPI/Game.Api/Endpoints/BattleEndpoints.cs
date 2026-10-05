@@ -34,14 +34,23 @@ public static class BattleEndpoints
                 return Results.Ok(BattleStateResponse.From(existing));
             }
 
-            if (!await dbContext.Players.AnyAsync(p => p.Id == playerId))
+            var player = await dbContext.Players.FindAsync(playerId);
+            if (player is null)
             {
                 return Results.NotFound("Player profile not found.");
             }
 
-            var battle = PveBattle.Start(playerId, timeProvider.GetUtcNow().UtcDateTime);
+            // Upgrades bought in the Gold Shop come along, and a Battle Elixir is drunk now.
+            var battle = PveBattle.Start(playerId, timeProvider.GetUtcNow().UtcDateTime, player.TakeLoadoutForBossFight());
             dbContext.PveBattles.Add(battle);
-            await dbContext.SaveChangesAsync();
+            try
+            {
+                await dbContext.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Results.Conflict(new { message = "Your gold changed at the same moment. Try again." });
+            }
 
             return Results.Created($"/api/battles/pve/{battle.Id}", BattleStateResponse.From(battle));
         });

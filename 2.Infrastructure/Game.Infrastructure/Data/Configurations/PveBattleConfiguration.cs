@@ -26,6 +26,12 @@ public class PveBattleConfiguration : IEntityTypeConfiguration<PveBattle>
             .HasConversion<string>()
             .HasMaxLength(20);
 
+        // Battles started before the Gold Shop existed are plain level-1, 100 HP fights.
+        builder.Property(b => b.PlayerMaxHp).HasDefaultValue(PveBattle.BasePlayerMaxHp);
+        builder.Property(b => b.FireballLevel).HasDefaultValue(1);
+        builder.Property(b => b.HolyShieldLevel).HasDefaultValue(1);
+        builder.Property(b => b.DragonClawLevel).HasDefaultValue(1);
+
         // Two turns submitted at once must not both apply to the same battle state.
         builder.Property(b => b.Version)
             .IsConcurrencyToken();

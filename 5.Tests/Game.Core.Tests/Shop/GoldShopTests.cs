@@ -1,0 +1,98 @@
+using Game.Core.Battles;
+using Game.Core.Entities;
+using Game.Core.Shop;
+
+namespace Game.Core.Tests.Shop;
+
+public class GoldShopTests
+{
+    private static Player PlayerWith(int gold) => new("Shopper", gold);
+
+    [Fact]
+    public void BuyingAnUpgrade_TakesTheGoldAndRaisesTheCardLevel()
+    {
+        var player = PlayerWith(500);
+
+        var offer = GoldShop.Buy(player, ShopItem.FireballUpgrade);
+
+        Assert.Equal(350, player.Gold);
+        Assert.Equal(2, player.CardLevel(BattleCard.Fireball));
+        Assert.Equal(2, offer.Owned);
+        Assert.Equal(300, offer.Price);
+    }
+
+    [Fact]
+    public void ACardStopsAtItsTopLevel()
+    {
+        var player = PlayerWith(1000);
+        GoldShop.Buy(player, ShopItem.DragonClawUpgrade);
+        GoldShop.Buy(player, ShopItem.DragonClawUpgrade);
+
+        Assert.Null(GoldShop.OfferFor(player, ShopItem.DragonClawUpgrade).Price);
+        var error = Assert.Throws<InvalidOperationException>(() => GoldShop.Buy(player, ShopItem.DragonClawUpgrade));
+        Assert.Contains("top level", error.Message);
+        Assert.Equal(550, player.Gold);
+    }
+
+    [Fact]
+    public void YouCantBuyWhatYouCantAfford()
+    {
+        var player = PlayerWith(100);
+
+        var error = Assert.Throws<InvalidOperationException>(() => GoldShop.Buy(player, ShopItem.HolyShieldUpgrade));
+
+        Assert.Contains("150 gold", error.Message);
+        Assert.Equal(100, player.Gold);
+        Assert.Equal(1, player.CardLevel(BattleCard.HolyShield));
+    }
+
+    [Fact]
+    public void ElixirsStackUpToTheLimit()
+    {
+        var player = PlayerWith(1000);
+        for (var i = 0; i < Player.MaxElixirs; i++) GoldShop.Buy(player, ShopItem.BattleElixir);
+
+        Assert.Equal(Player.MaxElixirs, player.Elixirs);
+        Assert.Throws<InvalidOperationException>(() => GoldShop.Buy(player, ShopItem.BattleElixir));
+        Assert.Equal(1000 - Player.MaxElixirs * GoldShop.ElixirPrice, player.Gold);
+    }
+
+    [Fact]
+    public void BuyingSomethingChangesThePlayersConcurrencyVersion()
+    {
+        var player = PlayerWith(500);
+        var before = player.Version;
+
+        GoldShop.Buy(player, ShopItem.BattleElixir);
+
+        Assert.NotEqual(before, player.Version);
+    }
+
+    [Fact]
+    public void TheLoadoutCarriesUpgradesAndUsesOneElixir()
+    {
+        var player = PlayerWith(1000);
+        GoldShop.Buy(player, ShopItem.HolyShieldUpgrade);
+        GoldShop.Buy(player, ShopItem.BattleElixir);
+
+        var first = player.TakeLoadoutForBossFight();
+        var second = player.TakeLoadoutForBossFight();
+
+        Assert.Equal(new PveLoadout(1, 2, 1, Player.ElixirBonusHp), first);
+        Assert.Equal(new PveLoadout(1, 2, 1, 0), second);
+        Assert.Equal(0, player.Elixirs);
+    }
+
+    [Fact]
+    public void UpgradesAddDamageOrHealingButKeepTheRisk()
+    {
+        var fireball = BattleCards.AtLevel(BattleCard.Fireball, 3);
+        var shield = BattleCards.AtLevel(BattleCard.HolyShield, 2);
+
+        Assert.Equal(30, fireball.Damage);
+        Assert.Equal(0, fireball.Heal);
+        Assert.Equal(BattleCards.Get(BattleCard.Fireball).FailChance, fireball.FailChance);
+        Assert.Equal(20, shield.Heal);
+        Assert.Equal(0, shield.Damage);
+    }
+}

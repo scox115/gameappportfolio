@@ -26,6 +26,21 @@ public class PlayerConfiguration : IEntityTypeConfiguration<Player>
         builder.Property(p => p.ExperiencePoints)
             .IsRequired();
             
+        // Purchases and rewards both change gold; this stops two requests spending the same gold.
+        builder.Property(p => p.Version)
+            .IsConcurrencyToken();
+
+        // Upgraded cards live in their own table, one row per card the player has upgraded.
+        builder.OwnsMany(p => p.CardUpgrades, upgrades =>
+        {
+            upgrades.ToTable("PlayerCardUpgrades");
+            upgrades.WithOwner().HasForeignKey("PlayerId");
+            upgrades.Property(u => u.Card)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+            upgrades.HasKey("PlayerId", nameof(CardUpgrade.Card));
+        });
+
         // Optimizes lookups by indexing the username field uniquely
         builder.HasIndex(p => p.Username)
             .IsUnique();

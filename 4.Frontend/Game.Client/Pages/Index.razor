@@ -106,6 +106,10 @@
                                             style="width: 100%; background: #0891b2; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(8,145,178,0.3);">
                                         🆚 FIND AN OPPONENT
                                     </button>
+                                    <button @onclick="() => State.ChangeScreen(GameScreen.Shop)"
+                                            style="width: 100%; background: #b45309; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(180,83,9,0.3);">
+                                        🪙 GOLD SHOP
+                                    </button>
                                 </div>
 
                                 <!-- CLOUD UPLOADER BOX -->
@@ -135,6 +139,10 @@
 
         case GameScreen.PvpArena:
                                 <PvpArena />
+                                break;
+
+        case GameScreen.Shop:
+                                <Shop />
                                 break;
 
         case GameScreen.Leaderboard:
@@ -200,7 +208,7 @@
                                             <h3 style="margin: 0; color: #ef4444;">😈 Boss: The Shadow Overlord</h3>
                                             <div style="font-size: 1.2rem; font-weight: bold;">
                                                 <span style="color: #ef4444; margin-right: 20px;">Boss HP: @enemyHp</span>
-                                                <span style="color: #3b82f6;">Your HP: @playerHp</span>
+                                                <span style="color: #3b82f6;">Your HP: @playerHp / @playerMaxHp</span>
                                             </div>
                                         </div>
 
@@ -232,10 +240,11 @@
                                             @foreach (var card in ArenaCards.Hand)
                                             {
                                                 var recharging = rechargingCard == card.Id;
+                                                var held = heldCards.FirstOrDefault(c => c.card == card.Id);
                                                 <button @onclick="() => PlayTurn(card.Id)" disabled="@recharging"
                                                         title="@card.Hint"
                                                         style="background: @(recharging ? "#475569" : card.Color); width: 150px; height: 110px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: @(recharging ? "not-allowed" : "pointer"); opacity: @(recharging ? "0.6" : "1");">
-                                                    @card.Icon @card.Label<br /><small>@card.Effect</small><br />
+                                                    @card.Icon @card.Label@(held is { level: > 1 } ? $" ★{held.level}" : "")<br /><small>@(held is null ? card.Effect : ArenaCards.EffectOf(held.damage, held.heal))</small><br />
                                                     <small style="font-weight: normal;">@(recharging ? "⏳ Recharging" : card.Risk)</small>
                                                 </button>
                                             }
@@ -284,6 +293,8 @@
     // Arena State (mirrors the server's battle; the server decides every outcome)
     private Guid battleId;
     private int playerHp = 100;
+    private int playerMaxHp = 100; // More than 100 when a Battle Elixir was drunk
+    private List<BattleCardDto> heldCards = new(); // The cards as upgraded in the Gold Shop
     private int enemyHp = 130;
     private int enemyIntentAttack = 15; // Damage of the boss's announced move
     private string bossNextMove = "Slash";
@@ -513,6 +524,8 @@
     {
         battleId = battle.id;
         playerHp = battle.playerHp;
+        playerMaxHp = battle.playerMaxHp;
+        heldCards = battle.cards;
         enemyHp = battle.bossHp;
         enemyIntentAttack = battle.bossNextAttack;
         bossNextMove = battle.bossNextMove;
@@ -635,6 +648,7 @@
     {
         public Guid id { get; set; }
         public int playerHp { get; set; }
+        public int playerMaxHp { get; set; } = 100;
         public int bossHp { get; set; }
         public string bossNextMove { get; set; } = "Slash";
         public string bossNextMoveName { get; set; } = "Slash";
@@ -642,6 +656,15 @@
         public string? rechargingCard { get; set; }
         public int turn { get; set; }
         public string status { get; set; } = "";
+        public List<BattleCardDto> cards { get; set; } = new();
+    }
+
+    public class BattleCardDto
+    {
+        public string card { get; set; } = "";
+        public int level { get; set; } = 1;
+        public int damage { get; set; }
+        public int heal { get; set; }
     }
 
     public class BattleTurnDto
