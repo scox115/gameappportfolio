@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Game.Api.Models;
 using Game.Core.Battles;
 using Game.Core.Entities;
+using Game.Core.Services;
 using Game.Core.Shop;
 using Game.Infrastructure.Data;
 using Microsoft.Extensions.DependencyInjection;
@@ -140,12 +141,12 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         await GiveDuelWinsAsync(playerId, 1);
         await BuyAsync(client, ShopItem.TitleDuelist);
 
-        // New players start at level 1, so give this one a level to make the top 10.
+        // The leaderboard ranks by PvP rating, so give this player a top rating to make the top 10.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var player = await db.Players.FindAsync(playerId);
-            player!.AddExperience(10_000);
+            player!.RecordPvpWin(ratingGained: 10_000);
             await db.SaveChangesAsync();
         }
 
@@ -154,14 +155,36 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal("the Duelist", board!.Single(r => r.Id == playerId).Title);
     }
 
-    private sealed record LeaderboardRow(Guid Id, string Username, string? Title, int PvpWins);
+    [Fact]
+    public async Task TheLeaderboardRanksByRating()
+    {
+        var (client, playerId) = await SignedInPlayerAsync();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FindAsync(playerId);
+            player!.RecordPvpWin(ratingGained: 20_000);
+            player.RecordPvpLoss(ratingLost: 0);
+            await db.SaveChangesAsync();
+        }
+
+        var board = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/players/leaderboard", Json);
+
+        Assert.Equal(board!.OrderByDescending(r => r.Rating).Select(r => r.Id), board.Select(r => r.Id));
+        var top = board[0];
+        Assert.Equal(playerId, top.Id);
+        Assert.Equal(EloRating.StartingRating + 20_000, top.Rating);
+        Assert.Equal(1, top.PvpLosses);
+    }
+
+    private sealed record LeaderboardRow(Guid Id, string Username, string? Title, int Rating, int PvpWins, int PvpLosses);
 
     private async Task GiveDuelWinsAsync(Guid playerId, int wins)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var player = await db.Players.FindAsync(playerId);
-        for (var i = 0; i < wins; i++) player!.RecordPvpWin();
+        for (var i = 0; i < wins; i++) player!.RecordPvpWin(ratingGained: 0);
         await db.SaveChangesAsync();
     }
 

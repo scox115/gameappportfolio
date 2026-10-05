@@ -114,6 +114,22 @@ public class MatchRulesEngineTests
         Assert.Equal(winner.Id, match.WinnerPlayerId);
         Assert.Equal(1, winner.PvpWins);
         Assert.Equal(0, loser.PvpWins);
+        Assert.Equal(0, winner.PvpLosses);
+        Assert.Equal(1, loser.PvpLosses);
+    }
+
+    [Fact]
+    public void Pvp_MovesRatingPointsFromTheLoserToTheWinner()
+    {
+        var winner = NewPlayer("a");
+        var loser = NewPlayer("b");
+        var match = new GameMatch(winner.Id, loser.Id);
+
+        var points = _engine.ProcessMatchWin(match, winner, loser);
+
+        Assert.Equal(EloRating.KFactor / 2, points);
+        Assert.Equal(EloRating.StartingRating + points, winner.Rating);
+        Assert.Equal(EloRating.StartingRating - points, loser.Rating);
     }
 
     [Fact]

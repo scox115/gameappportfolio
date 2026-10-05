@@ -1,4 +1,5 @@
 using Game.Core.Entities;
+using Game.Core.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -29,6 +30,11 @@ public class PlayerConfiguration : IEntityTypeConfiguration<Player>
         // Purchases and rewards both change gold; this stops two requests spending the same gold.
         builder.Property(p => p.Version)
             .IsConcurrencyToken();
+
+        // New and existing players start at the same PvP rating; the leaderboard sorts on it.
+        builder.Property(p => p.Rating)
+            .HasDefaultValue(EloRating.StartingRating);
+        builder.HasIndex(p => p.Rating);
 
         // Upgraded cards live in their own table, one row per card the player has upgraded.
         builder.OwnsMany(p => p.CardUpgrades, upgrades =>

@@ -52,6 +52,7 @@ public record BattleTurnResponse(
             turn.BossDamage, turn.AttackBlocked, turn.BossHealed);
 }
 
-public record BattleRewardResponse(int GoldEarned, int ExperienceEarned, PlayerProfileResponse Player);
+/// <param name="RatingChange">PvP only: rating points gained (positive) or lost (negative) in this duel.</param>
+public record BattleRewardResponse(int GoldEarned, int ExperienceEarned, PlayerProfileResponse Player, int? RatingChange = null);
 
 public record PlayCardResponse(BattleStateResponse Battle, BattleTurnResponse TurnResult, BattleRewardResponse? Reward);

@@ -102,7 +102,7 @@ public class GoldShopPvpTests
     private static Player PlayerWith(int gold, int pvpWins = 0)
     {
         var player = new Player("Duelist", gold);
-        for (var i = 0; i < pvpWins; i++) player.RecordPvpWin();
+        for (var i = 0; i < pvpWins; i++) player.RecordPvpWin(ratingGained: 0);
         return player;
     }
 
