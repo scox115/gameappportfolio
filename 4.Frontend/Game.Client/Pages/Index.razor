@@ -199,6 +199,8 @@
                                             }
                                         </div>
 
+                                        @if (battleResult is null)
+                                        {
                                         <!-- DECK ACTION HAND CARD PANELS -->
                                         <div style="display: flex; justify-content: center; gap: 15px;">
                                             <button @onclick='() => PlayTurn("Fireball")'
@@ -211,6 +213,35 @@
                                                             style="background: #7c3aed; width: 140px; height: 100px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: pointer;">🐉
                                                         Dragon Fury<br /><small>35 DMG</small></button>
                                                     </div>
+                                        }
+                                        else
+                                        {
+                                            <!-- BATTLE RESULT PANEL: SHOWS THE SERVER'S VERDICT AND THE REWARDS EARNED -->
+                                            <div style="text-align: center; padding: 25px; border-radius: 12px; background: @(battleResult.won ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)"); border: 2px solid @(battleResult.won ? "#22c55e" : "#ef4444");">
+                                                <div style="font-size: 3rem; line-height: 1;">@(battleResult.won ? "🏆" : "💀")</div>
+                                                <h2 style="margin: 10px 0 5px; color: @(battleResult.won ? "#4ade80" : "#f87171"); letter-spacing: 2px;">@(battleResult.won ? "VICTORY" : "DEFEAT")</h2>
+                                                <p style="color: #cbd5e1; margin: 0 0 20px;">
+                                                    @(battleResult.won ? "The Shadow Overlord has fallen!" : "The Shadow Overlord prevails... this time.")
+                                                </p>
+
+                                                <div style="display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; font-weight: bold;">
+                                                    <span style="color: #fbbf24;">🪙 +@battleResult.goldEarned Gold</span>
+                                                    <span style="color: #a78bfa;">✨ +@battleResult.experienceEarned XP</span>
+                                                </div>
+
+                                                @if (battleResult.leveledUp)
+                                                {
+                                                    <div style="color: #fbbf24; font-weight: bold; margin-bottom: 20px;">⬆️ LEVEL UP! You are now level @battleResult.newLevel.</div>
+                                                }
+
+                                                <div style="display: flex; justify-content: center; gap: 15px;">
+                                                    <button @onclick="ReturnToTown"
+                                                            style="background: #334155; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🏰 Return to Town</button>
+                                                    <button @onclick="EnterArena"
+                                                            style="background: #dc2626; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">⚔️ Fight Again</button>
+                                                </div>
+                                            </div>
+                                        }
                                                 </div>
                                                 break;
                                             }
@@ -231,6 +262,7 @@
     private int turnCount = 1;
     private bool isPlayerTurn = true; // Prevents button click spamming
     private bool matchConcluding = false; // Locks inputs during network saves
+    private BattleResultView? battleResult; // Set when the server ends the battle
     private List<string> logs = new() { "⚔️ Match Initialized. Select an action card block." };
 
     // Leaderboard state references
@@ -429,10 +461,12 @@
     {
         matchConcluding = true; // Lock all inputs
 
-        logs.Add(result.battle.status == "Won"
+        var won = result.battle.status == "Won";
+        logs.Add(won
             ? "🏆 VICTORY! The server confirmed your win."
             : "💀 DEFEAT! The Shadow Overlord prevails.");
 
+        var levelBefore = State.Level;
         if (result.reward is { } reward)
         {
             logs.Add($"🪙 +{reward.goldEarned} gold, +{reward.experienceEarned} XP.");
@@ -440,10 +474,23 @@
             State.UpdateRewards(reward.player.gold, reward.player.level);
         }
 
-        // Reset match values and send player back to the main character panel
+        // Stay in the arena and show the result until the player chooses what to do next
+        battleResult = new BattleResultView(
+            won,
+            result.reward?.goldEarned ?? 0,
+            result.reward?.experienceEarned ?? 0,
+            State.Level > levelBefore,
+            State.Level);
+        StateHasChanged();
+    }
+
+    private void ReturnToTown()
+    {
         ResetMatch();
         State.ChangeScreen(GameScreen.CharacterDashboard);
     }
+
+    private record BattleResultView(bool won, int goldEarned, int experienceEarned, bool leveledUp, int newLevel);
 
     private async Task LaunchLeaderboardView()
     {
@@ -472,6 +519,7 @@
         turnCount = 1;
         isPlayerTurn = true;
         matchConcluding = false;
+        battleResult = null;
         logs = new() { "⚔️ Match Initialized. Select an action card block." }; 
     }
 
