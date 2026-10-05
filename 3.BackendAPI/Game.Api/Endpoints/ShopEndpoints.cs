@@ -63,5 +63,35 @@ public static class ShopEndpoints
             logger.LogInformation("Player {PlayerId} bought {Item}", player.Id, request.Item);
             return Results.Ok(ShopResponse.For(player));
         });
+
+        // Chooses which owned title shows after the player's name (or none).
+        group.MapPut("/title", async (EquipTitleRequest request, ClaimsPrincipal user, AppDbContext dbContext) =>
+        {
+            if (request.Title is { } title && !Enum.IsDefined(title))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(EquipTitleRequest.Title)] = ["Unknown title."]
+                });
+            }
+
+            var player = await dbContext.Players.FindAsync(user.GetPlayerId());
+            if (player is null)
+            {
+                return Results.NotFound("Player profile not found.");
+            }
+
+            try
+            {
+                player.EquipTitle(request.Title);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "Can't use that title");
+            }
+
+            await dbContext.SaveChangesAsync();
+            return Results.Ok(ShopResponse.For(player));
+        });
     }
 }

@@ -78,8 +78,8 @@ public class GoldShopTests
         var first = player.TakeLoadoutForBossFight();
         var second = player.TakeLoadoutForBossFight();
 
-        Assert.Equal(new PveLoadout(1, 2, 1, Player.ElixirBonusHp), first);
-        Assert.Equal(new PveLoadout(1, 2, 1, 0), second);
+        Assert.Equal(new BattleLoadout(1, 2, 1, Player.ElixirBonusHp), first);
+        Assert.Equal(new BattleLoadout(1, 2, 1, 0), second);
         Assert.Equal(0, player.Elixirs);
     }
 
@@ -94,5 +94,74 @@ public class GoldShopTests
         Assert.Equal(BattleCards.Get(BattleCard.Fireball).FailChance, fireball.FailChance);
         Assert.Equal(20, shield.Heal);
         Assert.Equal(0, shield.Damage);
+    }
+}
+
+public class GoldShopPvpTests
+{
+    private static Player PlayerWith(int gold, int pvpWins = 0)
+    {
+        var player = new Player("Duelist", gold);
+        for (var i = 0; i < pvpWins; i++) player.RecordPvpWin();
+        return player;
+    }
+
+    [Fact]
+    public void ATitleStaysLockedUntilThePlayerHasWonEnoughDuels()
+    {
+        var player = PlayerWith(1000, pvpWins: 4);
+
+        var offer = GoldShop.OfferFor(player, ShopItem.TitleGladiator);
+        var error = Assert.Throws<InvalidOperationException>(() => GoldShop.Buy(player, ShopItem.TitleGladiator));
+
+        Assert.Equal("Win 1 more duel to unlock", offer.LockedReason);
+        Assert.Contains("1 more duel", error.Message);
+        Assert.Equal(1000, player.Gold);
+        Assert.False(player.OwnsTitle(PlayerTitle.Gladiator));
+    }
+
+    [Fact]
+    public void BuyingATitleShowsItAfterTheName()
+    {
+        var player = PlayerWith(1000, pvpWins: 5);
+
+        var offer = GoldShop.Buy(player, ShopItem.TitleGladiator);
+
+        Assert.Equal(700, player.Gold);
+        Assert.Equal(PlayerTitle.Gladiator, player.EquippedTitle);
+        Assert.Equal("the Gladiator", player.TitleName);
+        Assert.Null(offer.Price);
+        Assert.Throws<InvalidOperationException>(() => GoldShop.Buy(player, ShopItem.TitleGladiator));
+    }
+
+    [Fact]
+    public void APlayerCanOnlyShowATitleTheyOwn()
+    {
+        var player = PlayerWith(1000, pvpWins: 1);
+        GoldShop.Buy(player, ShopItem.TitleDuelist);
+
+        player.EquipTitle(null);
+        Assert.Null(player.TitleName);
+
+        Assert.Throws<InvalidOperationException>(() => player.EquipTitle(PlayerTitle.ArenaChampion));
+        player.EquipTitle(PlayerTitle.Duelist);
+        Assert.Equal("the Duelist", player.TitleName);
+    }
+
+    [Fact]
+    public void ADuelElixirIsUsedByTheNextDuelNotTheNextBossFight()
+    {
+        var player = PlayerWith(1000);
+        GoldShop.Buy(player, ShopItem.DuelElixir);
+        GoldShop.Buy(player, ShopItem.FireballUpgrade);
+
+        var bossFight = player.TakeLoadoutForBossFight();
+        var duel = player.TakeLoadoutForDuel();
+        var nextDuel = player.TakeLoadoutForDuel();
+
+        Assert.Equal(0, bossFight.BonusHp);
+        Assert.Equal(new BattleLoadout(2, 1, 1, Player.DuelElixirBonusHp), duel);
+        Assert.Equal(0, nextDuel.BonusHp);
+        Assert.Equal(1000 - GoldShop.DuelElixirPrice - 150, player.Gold);
     }
 }

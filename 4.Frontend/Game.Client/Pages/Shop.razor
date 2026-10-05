@@ -12,7 +12,7 @@
         <span style="color: #fbbf24; font-weight: bold; font-size: 1.2rem;">You have @State.Gold gold</span>
     </div>
     <p style="color: #94a3b8; margin: 0 0 20px;">
-        Upgrades make your cards stronger against the Shadow Overlord. PvP duels stay even, so every opponent fights with the same cards.
+        Upgrades make your cards stronger in boss fights and PvP duels. Titles show off your duel wins (you have @pvpWins).
     </p>
 
     @if (!string.IsNullOrEmpty(message))
@@ -29,34 +29,57 @@
     }
     else
     {
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 15px;">
-            @foreach (var offer in offers)
-            {
-                var look = Look(offer.item);
-                var soldOut = offer.price is null;
-                var affordable = offer.price is int price && price <= State.Gold;
-                <div style="background: #0f172a; border: 1px solid @(soldOut ? "#334155" : look.Color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 8px;">
-                    <div style="font-size: 2rem;">@look.Icon</div>
-                    <div style="font-weight: bold; color: #f1f5f9;">@offer.name</div>
-                    <div style="color: #94a3b8; font-size: 0.9rem; flex: 1;">@offer.description</div>
-                    <div style="color: #cbd5e1; font-size: 0.9rem;">
-                        @if (offer.item == "BattleElixir")
+        @foreach (var shelf in Sections)
+        {
+            var sectionOffers = offers.Where(o => shelf.Includes(o.item)).ToList();
+            if (sectionOffers.Count == 0) continue;
+            <h3 style="color: #f1f5f9; margin: 20px 0 10px; font-size: 1.05rem;">@shelf.Heading</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 15px;">
+                @foreach (var offer in sectionOffers)
+                {
+                    var look = Look(offer.item);
+                    var isTitle = offer.item.StartsWith("Title");
+                    var ownedTitle = isTitle && offer.owned > 0;
+                    var equipped = ownedTitle && equippedTitle == TitleOf(offer.item);
+                    var soldOut = offer.price is null;
+                    var buyable = !soldOut && offer.lockedReason is null && offer.price <= State.Gold;
+                    <div style="background: #0f172a; border: 1px solid @(soldOut && !ownedTitle ? "#334155" : look.Color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="font-size: 2rem;">@look.Icon</div>
+                        <div style="font-weight: bold; color: #f1f5f9;">@offer.name</div>
+                        <div style="color: #94a3b8; font-size: 0.9rem; flex: 1;">@offer.description</div>
+                        <div style="color: #cbd5e1; font-size: 0.9rem;">
+                            @if (isTitle)
+                            {
+                                <span>@(ownedTitle ? (equipped ? "✅ Showing after your name" : "Owned") : offer.lockedReason ?? "Unlocked")</span>
+                            }
+                            else if (offer.item.EndsWith("Elixir"))
+                            {
+                                <span>Carrying @offer.owned of @offer.maxOwned</span>
+                            }
+                            else
+                            {
+                                <span>Level @offer.owned of @offer.maxOwned (@look.Stat(offer.owned))</span>
+                            }
+                        </div>
+                        @if (ownedTitle)
                         {
-                            <span>Carrying @offer.owned of @offer.maxOwned</span>
+                            <button @onclick="() => ShowTitle(equipped ? null : TitleOf(offer.item))" disabled="@buying"
+                                    style="background: @(equipped ? "#334155" : look.Color); color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                                @(equipped ? "Hide title" : "Show this title")
+                            </button>
                         }
                         else
                         {
-                            <span>Level @offer.owned of @offer.maxOwned (@look.Stat(offer.owned))</span>
+                            <button @onclick="() => Buy(offer)" disabled="@(!buyable || buying)"
+                                    aria-label="@($"Buy {offer.name}")"
+                                    style="background: @(buyable ? look.Color : "#475569"); color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: @(buyable ? "pointer" : "not-allowed");">
+                                @(soldOut ? (offer.item.EndsWith("Elixir") ? "Pouch full" : "Max level") : offer.lockedReason is not null ? $"🔒 {offer.price} 🪙" : $"Buy for {offer.price} 🪙")
+                            </button>
                         }
                     </div>
-                    <button @onclick="() => Buy(offer)" disabled="@(soldOut || !affordable || buying)"
-                            aria-label="@($"Buy {offer.name}")"
-                            style="background: @(soldOut || !affordable ? "#475569" : look.Color); color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: @(soldOut || !affordable ? "not-allowed" : "pointer");">
-                        @(soldOut ? (offer.item == "BattleElixir" ? "Pouch full" : "Max level") : $"Buy for {offer.price} 🪙")
-                    </button>
-                </div>
-            }
-        </div>
+                }
+            </div>
+        }
     }
 
     <button @onclick="() => State.ChangeScreen(GameScreen.CharacterDashboard)"
@@ -65,6 +88,17 @@
 
 @code {
     private List<ShopOfferDto>? offers;
+    private int pvpWins;
+    private string? equippedTitle;
+
+    private record ShopSection(string Heading, Func<string, bool> Includes);
+
+    private static readonly ShopSection[] Sections =
+    [
+        new("⚔️ Card Upgrades (boss fights and duels)", item => item.EndsWith("Upgrade")),
+        new("🧪 Elixirs", item => item.EndsWith("Elixir")),
+        new("👑 Duel Titles", item => item.StartsWith("Title"))
+    ];
     private bool loadFailed;
     private bool buying;
     private string? message;
@@ -93,9 +127,13 @@
             if (response.IsSuccessStatusCode && await response.Content.ReadFromJsonAsync<ShopDto>() is { } shop)
             {
                 Show(shop);
-                message = offer.item == "BattleElixir"
-                    ? "Bought a Battle Elixir. You'll drink it at the start of your next boss fight."
-                    : $"{offer.name.Replace(" Upgrade", "")} is now level {offer.owned + 1}!";
+                message = offer.item switch
+                {
+                    "BattleElixir" => "Bought a Battle Elixir. You'll drink it at the start of your next boss fight.",
+                    "DuelElixir" => "Bought a Duel Elixir. You'll drink it at the start of your next PvP duel.",
+                    _ when offer.item.StartsWith("Title") => $"You are now {State.Username}, {offer.name.Replace("Title: ", "")}!",
+                    _ => $"{offer.name.Replace(" Upgrade", "")} is now level {offer.owned + 1}!"
+                };
                 messageIsError = false;
                 await Sounds.PlayAsync(Sound.Purchase);
             }
@@ -117,9 +155,44 @@
         }
     }
 
+    private async Task ShowTitle(string? title)
+    {
+        buying = true;
+        message = null;
+        try
+        {
+            var response = await Http.PutAsJsonAsync("/api/shop/title", new { Title = title });
+            if (response.IsSuccessStatusCode && await response.Content.ReadFromJsonAsync<ShopDto>() is { } shop)
+            {
+                Show(shop);
+                message = title is null ? "Your title is hidden." : "Your title now shows to duel opponents and on the leaderboard.";
+                messageIsError = false;
+            }
+            else
+            {
+                message = "Couldn't change your title. Please try again.";
+                messageIsError = true;
+            }
+        }
+        catch (Exception)
+        {
+            message = "Couldn't reach the shop. Please try again.";
+            messageIsError = true;
+        }
+        finally
+        {
+            buying = false;
+        }
+    }
+
+    // "TitleGladiator" (the shop item) sells "Gladiator" (the title).
+    private static string TitleOf(string item) => item["Title".Length..];
+
     private void Show(ShopDto shop)
     {
         offers = shop.offers;
+        pvpWins = shop.pvpWins;
+        equippedTitle = shop.equippedTitle;
         State.UpdateGold(shop.gold);
     }
 
@@ -131,12 +204,16 @@
         "FireballUpgrade" => new("🔥", "#ea580c", level => $"{20 + (level - 1) * 5} DMG"),
         "HolyShieldUpgrade" => new("🛡️", "#2563eb", level => $"{15 + (level - 1) * 5} HEAL"),
         "DragonClawUpgrade" => new("🐉", "#7c3aed", level => $"{35 + (level - 1) * 5} DMG"),
-        _ => new("🧪", "#059669", _ => "")
+        "BattleElixir" => new("🧪", "#059669", _ => ""),
+        "DuelElixir" => new("⚗️", "#0891b2", _ => ""),
+        _ => new("👑", "#ca8a04", _ => "")
     };
 
     private class ShopDto
     {
         public int gold { get; set; }
+        public int pvpWins { get; set; }
+        public string? equippedTitle { get; set; }
         public List<ShopOfferDto> offers { get; set; } = new();
     }
 
@@ -148,6 +225,7 @@
         public int? price { get; set; }
         public int owned { get; set; }
         public int maxOwned { get; set; }
+        public string? lockedReason { get; set; }
     }
 
     private class ProblemDto

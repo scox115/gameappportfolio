@@ -42,7 +42,7 @@ public record PvpTurnResult(
 /// </remarks>
 public class PvpBattle
 {
-    public const int PlayerMaxHp = 100;
+    public const int BasePlayerMaxHp = 100;
     public static readonly TimeSpan TurnTimeLimit = TimeSpan.FromSeconds(30);
 
     public Guid Id { get; private set; }
@@ -50,6 +50,17 @@ public class PvpBattle
     public Guid PlayerTwoId { get; private set; }
     public int PlayerOneHp { get; private set; }
     public int PlayerTwoHp { get; private set; }
+
+    // Each player's Gold Shop loadout, fixed when the battle starts: health (base plus any Duel
+    // Elixir) and card levels.
+    public int PlayerOneMaxHp { get; private set; } = BasePlayerMaxHp;
+    public int PlayerTwoMaxHp { get; private set; } = BasePlayerMaxHp;
+    public int PlayerOneFireballLevel { get; private set; } = 1;
+    public int PlayerOneHolyShieldLevel { get; private set; } = 1;
+    public int PlayerOneDragonClawLevel { get; private set; } = 1;
+    public int PlayerTwoFireballLevel { get; private set; } = 1;
+    public int PlayerTwoHolyShieldLevel { get; private set; } = 1;
+    public int PlayerTwoDragonClawLevel { get; private set; } = 1;
 
     /// <summary>A Holy Shield that will block the player's opponent's next attack.</summary>
     public bool PlayerOneShielded { get; private set; }
@@ -77,21 +88,38 @@ public class PvpBattle
 
     private PvpBattle() { }
 
-    /// <summary>Starts a battle. <paramref name="firstPlayerId"/> takes the first turn.</summary>
-    public static PvpBattle Start(Guid firstPlayerId, Guid secondPlayerId, DateTime startedAt)
+    /// <summary>
+    /// Starts a battle. <paramref name="firstPlayerId"/> takes the first turn. Each player brings
+    /// their own loadout of upgraded cards and elixir health; none means plain level-1 cards.
+    /// </summary>
+    public static PvpBattle Start(Guid firstPlayerId, Guid secondPlayerId, DateTime startedAt,
+        BattleLoadout? firstLoadout = null, BattleLoadout? secondLoadout = null)
     {
+        firstLoadout ??= BattleLoadout.Basic;
+        secondLoadout ??= BattleLoadout.Basic;
         if (firstPlayerId == Guid.Empty || secondPlayerId == Guid.Empty)
             throw new ArgumentException("Both players need an id.");
         if (firstPlayerId == secondPlayerId)
             throw new ArgumentException("A player cannot battle themselves.");
 
-        return new PvpBattle
+        if (firstLoadout.BonusHp < 0 || secondLoadout.BonusHp < 0)
+            throw new ArgumentException("Bonus health can't be negative.");
+
+        var battle = new PvpBattle
         {
             Id = Guid.NewGuid(),
             PlayerOneId = firstPlayerId,
             PlayerTwoId = secondPlayerId,
-            PlayerOneHp = PlayerMaxHp,
-            PlayerTwoHp = PlayerMaxHp,
+            PlayerOneHp = BasePlayerMaxHp + firstLoadout.BonusHp,
+            PlayerTwoHp = BasePlayerMaxHp + secondLoadout.BonusHp,
+            PlayerOneMaxHp = BasePlayerMaxHp + firstLoadout.BonusHp,
+            PlayerTwoMaxHp = BasePlayerMaxHp + secondLoadout.BonusHp,
+            PlayerOneFireballLevel = firstLoadout.FireballLevel,
+            PlayerOneHolyShieldLevel = firstLoadout.HolyShieldLevel,
+            PlayerOneDragonClawLevel = firstLoadout.DragonClawLevel,
+            PlayerTwoFireballLevel = secondLoadout.FireballLevel,
+            PlayerTwoHolyShieldLevel = secondLoadout.HolyShieldLevel,
+            PlayerTwoDragonClawLevel = secondLoadout.DragonClawLevel,
             ActivePlayerId = firstPlayerId,
             TurnDeadline = startedAt + TurnTimeLimit,
             Turn = 1,
@@ -99,6 +127,14 @@ public class PvpBattle
             StartedAt = startedAt,
             Version = Guid.NewGuid()
         };
+
+        // Fail now on a bad level rather than mid-duel.
+        foreach (var card in BattleCards.All)
+        {
+            battle.CardFor(firstPlayerId, card.Card);
+            battle.CardFor(secondPlayerId, card.Card);
+        }
+        return battle;
     }
 
     public bool IsFinished => Status == PvpBattleStatus.Finished;
@@ -108,6 +144,23 @@ public class PvpBattle
     public Guid OpponentOf(Guid playerId) => IsPlayerOne(playerId) ? PlayerTwoId : PlayerOneId;
 
     public int HpOf(Guid playerId) => IsPlayerOne(playerId) ? PlayerOneHp : PlayerTwoHp;
+
+    public int MaxHpOf(Guid playerId) => IsPlayerOne(playerId) ? PlayerOneMaxHp : PlayerTwoMaxHp;
+
+    public int LevelOf(Guid playerId, BattleCard card)
+    {
+        var one = IsPlayerOne(playerId);
+        return card switch
+        {
+            BattleCard.Fireball => one ? PlayerOneFireballLevel : PlayerTwoFireballLevel,
+            BattleCard.HolyShield => one ? PlayerOneHolyShieldLevel : PlayerTwoHolyShieldLevel,
+            BattleCard.DragonClaw => one ? PlayerOneDragonClawLevel : PlayerTwoDragonClawLevel,
+            _ => throw new ArgumentOutOfRangeException(nameof(card), card, "Unknown battle card.")
+        };
+    }
+
+    /// <summary>A card as this player holds it in this battle, upgrades included.</summary>
+    public BattleCardDefinition CardFor(Guid playerId, BattleCard card) => BattleCards.AtLevel(card, LevelOf(playerId, card));
 
     public bool IsShielded(Guid playerId) => IsPlayerOne(playerId) ? PlayerOneShielded : PlayerTwoShielded;
 
@@ -128,7 +181,7 @@ public class PvpBattle
         if (playerId != ActivePlayerId) throw new InvalidOperationException("It's not your turn.");
         if (IsTurnExpired(playedAt)) throw new InvalidOperationException("Your turn timer ran out.");
 
-        var definition = BattleCards.Get(card);
+        var definition = CardFor(playerId, card);
         if (RechargingCardOf(playerId) == card) throw new InvalidOperationException($"{definition.Name} is still recharging.");
 
         var opponentId = OpponentOf(playerId);
@@ -161,7 +214,7 @@ public class PvpBattle
                 }
             }
 
-            healthRestored = Math.Min(definition.Heal, PlayerMaxHp - HpOf(playerId));
+            healthRestored = Math.Min(definition.Heal, MaxHpOf(playerId) - HpOf(playerId));
             SetHp(playerId, HpOf(playerId) + healthRestored);
 
             if (definition.BlocksAttack) SetShield(playerId, true);

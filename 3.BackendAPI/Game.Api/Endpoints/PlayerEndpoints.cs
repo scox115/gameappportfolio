@@ -100,17 +100,19 @@ public static class PlayerEndpoints
                 .OrderByDescending(p => p.Level)
                 .ThenByDescending(p => p.ExperiencePoints)
                 .Take(10)
-                .Select(p => new
-                {
-                    id = p.Id,
-                    username = p.Username,
-                    level = p.Level,
-                    gold = p.Gold,
-                    avatarUrl = p.AvatarUrl
-                })
+                .Select(p => new { p.Id, p.Username, p.Level, p.Gold, p.AvatarUrl, p.EquippedTitle, p.PvpWins })
                 .ToListAsync();
 
-            return Results.Ok(topPlayers);
+            return Results.Ok(topPlayers.Select(p => new
+            {
+                id = p.Id,
+                username = p.Username,
+                title = p.EquippedTitle is { } title ? PlayerTitles.Get(title).Name : null,
+                level = p.Level,
+                gold = p.Gold,
+                pvpWins = p.PvpWins,
+                avatarUrl = p.AvatarUrl
+            }));
         });
     }
 }

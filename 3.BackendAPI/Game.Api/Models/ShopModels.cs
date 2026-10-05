@@ -6,14 +6,19 @@ namespace Game.Api.Models;
 public record PurchaseRequest(ShopItem Item);
 
 /// <param name="Price">Null when the player can't buy any more of this item.</param>
-public record ShopOfferResponse(ShopItem Item, string Name, string Description, int? Price, int Owned, int MaxOwned)
+/// <param name="LockedReason">Why it can't be bought yet, such as a title that needs more duel wins.</param>
+public record ShopOfferResponse(ShopItem Item, string Name, string Description, int? Price, int Owned, int MaxOwned, string? LockedReason)
 {
     public static ShopOfferResponse From(ShopOffer offer) =>
-        new(offer.Item, offer.Name, offer.Description, offer.Price, offer.Owned, offer.MaxOwned);
+        new(offer.Item, offer.Name, offer.Description, offer.Price, offer.Owned, offer.MaxOwned, offer.LockedReason);
 }
 
-public record ShopResponse(int Gold, IReadOnlyList<ShopOfferResponse> Offers)
+/// <param name="EquippedTitle">The title shown after the player's name, or null.</param>
+public record ShopResponse(int Gold, int PvpWins, PlayerTitle? EquippedTitle, IReadOnlyList<ShopOfferResponse> Offers)
 {
     public static ShopResponse For(Player player) =>
-        new(player.Gold, GoldShop.OffersFor(player).Select(ShopOfferResponse.From).ToList());
+        new(player.Gold, player.PvpWins, player.EquippedTitle, GoldShop.OffersFor(player).Select(ShopOfferResponse.From).ToList());
 }
+
+/// <param name="Title">The owned title to show, or null to show none.</param>
+public record EquipTitleRequest(PlayerTitle? Title);

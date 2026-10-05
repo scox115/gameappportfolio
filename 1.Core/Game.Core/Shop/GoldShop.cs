@@ -8,20 +8,26 @@ public enum ShopItem
     FireballUpgrade,
     HolyShieldUpgrade,
     DragonClawUpgrade,
-    BattleElixir
+    BattleElixir,
+    DuelElixir,
+    TitleDuelist,
+    TitleGladiator,
+    TitleArenaChampion
 }
 
 /// <summary>What a shop item is and what it costs this player right now.</summary>
-/// <param name="Price">Null when the player can't buy any more (a card at its top level, or a full elixir pouch).</param>
-public record ShopOffer(ShopItem Item, string Name, string Description, int? Price, int Owned, int MaxOwned);
+/// <param name="Price">Null when the player can't buy any more (a card at its top level, a full elixir pouch, or a title they own).</param>
+/// <param name="LockedReason">Why the player can't buy it yet, such as a title that needs more duel wins.</param>
+public record ShopOffer(ShopItem Item, string Name, string Description, int? Price, int Owned, int MaxOwned, string? LockedReason = null);
 
 /// <summary>
-/// Where players spend the gold they win. Card upgrades make a card stronger against the boss
-/// (PvP duels stay even), and a Battle Elixir adds health for the next boss fight.
+/// Where players spend the gold they win. Card upgrades make a card stronger in boss fights and
+/// duels, elixirs add health for the next boss fight or duel, and titles show off duel wins.
 /// </summary>
 public static class GoldShop
 {
     public const int ElixirPrice = 50;
+    public const int DuelElixirPrice = 60;
 
     /// <summary>Upgrade prices by the level being bought: level 2, then level 3.</summary>
     private static readonly int[] UpgradePrices = [150, 300];
@@ -36,11 +42,28 @@ public static class GoldShop
     {
         ArgumentNullException.ThrowIfNull(player);
 
+        if (TitleFor(item) is { } title)
+        {
+            var titleDefinition = PlayerTitles.Get(title);
+            var owned = player.OwnsTitle(title);
+            return new ShopOffer(item, $"Title: {titleDefinition.Name}",
+                $"Shown after your name to duel opponents and on the leaderboard. Needs {titleDefinition.DuelWinsNeeded} PvP win{(titleDefinition.DuelWinsNeeded == 1 ? "" : "s")}.",
+                owned ? null : titleDefinition.Price, owned ? 1 : 0, 1,
+                owned || player.PvpWins >= titleDefinition.DuelWinsNeeded ? null : $"Win {titleDefinition.DuelWinsNeeded - player.PvpWins} more duel{(titleDefinition.DuelWinsNeeded - player.PvpWins == 1 ? "" : "s")} to unlock");
+        }
+
         if (item == ShopItem.BattleElixir)
         {
             return new ShopOffer(item, "Battle Elixir",
                 $"Start your next boss fight with +{Player.ElixirBonusHp} HP. Used automatically.",
                 player.Elixirs < Player.MaxElixirs ? ElixirPrice : null, player.Elixirs, Player.MaxElixirs);
+        }
+
+        if (item == ShopItem.DuelElixir)
+        {
+            return new ShopOffer(item, "Duel Elixir",
+                $"Start your next PvP duel with +{Player.DuelElixirBonusHp} HP. Used automatically.",
+                player.DuelElixirs < Player.MaxElixirs ? DuelElixirPrice : null, player.DuelElixirs, Player.MaxElixirs);
         }
 
         var card = CardFor(item);
@@ -50,7 +73,7 @@ public static class GoldShop
         int? price = level < BattleCards.MaxLevel ? UpgradePrices[level - 1] : null;
 
         return new ShopOffer(item, $"{definition.Name} Upgrade",
-            $"+{BattleCards.BonusPerLevel} {effect} against the Shadow Overlord for each level.",
+            $"+{BattleCards.BonusPerLevel} {effect} per level, in boss fights and PvP duels.",
             price, level, BattleCards.MaxLevel);
     }
 
@@ -61,10 +84,16 @@ public static class GoldShop
         if (!Enum.IsDefined(item)) throw new ArgumentOutOfRangeException(nameof(item), item, "Unknown shop item.");
 
         var offer = OfferFor(player, item);
+        if (offer.LockedReason is not null)
+        {
+            throw new InvalidOperationException($"{offer.LockedReason}.");
+        }
+
         if (offer.Price is not { } price)
         {
-            throw new InvalidOperationException(item == ShopItem.BattleElixir
-                ? $"You can carry at most {Player.MaxElixirs} elixirs."
+            if (TitleFor(item) is not null) throw new InvalidOperationException("You already own that title.");
+            throw new InvalidOperationException(item is ShopItem.BattleElixir or ShopItem.DuelElixir
+                ? $"You can carry at most {Player.MaxElixirs} of those elixirs."
                 : $"{offer.Name.Replace(" Upgrade", "")} is already at its top level.");
         }
 
@@ -74,9 +103,17 @@ public static class GoldShop
         }
 
         player.DeductGold(price);
-        if (item == ShopItem.BattleElixir)
+        if (TitleFor(item) is { } boughtTitle)
+        {
+            player.AddTitle(boughtTitle);
+        }
+        else if (item == ShopItem.BattleElixir)
         {
             player.AddElixir();
+        }
+        else if (item == ShopItem.DuelElixir)
+        {
+            player.AddDuelElixir();
         }
         else
         {
@@ -85,6 +122,15 @@ public static class GoldShop
 
         return OfferFor(player, item);
     }
+
+    /// <summary>The title a shop item sells, or null for other items.</summary>
+    public static PlayerTitle? TitleFor(ShopItem item) => item switch
+    {
+        ShopItem.TitleDuelist => PlayerTitle.Duelist,
+        ShopItem.TitleGladiator => PlayerTitle.Gladiator,
+        ShopItem.TitleArenaChampion => PlayerTitle.ArenaChampion,
+        _ => null
+    };
 
     private static BattleCard CardFor(ShopItem item) => item switch
     {

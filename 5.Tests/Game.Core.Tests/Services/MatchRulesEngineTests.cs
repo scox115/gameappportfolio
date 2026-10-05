@@ -112,6 +112,8 @@ public class MatchRulesEngineTests
         Assert.Equal(MatchRulesEngine.LossExperience, loser.ExperiencePoints);
         Assert.True(match.IsCompleted);
         Assert.Equal(winner.Id, match.WinnerPlayerId);
+        Assert.Equal(1, winner.PvpWins);
+        Assert.Equal(0, loser.PvpWins);
     }
 
     [Fact]
