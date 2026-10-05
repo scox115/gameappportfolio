@@ -1,0 +1,89 @@
+@using Game.Client.Services
+@inject GameState State
+@inject IdleTimeoutSettings Settings
+@inject IJSRuntime JS
+@implements IDisposable
+
+@* Signs an inactive player out, with a warning shortly before it happens. *@
+@if (secondsLeft is int left)
+{
+    <div role="alertdialog" aria-live="assertive"
+         style="position: fixed; inset: 0; background: rgba(2,6,23,0.75); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+        <div style="background: #1e293b; border: 1px solid #f59e0b; border-radius: 16px; padding: 30px; max-width: 420px; text-align: center; color: #f8fafc;">
+            <div style="font-size: 2.5rem;">⏳</div>
+            <h3 style="margin: 10px 0; color: #fbbf24;">Are you still there?</h3>
+            <p style="color: #cbd5e1;">You'll be signed out in <strong>@left</strong> seconds because you haven't been active.</p>
+            <button @onclick="StaySignedIn"
+                    style="background: #6366f1; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Stay signed in</button>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(1);
+
+    private Timer? timer;
+    private int? secondsLeft;
+    private bool checking;
+
+    protected override void OnInitialized() =>
+        timer = new Timer(_ => InvokeAsync(CheckAsync), null, CheckInterval, CheckInterval);
+
+    private async Task CheckAsync()
+    {
+        if (checking) return;
+        checking = true;
+        try
+        {
+            if (string.IsNullOrEmpty(State.AccessToken))
+            {
+                SetWarning(null);
+                return;
+            }
+
+            var idle = TimeSpan.FromSeconds(await JS.InvokeAsync<int>("gameIdle.secondsIdle"));
+            var remaining = Settings.Timeout - idle;
+
+            if (remaining <= TimeSpan.Zero)
+            {
+                SetWarning(null);
+                State.SignOut($"You were signed out after {FormatTimeout()} of inactivity.");
+            }
+            else if (remaining <= Settings.WarningPeriod)
+            {
+                SetWarning((int)Math.Ceiling(remaining.TotalSeconds));
+            }
+            else
+            {
+                SetWarning(null);
+            }
+        }
+        catch (JSException)
+        {
+            // The tracker script failed to load; leave the session alone rather than sign out.
+        }
+        finally
+        {
+            checking = false;
+        }
+    }
+
+    private void SetWarning(int? seconds)
+    {
+        if (secondsLeft == seconds) return;
+        secondsLeft = seconds;
+        StateHasChanged();
+    }
+
+    private async Task StaySignedIn()
+    {
+        await JS.InvokeVoidAsync("gameIdle.markActive");
+        SetWarning(null);
+    }
+
+    private string FormatTimeout() => Settings.Timeout.TotalMinutes >= 1
+        ? $"{Settings.Timeout.TotalMinutes:0.#} minutes"
+        : $"{Settings.Timeout.TotalSeconds:0} seconds";
+
+    public void Dispose() => timer?.Dispose();
+}
