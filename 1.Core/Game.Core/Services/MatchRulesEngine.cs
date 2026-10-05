@@ -4,24 +4,63 @@ namespace Game.Core.Services;
 
 public class MatchRulesEngine
 {
+    public const int WinGold = 100;
+    public const int WinExperience = 50;
+    public const int LossGold = 20;
+    public const int LossExperience = 10;
+
+    /// <summary>
+    /// Settles a PvP match between two registered players: finalizes the match and pays
+    /// each player exactly once.
+    /// </summary>
     public void ProcessMatchWin(GameMatch match, Player winner, Player loser)
     {
-        // 1. Defensively guard against null profiles or data configurations
-        if (match == null) throw new ArgumentNullException(nameof(match));
+        ArgumentNullException.ThrowIfNull(match);
+        ArgumentNullException.ThrowIfNull(winner);
+        ArgumentNullException.ThrowIfNull(loser);
 
-        // 2. Award rewards to the winner (Add 100 gold bounty and 50 experience points)
-        if (winner != null)
+        if (winner.Id == loser.Id)
+            throw new ArgumentException("Winner and loser must be different players.");
+        if (!IsParticipant(match, winner.Id) || !IsParticipant(match, loser.Id))
+            throw new ArgumentException("Both players must be participants in the match.");
+
+        match.CompleteMatch(winner.Id);
+
+        winner.AddGold(WinGold);
+        winner.AddExperience(WinExperience);
+
+        loser.AddGold(LossGold);
+        loser.AddExperience(LossExperience);
+    }
+
+    /// <summary>
+    /// Settles a PvE match against an AI boss: finalizes the match and pays the player
+    /// either the win reward or the consolation reward, never both.
+    /// </summary>
+    public void ProcessPveMatch(GameMatch match, Player player, bool isVictory)
+    {
+        ArgumentNullException.ThrowIfNull(match);
+        ArgumentNullException.ThrowIfNull(player);
+
+        if (!match.IsPve)
+            throw new ArgumentException("Match is not a PvE match.");
+        if (match.PlayerOneId != player.Id)
+            throw new ArgumentException("Player is not the participant in this match.");
+
+        match.CompleteMatch(isVictory ? player.Id : GameMatch.AiBossId);
+
+        if (isVictory)
         {
-            // Assuming your Player entity methods match your domain design:
-            winner.AddGold(100);
-            winner.AddExperience(50);
+            player.AddGold(WinGold);
+            player.AddExperience(WinExperience);
         }
-
-        // 3. Award minor consolation rewards to the losing player (20 gold, 10 experience)
-        if (loser != null)
+        else
         {
-            loser.AddGold(20);
-            loser.AddExperience(10);
+            player.AddGold(LossGold);
+            player.AddExperience(LossExperience);
         }
     }
+
+    private static bool IsParticipant(GameMatch match, Guid playerId) =>
+        match.PlayerOneId == playerId || match.PlayerTwoId == playerId;
 }

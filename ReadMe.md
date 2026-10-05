@@ -8,7 +8,7 @@ The application utilizes a FREE, 100% open-source local cloud infrastructure sta
 CURRENT STATE ARCHITECTURE CHECKLIST:
 1. [Core Project] Implements rich domain entities (Player, GameMatch) and an isolated MatchRulesEngine referee service with zero database or web dependencies.
 2. [Infrastructure Project] Hosts Entity Framework Core DbContext mapped via Fluent API configurations to active Docker containers. Implements IStorageService utilizing native Azure.Storage.Blobs SDK streaming models.
-3. [Backend API Project] Exposes lightweight Minimal API route groupings (PlayerEndpoints, MatchEndpoints) with CORS unlocked for local host traffic. Implements a native Microsoft.Extensions.Hosting BackgroundService (MatchConsumerWorker) that asynchronously pulls raw JSON string packets off RabbitMQ channels to process combat gold rewards.
+3. [Backend API Project] Exposes lightweight Minimal API route groupings (PlayerEndpoints, MatchEndpoints) with CORS unlocked for local host traffic. Implements a native Microsoft.Extensions.Hosting BackgroundService (MatchConsumerWorker) that asynchronously pulls match telemetry packets off RabbitMQ channels. Gold and XP rewards are applied synchronously on the API request thread, never by the worker.
 4. [Frontend Blazor WASM] Hosts a unified single-page full-screen game UI client (Index.razor) driven entirely by a Scoped GameState state container service, eliminating slow browser URL parameter navigation reroutes. Features an active login/registration menu overlay, multi-part avatar binary cloud upload forms, and a responsive card battle loop canvas.
 
 GOAL LOGPOINT: 

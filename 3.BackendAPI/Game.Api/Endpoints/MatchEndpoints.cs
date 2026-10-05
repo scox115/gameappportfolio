@@ -1,4 +1,5 @@
 using Game.Core.Entities;
+using Game.Core.Events;
 using Game.Core.Services; // Brings in MatchRulesEngine!
 using Game.Infrastructure.Data;
 using Microsoft.AspNetCore.Builder;
@@ -13,12 +14,15 @@ namespace Game.Api.Endpoints;
 
 public static class MatchEndpoints
 {
+    public const string MatchCompletedQueue = "match-completed-queue";
+
     public static void MapMatchEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/matches").WithTags("Matches");
 
+        // PvP: both participants are registered players.
         group.MapPost("/complete", async (
-            CompleteMatchRequest request, 
+            CompleteMatchRequest request,
             AppDbContext dbContext,
             IConnectionFactory connectionFactory) =>
         {
@@ -27,61 +31,94 @@ public static class MatchEndpoints
                 return Results.BadRequest("Player IDs cannot be empty.");
             }
 
-            // 1. FETCH BOTH PLAYERS FROM THE LIVE SQL DATABASE
-            var winner = await dbContext.Players.FindAsync(request.WinnerPlayerId);
-            var loser = await dbContext.Players.FindAsync(request.LoserPlayerId);
+            if (request.WinnerPlayerId == request.LoserPlayerId)
+            {
+                return Results.BadRequest("Winner and loser must be different players. Use /api/matches/pve/complete for boss fights.");
+            }
 
-            // Create a placeholder if the opponent was a random AI boss generated on the frontend
-            if (winner is null && request.WinnerPlayerId == winner?.Id) return Results.NotFound("Winner player profile entry missing.");
-            
-            // 2. CONSTRUCT THE MATCH SHIELD ENTITY
-            var match = new GameMatch(request.WinnerPlayerId, request.LoserPlayerId);
+            var winner = await dbContext.Players.FindAsync(request.WinnerPlayerId);
+            if (winner is null) return Results.NotFound("Winner player profile entry missing.");
+
+            var loser = await dbContext.Players.FindAsync(request.LoserPlayerId);
+            if (loser is null) return Results.NotFound("Loser player profile entry missing.");
+
+            var match = new GameMatch(winner.Id, loser.Id);
             dbContext.Matches.Add(match);
 
-            // 3. RUN THE GAME RECOGNITION LAW LOGIC IMMEDIATELY ON THE REQUEST THREAD
-            // This guarantees the winning player gets their gold *before* the API returns!
-            if (winner != null || loser != null)
-            {
-                var rulesEngine = new MatchRulesEngine();
-                rulesEngine.ProcessMatchWin(match, winner, loser);
-            }
-
-            // 4. COMMIT EVERYTHING TO SQL SERVER Permanently
+            // Rewards are applied and saved on the request thread. RabbitMQ only gets a telemetry notice.
+            new MatchRulesEngine().ProcessMatchWin(match, winner, loser);
             await dbContext.SaveChangesAsync();
 
-            // 5. EVENT GENERATION: Push notification payload to RabbitMQ for background tasks
-            try
-            {
-                using var connection = await connectionFactory.CreateConnectionAsync();
-                using var channel = await connection.CreateChannelAsync();
+            await PublishTelemetryAsync(connectionFactory, new MatchCompletedEvent(match.Id, winner.Id, loser.Id));
 
-                await channel.QueueDeclareAsync(
-                    queue: "match-completed-queue", 
-                    durable: true, 
-                    exclusive: false, 
-                    autoDelete: false, 
-                    arguments: null);
-
-                var eventPayload = new { MatchId = match.Id, WinnerId = request.WinnerPlayerId, LoserId = request.LoserPlayerId };
-                var messageJson = JsonSerializer.Serialize(eventPayload);
-                var body = Encoding.UTF8.GetBytes(messageJson);
-
-                await channel.BasicPublishAsync(
-                    exchange: string.Empty, 
-                    routingKey: "match-completed-queue", 
-                    body: body);
-            }
-            catch (Exception ex)
-            {
-                // Log broker error but don't crash the player's game if Docker queues back up
-                System.Console.WriteLine($"[RabbitMQ Event Warning]: {ex.Message}");
-            }
-
-            // Return a 200 OK indicating transactions are completely finished and locked in
             return Results.Ok(new { MatchId = match.Id, Status = "MatchProcessedAndGoldAwarded" });
         });
+
+        // PvE: a registered player against an AI boss that has no Player row.
+        group.MapPost("/pve/complete", async (
+            CompletePveMatchRequest request,
+            AppDbContext dbContext,
+            IConnectionFactory connectionFactory) =>
+        {
+            if (request.PlayerId == Guid.Empty)
+            {
+                return Results.BadRequest("Player ID cannot be empty.");
+            }
+
+            var player = await dbContext.Players.FindAsync(request.PlayerId);
+            if (player is null) return Results.NotFound("Player profile entry missing.");
+
+            var match = GameMatch.CreatePve(player.Id);
+            dbContext.Matches.Add(match);
+
+            // Rewards are applied and saved on the request thread. RabbitMQ only gets a telemetry notice.
+            new MatchRulesEngine().ProcessPveMatch(match, player, request.IsVictory);
+            await dbContext.SaveChangesAsync();
+
+            var winnerId = match.WinnerPlayerId!.Value;
+            var loserId = winnerId == player.Id ? GameMatch.AiBossId : player.Id;
+            await PublishTelemetryAsync(connectionFactory, new MatchCompletedEvent(match.Id, winnerId, loserId));
+
+            return Results.Ok(new
+            {
+                MatchId = match.Id,
+                IsVictory = request.IsVictory,
+                Gold = player.Gold,
+                Level = player.Level,
+                ExperiencePoints = player.ExperiencePoints
+            });
+        });
+    }
+
+    private static async Task PublishTelemetryAsync(IConnectionFactory connectionFactory, MatchCompletedEvent matchEvent)
+    {
+        try
+        {
+            using var connection = await connectionFactory.CreateConnectionAsync();
+            using var channel = await connection.CreateChannelAsync();
+
+            await channel.QueueDeclareAsync(
+                queue: MatchCompletedQueue,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null);
+
+            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(matchEvent));
+
+            await channel.BasicPublishAsync(
+                exchange: string.Empty,
+                routingKey: MatchCompletedQueue,
+                body: body);
+        }
+        catch (Exception ex)
+        {
+            // Log broker error but don't crash the player's game if Docker queues back up
+            System.Console.WriteLine($"[RabbitMQ Event Warning]: {ex.Message}");
+        }
     }
 }
 
-// --- 🛡️ RESTORE THIS DATA CONTRACT RECORD AT THE BOTTOM OF THE FILE ---
 public record CompleteMatchRequest(Guid WinnerPlayerId, Guid LoserPlayerId);
+
+public record CompletePveMatchRequest(Guid PlayerId, bool IsVictory);

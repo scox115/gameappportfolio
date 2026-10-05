@@ -1,6 +1,5 @@
 using Game.Core.Entities;
-using Game.Core.Services;
-using Game.Infrastructure.Data;
+using Game.Core.Events;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
@@ -11,19 +10,16 @@ namespace Game.Api.Workers;
 public class MatchConsumerWorker : BackgroundService
 {
     private readonly IConnectionFactory _connectionFactory;
-    private readonly IServiceProvider _serviceProvider; // Required to safely resolve Scoped DbContext inside a Singleton background worker
     private readonly ILogger<MatchConsumerWorker> _logger;
     private IConnection? _connection;
     private IChannel? _channel;
-    private const string QueueName = "match-completed-queue";
+    private const string QueueName = Endpoints.MatchEndpoints.MatchCompletedQueue;
 
     public MatchConsumerWorker(
-        IConnectionFactory connectionFactory, 
-        IServiceProvider serviceProvider, 
+        IConnectionFactory connectionFactory,
         ILogger<MatchConsumerWorker> logger)
     {
         _connectionFactory = connectionFactory;
-        _serviceProvider = serviceProvider;
         _logger = logger;
     }
 
@@ -58,10 +54,10 @@ public class MatchConsumerWorker : BackgroundService
                 try
                 {
                     // 4. Parse the message body text contract back into a usable payload object
-                    var payload = JsonSerializer.Deserialize<MatchMessagePayload>(messageJson);
-                    if (payload != null)
+                    var matchEvent = JsonSerializer.Deserialize<MatchCompletedEvent>(messageJson);
+                    if (matchEvent != null)
                     {
-                        await ProcessMatchRewardsAsync(payload);
+                        RecordTelemetry(matchEvent);
                     }
 
                     // Acknowledge the message was successfully processed so RabbitMQ can safely delete it
@@ -69,9 +65,9 @@ public class MatchConsumerWorker : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "❌ Failed to process match message payload rewards.");
-                    // Negative Acknowledge: put the message back on the queue to retry later
-                    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true, cancellationToken: stoppingToken);
+                    _logger.LogError(ex, "❌ Failed to read match telemetry message.");
+                    // Drop malformed telemetry instead of requeueing it forever
+                    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken: stoppingToken);
                 }
             };
 
@@ -90,31 +86,16 @@ public class MatchConsumerWorker : BackgroundService
         }
     }
 
-    private async Task ProcessMatchRewardsAsync(MatchMessagePayload payload)
+    private void RecordTelemetry(MatchCompletedEvent matchEvent)
     {
-        // Open a clean dependency injection scope to fetch the database cleanly on a background thread
-        using var scope = _serviceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // Telemetry only. Rewards are applied and saved by the API on the request thread,
+        // so this worker must never touch Player balances.
+        var outcome = matchEvent.LoserId == GameMatch.AiBossId ? "PvE victory"
+            : matchEvent.WinnerId == GameMatch.AiBossId ? "PvE defeat"
+            : "PvP";
 
-        // 1. Fetch the exact Player profiles from the Docker SQL Database
-        var winner = await dbContext.Players.FindAsync(payload.WinnerId);
-        var loser = await dbContext.Players.FindAsync(payload.LoserId);
-        var match = await dbContext.Matches.FindAsync(payload.MatchId);
-
-        if (winner == null || loser == null || match == null)
-        {
-            _logger.LogWarning("⚠️ Could not process rewards. Database entities missing for Match {MatchId}", payload.MatchId);
-            return;
-        }
-
-        // 2. Invoke our untainted Game Core domain rules engine to referee the scoring parameters
-        var rulesEngine = new MatchRulesEngine();
-        rulesEngine.ProcessMatchWin(match, winner, loser);
-
-        // 3. Save the modified gold balances and experience points permanently back to SQL Server
-        await dbContext.SaveChangesAsync();
-
-        _logger.LogInformation("🏆 Rewards successfully processed! {Winner} earned gold/XP. {Loser} received consolation prizes.", winner.Username, loser.Username);
+        _logger.LogInformation("📊 Match telemetry: {MatchId} ({Outcome}) winner {WinnerId}, loser {LoserId}",
+            matchEvent.MatchId, outcome, matchEvent.WinnerId, matchEvent.LoserId);
     }
 
     public override void Dispose()
@@ -124,6 +105,3 @@ public class MatchConsumerWorker : BackgroundService
         base.Dispose();
     }
 }
-
-// Lightweight JSON parsing model container blueprint
-public record MatchMessagePayload(Guid MatchId, Guid WinnerId, Guid LoserId);
