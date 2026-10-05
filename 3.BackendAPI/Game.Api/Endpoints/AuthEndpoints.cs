@@ -23,7 +23,8 @@ public static class AuthEndpoints
             RegisterRequest request,
             UserManager<ApplicationUser> userManager,
             AppDbContext dbContext,
-            TokenService tokenService) =>
+            TokenService tokenService,
+            RefreshTokenService refreshTokens) =>
         {
             var username = request.Username?.Trim() ?? string.Empty;
             if (username.Length is < 3 or > 50)
@@ -54,9 +55,8 @@ public static class AuthEndpoints
                     : Results.ValidationProblem(ToValidationErrors(result));
             }
 
-            var token = tokenService.CreateAccessToken(user);
-            return Results.Created("/api/players/me",
-                new AuthResponse(token.Token, token.ExpiresAt, PlayerProfileResponse.From(player)));
+            var session = await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext);
+            return Results.Created("/api/players/me", session);
         });
 
         group.MapPost("/login", async (
@@ -64,7 +64,8 @@ public static class AuthEndpoints
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             AppDbContext dbContext,
-            TokenService tokenService) =>
+            TokenService tokenService,
+            RefreshTokenService refreshTokens) =>
         {
             var user = string.IsNullOrWhiteSpace(request.Username)
                 ? null
@@ -93,9 +94,54 @@ public static class AuthEndpoints
                 return Results.Problem("This account has no player profile.", statusCode: StatusCodes.Status409Conflict);
             }
 
-            var token = tokenService.CreateAccessToken(user);
-            return Results.Ok(new AuthResponse(token.Token, token.ExpiresAt, PlayerProfileResponse.From(player)));
+            return Results.Ok(await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext));
         });
+
+        // Trades a refresh token for a new access token and a new refresh token.
+        group.MapPost("/refresh", async (
+            RefreshRequest request,
+            UserManager<ApplicationUser> userManager,
+            AppDbContext dbContext,
+            TokenService tokenService,
+            RefreshTokenService refreshTokens) =>
+        {
+            if (await refreshTokens.RotateAsync(request.RefreshToken) is not { } rotated)
+            {
+                return Results.Unauthorized();
+            }
+
+            var user = await userManager.FindByIdAsync(rotated.UserId.ToString());
+            var player = await dbContext.Players.FindAsync(rotated.UserId);
+            if (user is null || player is null || await userManager.IsLockedOutAsync(user))
+            {
+                return Results.Unauthorized();
+            }
+
+            await dbContext.SaveChangesAsync();
+            var access = tokenService.CreateAccessToken(user);
+            return Results.Ok(new AuthResponse(access.Token, access.ExpiresAt,
+                rotated.Replacement.Token, rotated.Replacement.ExpiresAt, PlayerProfileResponse.From(player)));
+        });
+
+        // Signing out revokes the refresh token so it can't be used again.
+        group.MapPost("/logout", async (RefreshRequest request, RefreshTokenService refreshTokens) =>
+        {
+            await refreshTokens.RevokeAsync(request.RefreshToken);
+            return Results.NoContent();
+        });
+    }
+
+    private static async Task<AuthResponse> StartSessionAsync(
+        ApplicationUser user,
+        Player player,
+        TokenService tokenService,
+        RefreshTokenService refreshTokens,
+        AppDbContext dbContext)
+    {
+        var refresh = refreshTokens.Issue(user.Id);
+        await dbContext.SaveChangesAsync();
+        var access = tokenService.CreateAccessToken(user);
+        return new AuthResponse(access.Token, access.ExpiresAt, refresh.Token, refresh.ExpiresAt, PlayerProfileResponse.From(player));
     }
 
     private static Dictionary<string, string[]> ToValidationErrors(IdentityResult result) =>

@@ -2,6 +2,7 @@
 @inject GameState State
 @inject IdleTimeoutSettings Settings
 @inject IJSRuntime JS
+@inject TokenRefresher Tokens
 @implements IDisposable
 
 @* Signs an inactive player out, with a warning shortly before it happens. *@
@@ -47,7 +48,7 @@
             if (remaining <= TimeSpan.Zero)
             {
                 SetWarning(null);
-                State.SignOut($"You were signed out after {FormatTimeout()} of inactivity.");
+                await Tokens.SignOutAsync($"You were signed out after {FormatTimeout()} of inactivity.");
             }
             else if (remaining <= Settings.WarningPeriod)
             {

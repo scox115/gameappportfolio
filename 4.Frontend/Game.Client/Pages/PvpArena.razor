@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @inject GameState State
 @inject ApiEndpoint Api
+@inject TokenRefresher Tokens
 @implements IAsyncDisposable
 
 @* The live PvP arena: waits in the lobby for a real opponent, then plays turns over SignalR.
@@ -110,7 +111,7 @@
     {
         hub = new HubConnectionBuilder()
             .WithUrl(new Uri(Api.BaseAddress, "hubs/arena"), options =>
-                options.AccessTokenProvider = () => Task.FromResult(State.AccessToken))
+                options.AccessTokenProvider = Tokens.GetAccessTokenAsync)
             .WithAutomaticReconnect()
             .Build();
 

@@ -9,12 +9,16 @@ public enum GameScreen
     Leaderboard 
 }
 
+public record SessionTokens(string AccessToken, DateTimeOffset ExpiresAt, string RefreshToken);
+
 public class GameState
 {
     public GameScreen CurrentScreen { get; private set; } = GameScreen.LoginMenu;
     public Guid PlayerId { get; private set; }
-    // Kept in memory only, so a page refresh signs the player out.
+    // Tokens are kept in memory only, so a page refresh signs the player out.
     public string? AccessToken { get; private set; }
+    public DateTimeOffset AccessTokenExpiresAt { get; private set; }
+    public string? RefreshToken { get; private set; }
     public string? SignOutReason { get; private set; }
     public string Username { get; private set; } = string.Empty;
     public int Gold { get; private set; }
@@ -29,9 +33,9 @@ public class GameState
         NotifyStateChanged();
     }
 
-    public void SetPlayerSession(string accessToken, Guid id, string username, int gold, int level, string? avatar)
+    public void SetPlayerSession(SessionTokens tokens, Guid id, string username, int gold, int level, string? avatar)
     {
-        AccessToken = accessToken;
+        UpdateTokens(tokens);
         SignOutReason = null;
         PlayerId = id;
         Username = username;
@@ -40,6 +44,14 @@ public class GameState
         AvatarUrl = avatar ?? string.Empty;
         CurrentScreen = GameScreen.CharacterDashboard;
         NotifyStateChanged();
+    }
+
+    /// <summary>Swaps in a renewed access token and refresh token.</summary>
+    public void UpdateTokens(SessionTokens tokens)
+    {
+        AccessToken = tokens.AccessToken;
+        AccessTokenExpiresAt = tokens.ExpiresAt;
+        RefreshToken = tokens.RefreshToken;
     }
 
     public void UpdateRewards(int newGold, int newLevel)
@@ -58,6 +70,7 @@ public class GameState
     public void SignOut(string? reason = null)
     {
         AccessToken = null;
+        RefreshToken = null;
         SignOutReason = reason;
         PlayerId = Guid.Empty;
         Username = string.Empty;

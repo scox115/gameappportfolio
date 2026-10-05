@@ -19,6 +19,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<GameMatch> Matches => Set<GameMatch>();
     public DbSet<PveBattle> PveBattles => Set<PveBattle>();
     public DbSet<PvpBattle> PvpBattles => Set<PvpBattle>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

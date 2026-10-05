@@ -4,6 +4,7 @@
 @using System.Net.Http.Headers
 @inject GameState State
 @inject HttpClient Http
+@inject TokenRefresher Tokens
 @implements IDisposable
 
 <div class="game-client-shell"
@@ -339,7 +340,7 @@
 
         statusMsg = string.Empty;
         inputPassword = string.Empty;
-        State.SetPlayerSession(auth.accessToken, auth.player.id, auth.player.username, auth.player.gold, auth.player.level, auth.player.avatarUrl);
+        State.SetPlayerSession(new SessionTokens(auth.accessToken, auth.expiresAt, auth.refreshToken), auth.player.id, auth.player.username, auth.player.gold, auth.player.level, auth.player.avatarUrl);
     }
 
     // Turns an ASP.NET Core validation problem (e.g. password rules) into one readable line.
@@ -575,10 +576,10 @@
         _ => "⚔️"
     };
 
-    private void Logout()
+    private async Task Logout()
     {
         statusMsg = string.Empty;
-        State.SignOut();
+        await Tokens.SignOutAsync();
     }
 
     // --- FIXED DISPOSE SIGNATURE TO MATCH INTERFACE RULES ---
@@ -648,6 +649,8 @@
     public class AuthResponseDto
     {
         public string accessToken { get; set; } = "";
+        public DateTimeOffset expiresAt { get; set; }
+        public string refreshToken { get; set; } = "";
         public PlayerProfileDto? player { get; set; }
     }
 
