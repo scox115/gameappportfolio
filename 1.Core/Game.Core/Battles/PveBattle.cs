@@ -43,13 +43,17 @@ public record BattleTurnResult(
 public class PveBattle
 {
     public const int BasePlayerMaxHp = 100;
-    public const int BossMaxHp = 130;
+    public const int BossMaxHp = 160;
     public const int OpeningBossAttack = 15;
 
     // The boss hits harder every turn: base + growth per turn + a random 0-5.
-    public const int BossAttackBase = 8;
+    public const int BossAttackBase = 9;
     public const int BossAttackGrowthPerTurn = 2;
     public const int BossAttackVariance = 5;
+
+    // Below this share of its health the boss is enraged and every move hits harder.
+    public const int EnrageBelowPercent = 40;
+    public const int EnrageDamagePercent = 150;
 
     // Chance (out of 100) of each move; Slash takes the rest.
     public const int CrushingBlowChance = 25;
@@ -133,6 +137,9 @@ public class PveBattle
 
     public bool IsFinished => Status != BattleStatus.InProgress;
 
+    /// <summary>The boss is badly hurt and fights harder.</summary>
+    public bool IsEnraged => BossHp * 100 < BossMaxHp * EnrageBelowPercent;
+
     /// <summary>The card that is recharging this turn, if any.</summary>
     public BattleCard? RechargingCard =>
         LastCardPlayed is { } last && BattleCards.Get(last).NeedsRecharge ? last : null;
@@ -193,6 +200,7 @@ public class PveBattle
         // 3. The boss announces its next, stronger move.
         Turn++;
         (BossNextMove, BossNextAttack) = RollNextMove(Turn, random);
+        if (IsEnraged) BossNextAttack = BossNextAttack * EnrageDamagePercent / 100;
 
         return new BattleTurnResult(turn, definition, cardFailed, damageDealt, healthRestored,
             move, bossDamage, blocked, bossHealed, Status);

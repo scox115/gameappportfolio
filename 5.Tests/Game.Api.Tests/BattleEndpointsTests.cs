@@ -50,7 +50,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(first.Id, resumed!.Id);
-        Assert.Equal(110, resumed.BossHp);
+        Assert.Equal(PveBattle.BossMaxHp - 20, resumed.BossHp);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(20, result.TurnResult.DamageDealt);
         Assert.Equal("Slash", result.TurnResult.BossMoveName);
         Assert.Equal(PveBattle.OpeningBossAttack, result.TurnResult.BossDamage);
-        Assert.Equal(110, result.Battle.BossHp);
+        Assert.Equal(PveBattle.BossMaxHp - 20, result.Battle.BossHp);
         Assert.Equal(85, result.Battle.PlayerHp);
         Assert.Equal("Slash", result.Battle.BossNextMoveName);
         Assert.Null(result.Reward);

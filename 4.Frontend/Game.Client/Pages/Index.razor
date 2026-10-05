@@ -206,8 +206,12 @@
                                         style="max-width: 900px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
                                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
                                             <h3 style="margin: 0; color: #ef4444;">😈 Boss: The Shadow Overlord</h3>
-                                            <div style="font-size: 1.2rem; font-weight: bold;">
-                                                <span style="color: #ef4444; margin-right: 20px;">Boss HP: @enemyHp</span>
+                                            <div style="font-size: 1.2rem; font-weight: bold; white-space: nowrap;">
+                                                @if (bossEnraged)
+                                                {
+                                                    <span title="Below 40% health the boss's attacks hit 50% harder." style="background: #7f1d1d; color: #fecaca; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem; margin-right: 12px;">😡 ENRAGED</span>
+                                                }
+                                                <span style="color: #ef4444; margin-right: 20px;">Boss HP: @enemyHp / @enemyMaxHp</span>
                                                 <span style="color: #3b82f6;">Your HP: @playerHp / @playerMaxHp</span>
                                             </div>
                                         </div>
@@ -295,7 +299,9 @@
     private int playerHp = 100;
     private int playerMaxHp = 100; // More than 100 when a Battle Elixir was drunk
     private List<BattleCardDto> heldCards = new(); // The cards as upgraded in the Gold Shop
-    private int enemyHp = 130;
+    private int enemyHp = 160;
+    private int enemyMaxHp = 160;
+    private bool bossEnraged; // Below 40% health the boss's attacks hit 50% harder
     private int enemyIntentAttack = 15; // Damage of the boss's announced move
     private string bossNextMove = "Slash";
     private string bossNextMoveName = "Slash";
@@ -504,7 +510,13 @@
             }
         }
 
+        var wasEnraged = bossEnraged;
         ApplyBattleState(result.battle);
+        if (bossEnraged && !wasEnraged && result.battle.status == "InProgress")
+        {
+            logs.Add("😡 The Shadow Overlord is badly hurt and flies into a rage! Its attacks now hit 50% harder.");
+            await Sounds.PlayAsync(Sound.Drain);
+        }
 
         // 3. THE SERVER SAYS WHETHER THE FIGHT IS OVER
         if (result.battle.status != "InProgress")
@@ -527,6 +539,8 @@
         playerMaxHp = battle.playerMaxHp;
         heldCards = battle.cards;
         enemyHp = battle.bossHp;
+        enemyMaxHp = battle.bossMaxHp;
+        bossEnraged = battle.bossEnraged;
         enemyIntentAttack = battle.bossNextAttack;
         bossNextMove = battle.bossNextMove;
         bossNextMoveName = battle.bossNextMoveName;
@@ -592,7 +606,8 @@
     { 
         battleId = Guid.Empty;
         playerHp = 100; 
-        enemyHp = 130;
+        enemyHp = 160;
+        bossEnraged = false;
         enemyIntentAttack = 15;
         bossNextMove = "Slash";
         bossNextMoveName = "Slash";
@@ -650,6 +665,8 @@
         public int playerHp { get; set; }
         public int playerMaxHp { get; set; } = 100;
         public int bossHp { get; set; }
+        public int bossMaxHp { get; set; } = 160;
+        public bool bossEnraged { get; set; }
         public string bossNextMove { get; set; } = "Slash";
         public string bossNextMoveName { get; set; } = "Slash";
         public int bossNextAttack { get; set; }
