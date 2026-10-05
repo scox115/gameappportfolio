@@ -5,6 +5,7 @@
 @inject GameState State
 @inject HttpClient Http
 @inject TokenRefresher Tokens
+@inject SoundEffects Sounds
 @implements IDisposable
 
 <div class="game-client-shell"
@@ -32,6 +33,10 @@
                     <!-- Inside the top header row, append action links next to Logout -->
                     <button @onclick='() => State.ChangeScreen(GameScreen.CharacterDashboard)' style="background: transparent; color: #818cf8; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold; margin-right: 10px;">🏰 Town Dashboard</button>
                     <button @onclick="LaunchLeaderboardView" style="background: transparent; color: #fbbf24; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold; margin-right: 10px;">🏆 Leaderboards</button>
+
+                    <button @onclick="Sounds.ToggleAsync" title="@(Sounds.Enabled ? "Turn sound effects off" : "Turn sound effects on")"
+                            aria-label="@(Sounds.Enabled ? "Turn sound effects off" : "Turn sound effects on")"
+                            style="background: transparent; border: none; cursor: pointer; font-size: 1.1rem; margin-right: 10px;">@(Sounds.Enabled ? "🔊" : "🔇")</button>
 
                     <button @onclick="Logout"
                             style="background: transparent; color: #94a3b8; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold;">Logout</button>
@@ -294,7 +299,17 @@
     private bool leaderboardLoading = false;
     private List<PlayerProfileDto>? leaderboardPlayers;
 
-    protected override void OnInitialized() => State.OnStateChanged += StateHasChanged;
+    protected override void OnInitialized()
+    {
+        State.OnStateChanged += StateHasChanged;
+        Sounds.OnChanged += StateHasChanged;
+    }
+
+    // The saved sound setting lives in the browser, which is only reachable after the first render.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Sounds.LoadAsync();
+    }
 
     private async Task HandleLogin()
     {
@@ -440,16 +455,19 @@
         if (turn.cardFailed)
         {
             logs.Add($"🌀 Turn {turn.turn}: Your {turn.cardName} was {turn.cardFailedReason} by the Shadow Overlord!");
+            await Sounds.PlayAsync(Sound.Miss);
         }
         else if (turn.damageDealt > 0)
         {
             enemyHp = Math.Max(0, enemyHp - turn.damageDealt);
             logs.Add($"» Turn {turn.turn}: You cast {turn.cardName} dealing {turn.damageDealt} DMG.");
+            await Sounds.PlayAsync(SoundEffects.ForCard(turn.cardName));
         }
         else if (card == "HolyShield")
         {
             playerHp += turn.healthRestored;
             logs.Add($"» Turn {turn.turn}: You raise {turn.cardName} and recover {turn.healthRestored} HP.");
+            await Sounds.PlayAsync(Sound.Shield);
         }
 
         // 2. SHOW THE BOSS'S COUNTER-ATTACK WITH A SHORT DRAMATIC PAUSE
@@ -461,14 +479,17 @@
             if (turn.attackBlocked)
             {
                 logs.Add($"🛡️ Your shield blocks the {turn.bossMoveName}! No damage taken.");
+                await Sounds.PlayAsync(Sound.Block);
             }
             else
             {
                 logs.Add($"💥 {turn.bossMoveName} hits you for {bossDamage} damage!");
+                await Sounds.PlayAsync(Sound.Hit);
             }
             if (turn.bossHealed > 0)
             {
                 logs.Add($"🩸 The Shadow Overlord drains {turn.bossHealed} HP back.");
+                await Sounds.PlayAsync(Sound.Drain);
             }
         }
 
@@ -505,6 +526,7 @@
         matchConcluding = true; // Lock all inputs
 
         var won = result.battle.status == "Won";
+        _ = Sounds.PlayAsync(won ? Sound.Victory : Sound.Defeat);
         logs.Add(won
             ? "🏆 VICTORY! The server confirmed your win."
             : "💀 DEFEAT! The Shadow Overlord prevails.");
@@ -583,7 +605,11 @@
     }
 
     // --- FIXED DISPOSE SIGNATURE TO MATCH INTERFACE RULES ---
-    void IDisposable.Dispose() => State.OnStateChanged -= StateHasChanged;
+    void IDisposable.Dispose()
+    {
+        State.OnStateChanged -= StateHasChanged;
+        Sounds.OnChanged -= StateHasChanged;
+    }
 
     public class PlayerProfileDto 
     { 

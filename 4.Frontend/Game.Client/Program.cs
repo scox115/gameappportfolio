@@ -21,6 +21,7 @@ var idleTimeoutMinutes = builder.Configuration.GetValue("IdleTimeoutMinutes", 15
 builder.Services.AddSingleton(new IdleTimeoutSettings(TimeSpan.FromMinutes(idleTimeoutMinutes)));
 builder.Services.AddScoped<GameState>();
 builder.Services.AddScoped<TokenRefresher>();
+builder.Services.AddScoped<SoundEffects>();
 builder.Services.AddScoped(sp => new HttpClient(new AuthTokenHandler(sp.GetRequiredService<GameState>(), sp.GetRequiredService<TokenRefresher>()))
 {
     BaseAddress = apiBaseAddress

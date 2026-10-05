@@ -3,6 +3,7 @@
 @inject GameState State
 @inject ApiEndpoint Api
 @inject TokenRefresher Tokens
+@inject SoundEffects Sounds
 @implements IAsyncDisposable
 
 @* The live PvP arena: waits in the lobby for a real opponent, then plays turns over SignalR.
@@ -154,6 +155,7 @@
         searching = false;
         reward = null;
         logs = new() { $"⚔️ Battle on! You face {update.Battle.Opponent.Username}." };
+        _ = Sounds.PlayAsync(update.Battle.YourTurn ? Sound.YourTurn : Sound.MatchFound);
         Apply(update);
     }
 
@@ -164,6 +166,13 @@
         if (update.LastTurn is { } turn)
         {
             var who = turn.YourCard ? "You" : turn.PlayerName;
+            _ = Sounds.PlayAsync(turn switch
+            {
+                { CardFailed: true } => Sound.Miss,
+                { AttackBlocked: true } => Sound.Block,
+                { DamageDealt: > 0, YourCard: false } => Sound.Hit,
+                _ => SoundEffects.ForCard(turn.CardName)
+            });
             if (turn.CardFailed)
                 logs.Add($"🌀 Turn {turn.Turn}: {who} played {turn.CardName}, but it was {turn.CardFailedReason}!");
             else if (turn.AttackBlocked)
@@ -176,6 +185,7 @@
 
         if (update.Battle.Status != "InProgress")
         {
+            _ = Sounds.PlayAsync(update.Battle.YouWon == true ? Sound.Victory : Sound.Defeat);
             logs.Add(update.Battle.EndReason switch
             {
                 "Timeout" => update.Battle.YouWon == true ? "⌛ Your opponent ran out of time." : "⌛ You ran out of time.",
