@@ -9,6 +9,10 @@ cp .env.example .env          # then edit MSSQL_SA_PASSWORD
 docker compose up -d          # SQL Server :1433, Azurite :10000, RabbitMQ :5672
 ```
 
+Data lives in named Docker volumes (`sql_data`, `azurite_data`, `rabbit_data`), so it survives `docker compose down` and restarts. `docker compose down -v` deletes it.
+
+If you use Visual Studio, make sure its built-in Azurite isn't also running on port 10000 (`netstat -ano | findstr :10000` should show only Docker); otherwise uploads go to that copy instead of the container.
+
 ## 2. Give the API its secrets
 
 Secrets are kept out of the repo with [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets). Use the same password you put in `.env`:
@@ -27,8 +31,9 @@ dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)" --project 
 ```
 
 ```powershell
-# Windows PowerShell
-dotnet user-secrets set "Jwt:SigningKey" ([Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))) --project 3.BackendAPI/Game.Api
+# Windows PowerShell 5.1 or PowerShell 7
+$bytes = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+dotnet user-secrets set "Jwt:SigningKey" ([Convert]::ToBase64String($bytes)) --project 3.BackendAPI/Game.Api
 ```
 
 ## 3. Run

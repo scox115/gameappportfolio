@@ -21,8 +21,8 @@ services:
       - "10002:10002"
     volumes:
       - azurite_data:/data
-    # Append the skip API version flag right here:
-    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
+    # --location /data keeps blobs in the azurite_data volume so they survive container re-creation.
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --location /data --skipApiVersionCheck
 
   # Local Message Broker
   game-messaging:
