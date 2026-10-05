@@ -58,7 +58,8 @@ The lobby queue is kept in the API's memory, so it assumes one API instance. Sca
 | `ConnectionStrings:DefaultConnection` | none | user-secrets | yes |
 | `ConnectionStrings:AzureBlobStorage` | none | `UseDevelopmentStorage=true` (Azurite) | in cloud |
 | `Jwt:SigningKey` | none | user-secrets | yes |
-| `Jwt:Issuer` / `Audience` / `AccessTokenMinutes` | set | inherited | no |
+| `Jwt:Issuer` / `Audience` | set | inherited | no |
+| `Jwt:AccessTokenMinutes` / `RefreshTokenDays` | `15` / `7` (the client renews access tokens with a one-time refresh token) | inherited | no |
 | `RabbitMq:HostName` / `Port` / `VirtualHost` | `localhost` / `5672` / `/` | inherited | no |
 | `RabbitMq:UserName` / `Password` | none | `guest` / `guest` (RabbitMQ's local default) | in cloud |
 | `Cors:AllowedOrigins` | empty (no cross-origin calls) | the client's local URLs | no |

@@ -150,6 +150,7 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<RefreshTokenService>();
 
 // --- ⚔️ SERVER-AUTHORITATIVE BATTLES ---
 builder.Services.AddSingleton<IBattleRandom, SystemBattleRandom>();

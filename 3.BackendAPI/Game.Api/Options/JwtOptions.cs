@@ -18,6 +18,10 @@ public class JwtOptions
     [Required, MinLength(32)]
     public string SigningKey { get; set; } = string.Empty;
 
+    // Short, because an access token can't be revoked; clients renew it with a refresh token.
     [Range(1, 1440)]
-    public int AccessTokenMinutes { get; set; } = 60;
+    public int AccessTokenMinutes { get; set; } = 15;
+
+    [Range(1, 90)]
+    public int RefreshTokenDays { get; set; } = 7;
 }
