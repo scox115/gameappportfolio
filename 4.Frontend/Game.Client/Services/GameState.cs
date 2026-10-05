@@ -6,6 +6,7 @@ public enum GameScreen
     CharacterDashboard,
     BattleArena,
     PvpArena,
+    Shop,
     Leaderboard 
 }
 
@@ -64,6 +65,12 @@ public class GameState
     {
         Gold = newGold;
         Level = newLevel;
+        NotifyStateChanged();
+    }
+
+    public void UpdateGold(int newGold)
+    {
+        Gold = newGold;
         NotifyStateChanged();
     }
 

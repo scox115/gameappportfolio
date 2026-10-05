@@ -7,6 +7,12 @@ public enum BattleStatus
     Lost
 }
 
+/// <summary>What the player brings into a boss fight from the Gold Shop.</summary>
+public record PveLoadout(int FireballLevel, int HolyShieldLevel, int DragonClawLevel, int BonusHp)
+{
+    public static readonly PveLoadout Basic = new(1, 1, 1, 0);
+}
+
 /// <summary>What happened in one turn, so the client can replay it.</summary>
 /// <param name="CardFailed">The boss resisted, dodged or interrupted the card, so it did nothing.</param>
 /// <param name="BossMove">The move the boss used, or null when the player won before it struck.</param>
@@ -36,7 +42,7 @@ public record BattleTurnResult(
 /// </remarks>
 public class PveBattle
 {
-    public const int PlayerMaxHp = 100;
+    public const int BasePlayerMaxHp = 100;
     public const int BossMaxHp = 130;
     public const int OpeningBossAttack = 15;
 
@@ -52,6 +58,14 @@ public class PveBattle
     public Guid Id { get; private set; }
     public Guid PlayerId { get; private set; }
     public int PlayerHp { get; private set; }
+
+    /// <summary>Base health plus any Battle Elixir drunk before the fight.</summary>
+    public int PlayerMaxHp { get; private set; }
+
+    // Card levels are fixed when the battle starts, so buying an upgrade mid-fight changes nothing.
+    public int FireballLevel { get; private set; } = 1;
+    public int HolyShieldLevel { get; private set; } = 1;
+    public int DragonClawLevel { get; private set; } = 1;
     public int BossHp { get; private set; }
 
     /// <summary>The move the boss has announced for this turn.</summary>
@@ -76,15 +90,22 @@ public class PveBattle
 
     private PveBattle() { }
 
-    public static PveBattle Start(Guid playerId, DateTime startedAt)
+    public static PveBattle Start(Guid playerId, DateTime startedAt, PveLoadout? loadout = null)
     {
         if (playerId == Guid.Empty) throw new ArgumentException("Player id cannot be empty.", nameof(playerId));
+        loadout ??= PveLoadout.Basic;
+        if (loadout.BonusHp < 0) throw new ArgumentOutOfRangeException(nameof(loadout), "Bonus health can't be negative.");
 
-        return new PveBattle
+        var maxHp = BasePlayerMaxHp + loadout.BonusHp;
+        var battle = new PveBattle
         {
             Id = Guid.NewGuid(),
             PlayerId = playerId,
-            PlayerHp = PlayerMaxHp,
+            PlayerHp = maxHp,
+            PlayerMaxHp = maxHp,
+            FireballLevel = loadout.FireballLevel,
+            HolyShieldLevel = loadout.HolyShieldLevel,
+            DragonClawLevel = loadout.DragonClawLevel,
             BossHp = BossMaxHp,
             BossNextMove = BossMove.Slash,
             BossNextAttack = OpeningBossAttack,
@@ -93,7 +114,22 @@ public class PveBattle
             StartedAt = startedAt,
             Version = Guid.NewGuid()
         };
+
+        // Fail now on a bad level rather than mid-fight.
+        foreach (var card in BattleCards.All) battle.CardFor(card.Card);
+        return battle;
     }
+
+    public int LevelOf(BattleCard card) => card switch
+    {
+        BattleCard.Fireball => FireballLevel,
+        BattleCard.HolyShield => HolyShieldLevel,
+        BattleCard.DragonClaw => DragonClawLevel,
+        _ => throw new ArgumentOutOfRangeException(nameof(card), card, "Unknown battle card.")
+    };
+
+    /// <summary>The card as the player holds it in this battle, upgrades included.</summary>
+    public BattleCardDefinition CardFor(BattleCard card) => BattleCards.AtLevel(card, LevelOf(card));
 
     public bool IsFinished => Status != BattleStatus.InProgress;
 
@@ -108,7 +144,7 @@ public class PveBattle
         ArgumentNullException.ThrowIfNull(random);
         if (IsFinished) throw new InvalidOperationException("This battle is already over.");
 
-        var definition = BattleCards.Get(card);
+        var definition = CardFor(card);
         if (!CanPlay(card)) throw new InvalidOperationException($"{definition.Name} is still recharging.");
 
         var turn = Turn;

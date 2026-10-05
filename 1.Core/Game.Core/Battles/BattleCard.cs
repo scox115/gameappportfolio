@@ -25,6 +25,12 @@ public record BattleCardDefinition(
 
 public static class BattleCards
 {
+    /// <summary>Cards start at level 1 and can be upgraded in the Gold Shop up to this level.</summary>
+    public const int MaxLevel = 3;
+
+    /// <summary>Extra damage (or healing, for Holy Shield) each level above 1 adds.</summary>
+    public const int BonusPerLevel = 5;
+
     private static readonly IReadOnlyDictionary<BattleCard, BattleCardDefinition> Definitions =
         new Dictionary<BattleCard, BattleCardDefinition>
         {
@@ -37,6 +43,20 @@ public static class BattleCards
         };
 
     public static IEnumerable<BattleCardDefinition> All => Definitions.Values;
+
+    /// <summary>The card at an upgrade level. Only its damage or healing grows; the risk stays the same.</summary>
+    public static BattleCardDefinition AtLevel(BattleCard card, int level)
+    {
+        if (level is < 1 or > MaxLevel) throw new ArgumentOutOfRangeException(nameof(level), level, $"Card levels run from 1 to {MaxLevel}.");
+
+        var definition = Get(card);
+        var bonus = (level - 1) * BonusPerLevel;
+        return definition with
+        {
+            Damage = definition.Damage > 0 ? definition.Damage + bonus : 0,
+            Heal = definition.Heal > 0 ? definition.Heal + bonus : 0
+        };
+    }
 
     public static BattleCardDefinition Get(BattleCard card) =>
         Definitions.TryGetValue(card, out var definition)

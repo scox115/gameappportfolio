@@ -33,7 +33,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var battle = await response.Content.ReadFromJsonAsync<BattleStateResponse>(Json);
-        Assert.Equal(PveBattle.PlayerMaxHp, battle!.PlayerHp);
+        Assert.Equal(PveBattle.BasePlayerMaxHp, battle!.PlayerHp);
         Assert.Equal(PveBattle.BossMaxHp, battle.BossHp);
         Assert.Equal(BattleStatus.InProgress, battle.Status);
     }

@@ -11,4 +11,7 @@ public static class ArenaCards
         new("HolyShield", "🛡️", "Holy Shield", "15 HEAL + BLOCK", "20% interrupted", "Heals and blocks the next attack against you. Needs a turn to recharge.", "#2563eb"),
         new("DragonClaw", "🐉", "Dragon Claw", "35 DMG", "25% dodged", "Big damage. Needs a turn to recharge.", "#7c3aed")
     ];
+
+    /// <summary>A card's effect line, for a card whose numbers come from the server (Gold Shop upgrades included).</summary>
+    public static string EffectOf(int damage, int heal) => damage > 0 ? $"{damage} DMG" : $"{heal} HEAL + BLOCK";
 }

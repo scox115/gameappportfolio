@@ -63,7 +63,8 @@ window.gameSound = (() => {
         victory: () => [523, 659, 784, 1047].forEach((f, i) => tone("triangle", f, f, i * 0.15, i === 3 ? 0.6 : 0.18, 0.2)),
         defeat: () => [392, 330, 262, 196].forEach((f, i) => tone("triangle", f, f * 0.98, i * 0.22, i === 3 ? 0.7 : 0.25, 0.18)),
         matchFound: () => { tone("square", 440, 440, 0, 0.12, 0.1); tone("square", 660, 660, 0.14, 0.2, 0.1); },
-        yourTurn: () => tone("sine", 880, 880, 0, 0.15, 0.12)
+        yourTurn: () => tone("sine", 880, 880, 0, 0.15, 0.12),
+        purchase: () => [1319, 1568, 2093].forEach((f, i) => tone("triangle", f, f, i * 0.07, 0.25, 0.12))
     };
 
     return {
