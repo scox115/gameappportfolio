@@ -6,13 +6,21 @@ public class PveBattleTests
 {
     private static readonly DateTime Now = new(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
 
-    private sealed class FixedRandom(int value) : IBattleRandom
+    // Each turn rolls, in order: does the card fail (0-99), the boss's next move (0-99),
+    // then the extra damage (0-5). Low rolls favour the player.
+    private sealed class ScriptedRandom(int fallback, params int[] rolls) : IBattleRandom
     {
-        public int Next(int minInclusive, int maxExclusive) => Math.Clamp(value, minInclusive, maxExclusive - 1);
+        private readonly Queue<int> _rolls = new(rolls);
+
+        public int Next(int minInclusive, int maxExclusive) =>
+            Math.Clamp(_rolls.TryDequeue(out var roll) ? roll : fallback, minInclusive, maxExclusive - 1);
     }
 
+    private static IBattleRandom Lucky(params int[] rolls) => new ScriptedRandom(0, rolls);
+    private static IBattleRandom Unlucky => new ScriptedRandom(99);
+
     [Fact]
-    public void Start_SetsFullHealthAndTheOpeningBossAttack()
+    public void Start_SetsFullHealthAndTheOpeningSlash()
     {
         var playerId = Guid.NewGuid();
         var battle = PveBattle.Start(playerId, Now);
@@ -20,7 +28,9 @@ public class PveBattleTests
         Assert.Equal(playerId, battle.PlayerId);
         Assert.Equal(PveBattle.PlayerMaxHp, battle.PlayerHp);
         Assert.Equal(PveBattle.BossMaxHp, battle.BossHp);
+        Assert.Equal(BossMove.Slash, battle.BossNextMove);
         Assert.Equal(PveBattle.OpeningBossAttack, battle.BossNextAttack);
+        Assert.Null(battle.RechargingCard);
         Assert.Equal(1, battle.Turn);
         Assert.Equal(BattleStatus.InProgress, battle.Status);
     }
@@ -32,29 +42,154 @@ public class PveBattleTests
     }
 
     [Fact]
-    public void PlayCard_DamagesBossThenBossStrikesAndEnrages()
+    public void PlayCard_DamagesBossThenBossStrikesAndAnnouncesItsNextMove()
     {
         var battle = PveBattle.Start(Guid.NewGuid(), Now);
 
-        var result = battle.PlayCard(BattleCard.Fireball, new FixedRandom(5), Now);
+        var result = battle.PlayCard(BattleCard.Fireball, Lucky(), Now);
 
+        Assert.False(result.CardFailed);
         Assert.Equal(20, result.DamageDealt);
+        Assert.Equal(BossMove.Slash, result.BossMove);
         Assert.Equal(15, result.BossDamage);
-        Assert.Equal(100, battle.BossHp);
+        Assert.Equal(110, battle.BossHp);
         Assert.Equal(85, battle.PlayerHp);
         Assert.Equal(2, battle.Turn);
-        Assert.Equal(2 * 4 + 5, battle.BossNextAttack);
+        Assert.Equal(BossMove.Slash, battle.BossNextMove);
+        Assert.Equal(8 + (2 * 2), battle.BossNextAttack);
+    }
+
+    [Theory]
+    [InlineData(BattleCard.Fireball, 90)]
+    [InlineData(BattleCard.DragonClaw, 75)]
+    public void PlayCard_TheBossCanResistOrDodgeAttacks(BattleCard card, int failingRoll)
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+
+        var result = battle.PlayCard(card, Lucky(failingRoll), Now);
+
+        Assert.True(result.CardFailed);
+        Assert.Equal(0, result.DamageDealt);
+        Assert.Equal(PveBattle.BossMaxHp, battle.BossHp);
+        Assert.Equal(15, result.BossDamage);
     }
 
     [Fact]
-    public void PlayCard_HealingIsCappedAtMaxHealth()
+    public void PlayCard_JustBelowTheFailChanceStillLands()
     {
         var battle = PveBattle.Start(Guid.NewGuid(), Now);
 
-        var result = battle.PlayCard(BattleCard.HolyShield, new FixedRandom(5), Now);
+        var result = battle.PlayCard(BattleCard.DragonClaw, Lucky(74), Now);
 
+        Assert.False(result.CardFailed);
+        Assert.Equal(35, result.DamageDealt);
+    }
+
+    [Fact]
+    public void HolyShield_BlocksTheBossAttack()
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+
+        var result = battle.PlayCard(BattleCard.HolyShield, Lucky(), Now);
+
+        Assert.True(result.AttackBlocked);
+        Assert.Equal(0, result.BossDamage);
+        Assert.Equal(PveBattle.PlayerMaxHp, battle.PlayerHp);
+    }
+
+    [Fact]
+    public void HolyShield_CanBeInterrupted()
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+        battle.PlayCard(BattleCard.Fireball, Lucky(), Now);
+
+        var result = battle.PlayCard(BattleCard.HolyShield, Lucky(80), Now);
+
+        Assert.True(result.CardFailed);
+        Assert.False(result.AttackBlocked);
         Assert.Equal(0, result.HealthRestored);
-        Assert.Equal(PveBattle.PlayerMaxHp - PveBattle.OpeningBossAttack, battle.PlayerHp);
+        Assert.Equal(12, result.BossDamage);
+        Assert.Equal(85 - 12, battle.PlayerHp);
+    }
+
+    [Fact]
+    public void HolyShield_HealingIsCappedAtMaxHealth()
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+        battle.PlayCard(BattleCard.Fireball, Lucky(), Now);
+
+        var result = battle.PlayCard(BattleCard.HolyShield, Lucky(), Now);
+
+        Assert.Equal(15, result.HealthRestored);
+        Assert.Equal(PveBattle.PlayerMaxHp, battle.PlayerHp);
+    }
+
+    [Theory]
+    [InlineData(54, 5, BossMove.Slash, 8 + 4 + 5)]
+    [InlineData(55, 5, BossMove.CrushingBlow, (8 + 4 + 5) * 8 / 5)]
+    [InlineData(79, 0, BossMove.CrushingBlow, (8 + 4) * 8 / 5)]
+    [InlineData(80, 0, BossMove.LifeDrain, (8 + 4) * 3 / 4)]
+    public void PlayCard_TheBossVariesItsMoves(int moveRoll, int extraDamage, BossMove expectedMove, int expectedDamage)
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+
+        battle.PlayCard(BattleCard.Fireball, Lucky(0, moveRoll, extraDamage), Now);
+
+        Assert.Equal(expectedMove, battle.BossNextMove);
+        Assert.Equal(expectedDamage, battle.BossNextAttack);
+    }
+
+    [Fact]
+    public void LifeDrain_HealsTheBossByTheDamageDealt()
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+        battle.PlayCard(BattleCard.Fireball, Lucky(0, 80, 0), Now);
+
+        var result = battle.PlayCard(BattleCard.Fireball, Lucky(), Now);
+
+        Assert.Equal(BossMove.LifeDrain, result.BossMove);
+        Assert.Equal(9, result.BossDamage);
+        Assert.Equal(9, result.BossHealed);
+        Assert.Equal(130 - 20 - 20 + 9, battle.BossHp);
+    }
+
+    [Fact]
+    public void LifeDrain_HealsNothingWhenBlocked()
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+        battle.PlayCard(BattleCard.Fireball, Lucky(0, 80, 0), Now);
+
+        var result = battle.PlayCard(BattleCard.HolyShield, Lucky(), Now);
+
+        Assert.True(result.AttackBlocked);
+        Assert.Equal(0, result.BossHealed);
+        Assert.Equal(110, battle.BossHp);
+    }
+
+    [Theory]
+    [InlineData(BattleCard.DragonClaw)]
+    [InlineData(BattleCard.HolyShield)]
+    public void PlayCard_PowerCardsNeedATurnToRecharge(BattleCard card)
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+        battle.PlayCard(card, Lucky(), Now);
+
+        Assert.Equal(card, battle.RechargingCard);
+        Assert.False(battle.CanPlay(card));
+        Assert.Throws<InvalidOperationException>(() => battle.PlayCard(card, Lucky(), Now));
+
+        battle.PlayCard(BattleCard.Fireball, Lucky(), Now);
+        Assert.True(battle.CanPlay(card));
+    }
+
+    [Fact]
+    public void PlayCard_FireballCanBePlayedEveryTurn()
+    {
+        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+        battle.PlayCard(BattleCard.Fireball, Lucky(), Now);
+
+        Assert.Null(battle.RechargingCard);
+        Assert.True(battle.CanPlay(BattleCard.Fireball));
     }
 
     [Fact]
@@ -62,13 +197,10 @@ public class PveBattleTests
     {
         var battle = PveBattle.Start(Guid.NewGuid(), Now);
 
-        BattleTurnResult result = null!;
-        while (!battle.IsFinished)
-        {
-            result = battle.PlayCard(BattleCard.DragonClaw, new FixedRandom(5), Now);
-        }
+        var result = PlayUntilFinished(battle, Lucky);
 
         Assert.Equal(BattleStatus.Won, battle.Status);
+        Assert.Null(result.BossMove);
         Assert.Null(result.BossDamage);
         Assert.Equal(0, battle.BossHp);
         Assert.Equal(Now, battle.CompletedAt);
@@ -79,10 +211,7 @@ public class PveBattleTests
     {
         var battle = PveBattle.Start(Guid.NewGuid(), Now);
 
-        while (!battle.IsFinished)
-        {
-            battle.PlayCard(BattleCard.HolyShield, new FixedRandom(14), Now);
-        }
+        PlayUntilFinished(battle, () => Unlucky);
 
         Assert.Equal(BattleStatus.Lost, battle.Status);
         Assert.Equal(0, battle.PlayerHp);
@@ -92,12 +221,9 @@ public class PveBattleTests
     public void PlayCard_RejectsMovesAfterTheBattleEnds()
     {
         var battle = PveBattle.Start(Guid.NewGuid(), Now);
-        while (!battle.IsFinished)
-        {
-            battle.PlayCard(BattleCard.DragonClaw, new FixedRandom(5), Now);
-        }
+        PlayUntilFinished(battle, Lucky);
 
-        Assert.Throws<InvalidOperationException>(() => battle.PlayCard(BattleCard.Fireball, new FixedRandom(5), Now));
+        Assert.Throws<InvalidOperationException>(() => battle.PlayCard(BattleCard.Fireball, Lucky(), Now));
     }
 
     [Fact]
@@ -106,7 +232,7 @@ public class PveBattleTests
         var battle = PveBattle.Start(Guid.NewGuid(), Now);
         var before = battle.Version;
 
-        battle.PlayCard(BattleCard.Fireball, new FixedRandom(5), Now);
+        battle.PlayCard(BattleCard.Fireball, Lucky(), Now);
 
         Assert.NotEqual(before, battle.Version);
     }
@@ -117,12 +243,25 @@ public class PveBattleTests
         var battle = PveBattle.Start(Guid.NewGuid(), Now);
         Assert.Throws<InvalidOperationException>(() => battle.AttachMatch(Guid.NewGuid()));
 
-        while (!battle.IsFinished)
-        {
-            battle.PlayCard(BattleCard.DragonClaw, new FixedRandom(5), Now);
-        }
+        PlayUntilFinished(battle, Lucky);
         battle.AttachMatch(Guid.NewGuid());
 
         Assert.Throws<InvalidOperationException>(() => battle.AttachMatch(Guid.NewGuid()));
     }
+
+    // Plays Dragon Claw whenever it is ready and Fireball while it recharges.
+    private static BattleTurnResult PlayUntilFinished(PveBattle battle, Func<IBattleRandom> random)
+    {
+        BattleTurnResult result = null!;
+        for (var turn = 0; turn < 100 && !battle.IsFinished; turn++)
+        {
+            var card = battle.CanPlay(BattleCard.DragonClaw) ? BattleCard.DragonClaw : BattleCard.Fireball;
+            result = battle.PlayCard(card, random(), Now);
+        }
+
+        return battle.IsFinished ? result : throw new InvalidOperationException("The battle never ended.");
+    }
+
+    private static BattleTurnResult PlayUntilFinished(PveBattle battle, Func<int[], IBattleRandom> random) =>
+        PlayUntilFinished(battle, () => random([]));
 }

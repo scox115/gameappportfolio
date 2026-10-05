@@ -190,6 +190,18 @@
                                             </div>
                                         </div>
 
+                                        @if (battleResult is null)
+                                        {
+                                            <!-- THE BOSS ANNOUNCES ITS NEXT MOVE SO THE PLAYER CAN PLAN AROUND IT -->
+                                            <div style="background: rgba(239,68,68,0.1); border: 1px solid #7f1d1d; border-radius: 8px; padding: 10px 15px; margin-bottom: 15px; color: #fca5a5;">
+                                                @BossMoveIcon(bossNextMove) Next boss move: <strong>@bossNextMoveName</strong> for <strong>@enemyIntentAttack DMG</strong>
+                                                @if (bossNextMove == "LifeDrain")
+                                                {
+                                                    <span> (heals the boss)</span>
+                                                }
+                                            </div>
+                                        }
+
                                         <!-- COMBAT EVENTS LOGGER FEED -->
                                         <div
                                             style="height: 180px; background: #0f172a; border-radius: 8px; padding: 15px; overflow-y: auto; border: 1px solid #334155; font-family: monospace; color: #94a3b8; margin-bottom: 25px; line-height: 1.6;">
@@ -203,15 +215,16 @@
                                         {
                                         <!-- DECK ACTION HAND CARD PANELS -->
                                         <div style="display: flex; justify-content: center; gap: 15px;">
-                                            <button @onclick='() => PlayTurn("Fireball")'
-                                                    style="background: #ea580c; width: 140px; height: 100px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: pointer;">🔥
-                                                Fireball<br /><small>20 DMG</small></button>
-                                                <button @onclick='() => PlayTurn("HolyShield")'
-                                                        style="background: #2563eb; width: 140px; height: 100px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: pointer;">🛡️
-                                                    Shield<br /><small>15 HEAL</small></button>
-                                                    <button @onclick='() => PlayTurn("DragonClaw")'
-                                                            style="background: #7c3aed; width: 140px; height: 100px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: pointer;">🐉
-                                                        Dragon Fury<br /><small>35 DMG</small></button>
+                                            @foreach (var card in HandCards)
+                                            {
+                                                var recharging = rechargingCard == card.Id;
+                                                <button @onclick="() => PlayTurn(card.Id)" disabled="@recharging"
+                                                        title="@card.Hint"
+                                                        style="background: @(recharging ? "#475569" : card.Color); width: 150px; height: 110px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: @(recharging ? "not-allowed" : "pointer"); opacity: @(recharging ? "0.6" : "1");">
+                                                    @card.Icon @card.Label<br /><small>@card.Effect</small><br />
+                                                    <small style="font-weight: normal;">@(recharging ? "⏳ Recharging" : card.Risk)</small>
+                                                </button>
+                                            }
                                                     </div>
                                         }
                                         else
@@ -257,8 +270,11 @@
     // Arena State (mirrors the server's battle; the server decides every outcome)
     private Guid battleId;
     private int playerHp = 100;
-    private int enemyHp = 120; // Increased boss max pool to survive initial burst
-    private int enemyIntentAttack = 15; // Starting attack damage values
+    private int enemyHp = 130;
+    private int enemyIntentAttack = 15; // Damage of the boss's announced move
+    private string bossNextMove = "Slash";
+    private string bossNextMoveName = "Slash";
+    private string? rechargingCard; // Dragon Claw and Holy Shield can't be played two turns in a row
     private int turnCount = 1;
     private bool isPlayerTurn = true; // Prevents button click spamming
     private bool matchConcluding = false; // Locks inputs during network saves
@@ -412,7 +428,11 @@
         var turn = result.turnResult;
 
         // 1. SHOW THE PLAYER'S CARD
-        if (turn.damageDealt > 0)
+        if (turn.cardFailed)
+        {
+            logs.Add($"🌀 Turn {turn.turn}: Your {turn.cardName} was {turn.cardFailedReason} by the Shadow Overlord!");
+        }
+        else if (turn.damageDealt > 0)
         {
             enemyHp = Math.Max(0, enemyHp - turn.damageDealt);
             logs.Add($"» Turn {turn.turn}: You cast {turn.cardName} dealing {turn.damageDealt} DMG.");
@@ -420,16 +440,27 @@
         else if (card == "HolyShield")
         {
             playerHp += turn.healthRestored;
-            logs.Add($"» Turn {turn.turn}: You use {turn.cardName} and recover {turn.healthRestored} HP.");
+            logs.Add($"» Turn {turn.turn}: You raise {turn.cardName} and recover {turn.healthRestored} HP.");
         }
 
         // 2. SHOW THE BOSS'S COUNTER-ATTACK WITH A SHORT DRAMATIC PAUSE
         if (turn.bossDamage is int bossDamage)
         {
             StateHasChanged();
-            logs.Add($"⏳ The Shadow Overlord winds up for a {enemyIntentAttack} DMG slash...");
+            logs.Add($"⏳ The Shadow Overlord winds up a {turn.bossMoveName}...");
             await Task.Delay(1000);
-            logs.Add($"💥 Enemy Boss hits you back dealing {bossDamage} damage!");
+            if (turn.attackBlocked)
+            {
+                logs.Add($"🛡️ Your shield blocks the {turn.bossMoveName}! No damage taken.");
+            }
+            else
+            {
+                logs.Add($"💥 {turn.bossMoveName} hits you for {bossDamage} damage!");
+            }
+            if (turn.bossHealed > 0)
+            {
+                logs.Add($"🩸 The Shadow Overlord drains {turn.bossHealed} HP back.");
+            }
         }
 
         ApplyBattleState(result.battle);
@@ -441,7 +472,7 @@
             return;
         }
 
-        logs.Add($"⚠️ Warning: Boss enters rage step. Next attack intent scaled up to {enemyIntentAttack} DMG!");
+        logs.Add($"⚠️ The Shadow Overlord prepares {bossNextMoveName} for {enemyIntentAttack} DMG.");
 
         // 4. UNLOCK CONTROLS
         isPlayerTurn = true;
@@ -454,6 +485,9 @@
         playerHp = battle.playerHp;
         enemyHp = battle.bossHp;
         enemyIntentAttack = battle.bossNextAttack;
+        bossNextMove = battle.bossNextMove;
+        bossNextMoveName = battle.bossNextMoveName;
+        rechargingCard = battle.rechargingCard;
         turnCount = battle.turn;
     }
 
@@ -514,14 +548,34 @@
     { 
         battleId = Guid.Empty;
         playerHp = 100; 
-        enemyHp = 120; // Matches your scaling max pool definition fields
+        enemyHp = 130;
         enemyIntentAttack = 15;
+        bossNextMove = "Slash";
+        bossNextMoveName = "Slash";
+        rechargingCard = null;
         turnCount = 1;
         isPlayerTurn = true;
         matchConcluding = false;
         battleResult = null;
         logs = new() { "⚔️ Match Initialized. Select an action card block." }; 
     }
+
+    private record HandCard(string Id, string Icon, string Label, string Effect, string Risk, string Hint, string Color);
+
+    // Mirrors the server's card rules (Game.Core BattleCards) for display only.
+    private static readonly HandCard[] HandCards =
+    [
+        new("Fireball", "🔥", "Fireball", "20 DMG", "10% resisted", "Reliable damage you can cast every turn.", "#ea580c"),
+        new("HolyShield", "🛡️", "Holy Shield", "15 HEAL + BLOCK", "20% interrupted", "Heals and blocks the boss's next move. Needs a turn to recharge.", "#2563eb"),
+        new("DragonClaw", "🐉", "Dragon Claw", "35 DMG", "25% dodged", "Big damage. Needs a turn to recharge.", "#7c3aed")
+    ];
+
+    private static string BossMoveIcon(string move) => move switch
+    {
+        "CrushingBlow" => "🔨",
+        "LifeDrain" => "🩸",
+        _ => "⚔️"
+    };
 
     private void Logout()
     {
@@ -557,7 +611,10 @@
         public Guid id { get; set; }
         public int playerHp { get; set; }
         public int bossHp { get; set; }
+        public string bossNextMove { get; set; } = "Slash";
+        public string bossNextMoveName { get; set; } = "Slash";
         public int bossNextAttack { get; set; }
+        public string? rechargingCard { get; set; }
         public int turn { get; set; }
         public string status { get; set; } = "";
     }
@@ -566,9 +623,14 @@
     {
         public int turn { get; set; }
         public string cardName { get; set; } = "";
+        public bool cardFailed { get; set; }
+        public string? cardFailedReason { get; set; }
         public int damageDealt { get; set; }
         public int healthRestored { get; set; }
+        public string? bossMoveName { get; set; }
         public int? bossDamage { get; set; }
+        public bool attackBlocked { get; set; }
+        public int bossHealed { get; set; }
     }
 
     public class BattleRewardDto

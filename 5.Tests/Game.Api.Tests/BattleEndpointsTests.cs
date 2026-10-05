@@ -6,10 +6,12 @@ using System.Text.Json.Serialization;
 using Game.Api.Models;
 using Game.Core.Battles;
 using Game.Core.Services;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Game.Api.Tests;
 
-// Battles run on the server with FixedBattleRandom, so every boss attack rolls its minimum.
+// Battles run on the server with FixedBattleRandom, so every roll favours the player unless a test says otherwise.
 public class BattleEndpointsTests : IClassFixture<GameApiFactory>
 {
     private const string Password = "Arena-Pass1";
@@ -48,7 +50,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(first.Id, resumed!.Id);
-        Assert.Equal(100, resumed.BossHp);
+        Assert.Equal(110, resumed.BossHp);
     }
 
     [Fact]
@@ -59,11 +61,30 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
 
         var result = await PlayAsync(client, battle.Id, "Fireball");
 
+        Assert.False(result.TurnResult.CardFailed);
         Assert.Equal(20, result.TurnResult.DamageDealt);
+        Assert.Equal("Slash", result.TurnResult.BossMoveName);
         Assert.Equal(PveBattle.OpeningBossAttack, result.TurnResult.BossDamage);
-        Assert.Equal(100, result.Battle.BossHp);
+        Assert.Equal(110, result.Battle.BossHp);
         Assert.Equal(85, result.Battle.PlayerHp);
+        Assert.Equal("Slash", result.Battle.BossNextMoveName);
         Assert.Null(result.Reward);
+    }
+
+    [Fact]
+    public async Task HolyShield_BlocksTheBossAttackThenRecharges()
+    {
+        var client = await SignedInClientAsync();
+        var battle = await StartBattleAsync(client);
+
+        var result = await PlayAsync(client, battle.Id, "HolyShield");
+
+        Assert.True(result.TurnResult.AttackBlocked);
+        Assert.Equal(0, result.TurnResult.BossDamage);
+        Assert.Equal(BattleCard.HolyShield, result.Battle.RechargingCard);
+
+        var again = await client.PostAsJsonAsync($"/api/battles/pve/{battle.Id}/turns", new { Card = "HolyShield" });
+        Assert.Equal(HttpStatusCode.BadRequest, again.StatusCode);
     }
 
     [Fact]
@@ -72,7 +93,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         var client = await SignedInClientAsync();
         var battle = await StartBattleAsync(client);
 
-        var final = await PlayUntilFinishedAsync(client, battle.Id, "DragonClaw");
+        var final = await PlayUntilFinishedAsync(client, battle.Id);
 
         Assert.Equal(BattleStatus.Won, final.Battle.Status);
         Assert.Equal(MatchRulesEngine.WinGold, final.Reward!.GoldEarned);
@@ -89,10 +110,16 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
     [Fact]
     public async Task LosingABattle_PaysOnlyTheConsolationReward()
     {
-        var client = await SignedInClientAsync();
+        // Every card fails and the boss drains its health back, so the fight can't be won.
+        using var unluckyFactory = _factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IBattleRandom>();
+            services.AddSingleton<IBattleRandom>(new FixedBattleRandom(lucky: false));
+        }));
+        var client = await SignedInClientAsync(unluckyFactory);
         var battle = await StartBattleAsync(client);
 
-        var final = await PlayUntilFinishedAsync(client, battle.Id, "HolyShield");
+        var final = await PlayUntilFinishedAsync(client, battle.Id);
 
         Assert.Equal(BattleStatus.Lost, final.Battle.Status);
         Assert.Equal(0, final.Battle.PlayerHp);
@@ -133,9 +160,11 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    private async Task<HttpClient> SignedInClientAsync()
+    private Task<HttpClient> SignedInClientAsync() => SignedInClientAsync(_factory);
+
+    private static async Task<HttpClient> SignedInClientAsync(WebApplicationFactory<Program> factory)
     {
-        var client = _factory.CreateClient();
+        var client = factory.CreateClient();
         var username = $"hero{Guid.NewGuid():N}"[..20];
         var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
         response.EnsureSuccessStatusCode();
@@ -158,15 +187,19 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         return (await response.Content.ReadFromJsonAsync<PlayCardResponse>(Json))!;
     }
 
-    private static async Task<PlayCardResponse> PlayUntilFinishedAsync(HttpClient client, Guid battleId, string card)
+    // Plays Dragon Claw whenever it is ready and Fireball while it recharges.
+    private static async Task<PlayCardResponse> PlayUntilFinishedAsync(HttpClient client, Guid battleId)
     {
+        BattleCard? recharging = null;
         for (var turn = 0; turn < 50; turn++)
         {
+            var card = recharging == BattleCard.DragonClaw ? "Fireball" : "DragonClaw";
             var result = await PlayAsync(client, battleId, card);
             if (result.Battle.Status != BattleStatus.InProgress)
             {
                 return result;
             }
+            recharging = result.Battle.RechargingCard;
         }
 
         throw new InvalidOperationException("Battle did not finish within 50 turns.");
