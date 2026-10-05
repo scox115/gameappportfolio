@@ -7,10 +7,10 @@ public enum BattleStatus
     Lost
 }
 
-/// <summary>What the player brings into a boss fight from the Gold Shop.</summary>
-public record PveLoadout(int FireballLevel, int HolyShieldLevel, int DragonClawLevel, int BonusHp)
+/// <summary>What a player brings into a boss fight or a duel from the Gold Shop.</summary>
+public record BattleLoadout(int FireballLevel, int HolyShieldLevel, int DragonClawLevel, int BonusHp)
 {
-    public static readonly PveLoadout Basic = new(1, 1, 1, 0);
+    public static readonly BattleLoadout Basic = new(1, 1, 1, 0);
 }
 
 /// <summary>What happened in one turn, so the client can replay it.</summary>
@@ -94,10 +94,10 @@ public class PveBattle
 
     private PveBattle() { }
 
-    public static PveBattle Start(Guid playerId, DateTime startedAt, PveLoadout? loadout = null)
+    public static PveBattle Start(Guid playerId, DateTime startedAt, BattleLoadout? loadout = null)
     {
         if (playerId == Guid.Empty) throw new ArgumentException("Player id cannot be empty.", nameof(playerId));
-        loadout ??= PveLoadout.Basic;
+        loadout ??= BattleLoadout.Basic;
         if (loadout.BonusHp < 0) throw new ArgumentOutOfRangeException(nameof(loadout), "Bonus health can't be negative.");
 
         var maxHp = BasePlayerMaxHp + loadout.BonusHp;

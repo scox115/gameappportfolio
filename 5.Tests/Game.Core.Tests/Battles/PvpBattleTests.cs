@@ -22,8 +22,8 @@ public class PvpBattleTests
     {
         var battle = PvpBattle.Start(Alice, Bob, Now);
 
-        Assert.Equal(PvpBattle.PlayerMaxHp, battle.HpOf(Alice));
-        Assert.Equal(PvpBattle.PlayerMaxHp, battle.HpOf(Bob));
+        Assert.Equal(PvpBattle.BasePlayerMaxHp, battle.HpOf(Alice));
+        Assert.Equal(PvpBattle.BasePlayerMaxHp, battle.HpOf(Bob));
         Assert.Equal(Alice, battle.ActivePlayerId);
         Assert.Equal(Now + PvpBattle.TurnTimeLimit, battle.TurnDeadline);
         Assert.Equal(PvpBattleStatus.InProgress, battle.Status);
@@ -73,7 +73,7 @@ public class PvpBattleTests
         var result = battle.PlayCard(Alice, BattleCard.DragonClaw, Fails, Now);
 
         Assert.True(result.CardFailed);
-        Assert.Equal(PvpBattle.PlayerMaxHp, battle.HpOf(Bob));
+        Assert.Equal(PvpBattle.BasePlayerMaxHp, battle.HpOf(Bob));
         Assert.Equal(Bob, battle.ActivePlayerId);
     }
 
@@ -88,7 +88,7 @@ public class PvpBattleTests
 
         Assert.True(result.AttackBlocked);
         Assert.Equal(0, result.DamageDealt);
-        Assert.Equal(PvpBattle.PlayerMaxHp, battle.HpOf(Alice));
+        Assert.Equal(PvpBattle.BasePlayerMaxHp, battle.HpOf(Alice));
         Assert.False(battle.IsShielded(Alice));
     }
 
@@ -191,5 +191,53 @@ public class PvpBattleTests
         battle.AttachMatch(Guid.NewGuid());
 
         Assert.Throws<InvalidOperationException>(() => battle.AttachMatch(Guid.NewGuid()));
+    }
+}
+
+public class PvpBattleLoadoutTests
+{
+    private static readonly DateTime Now = new(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+    private static readonly Guid Alice = Guid.NewGuid();
+    private static readonly Guid Bob = Guid.NewGuid();
+
+    private sealed class Lands : IBattleRandom
+    {
+        public int Next(int minInclusive, int maxExclusive) => minInclusive;
+    }
+
+    [Fact]
+    public void EachPlayerFightsWithTheirOwnUpgradesAndHealth()
+    {
+        var battle = PvpBattle.Start(Alice, Bob, Now, new BattleLoadout(3, 1, 1, 15), BattleLoadout.Basic);
+
+        Assert.Equal(115, battle.HpOf(Alice));
+        Assert.Equal(115, battle.MaxHpOf(Alice));
+        Assert.Equal(PvpBattle.BasePlayerMaxHp, battle.MaxHpOf(Bob));
+
+        var aliceTurn = battle.PlayCard(Alice, BattleCard.Fireball, new Lands(), Now);
+        var bobTurn = battle.PlayCard(Bob, BattleCard.Fireball, new Lands(), Now);
+
+        Assert.Equal(30, aliceTurn.DamageDealt);
+        Assert.Equal(20, bobTurn.DamageDealt);
+        Assert.Equal(3, battle.LevelOf(Alice, BattleCard.Fireball));
+        Assert.Equal(1, battle.LevelOf(Bob, BattleCard.Fireball));
+    }
+
+    [Fact]
+    public void HealingStopsAtThePlayersOwnMaximum()
+    {
+        var battle = PvpBattle.Start(Alice, Bob, Now, BattleLoadout.Basic, new BattleLoadout(1, 2, 1, 15));
+        battle.PlayCard(Alice, BattleCard.Fireball, new Lands(), Now);   // Bob 115 -> 95
+
+        var heal = battle.PlayCard(Bob, BattleCard.HolyShield, new Lands(), Now);
+
+        Assert.Equal(20, heal.HealthRestored);
+        Assert.Equal(115, battle.HpOf(Bob));
+    }
+
+    [Fact]
+    public void Start_RejectsACardLevelOutOfRange()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => PvpBattle.Start(Alice, Bob, Now, BattleLoadout.Basic, new BattleLoadout(1, 9, 1, 0)));
     }
 }

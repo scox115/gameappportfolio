@@ -81,12 +81,35 @@ public class PvpBattleService(
 
         // A coin flip decides who goes first.
         var (first, second) = random.Next(0, 2) == 0 ? (playerId, opponentId) : (opponentId, playerId);
-        var battle = PvpBattle.Start(first, second, Now);
-        dbContext.PvpBattles.Add(battle);
-        await dbContext.SaveChangesAsync();
+        var battle = await StartDuelAsync(first, second);
 
         await BroadcastAsync(battle, lastTurn: null, rewards: null, (client, update) => client.MatchFound(update));
         return false;
+    }
+
+    // Each player brings their upgraded cards and drinks a Duel Elixir if they have one. A shop
+    // purchase saved at the same moment changes the player row, so reload and try again.
+    private async Task<PvpBattle> StartDuelAsync(Guid first, Guid second)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var firstPlayer = await LoadPlayerAsync(first);
+            var secondPlayer = await LoadPlayerAsync(second);
+            var battle = PvpBattle.Start(first, second, Now, firstPlayer.TakeLoadoutForDuel(), secondPlayer.TakeLoadoutForDuel());
+            dbContext.PvpBattles.Add(battle);
+            try
+            {
+                await dbContext.SaveChangesAsync();
+                return battle;
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < 3)
+            {
+                foreach (var entry in dbContext.ChangeTracker.Entries().ToList())
+                {
+                    entry.State = EntityState.Detached;
+                }
+            }
+        }
     }
 
     public async Task PlayCardAsync(Guid playerId, Guid battleId, BattleCard card)

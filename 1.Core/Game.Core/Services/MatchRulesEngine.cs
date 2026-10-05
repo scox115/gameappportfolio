@@ -28,6 +28,7 @@ public class MatchRulesEngine
 
         winner.AddGold(WinGold);
         winner.AddExperience(WinExperience);
+        winner.RecordPvpWin();
 
         loser.AddGold(LossGold);
         loser.AddExperience(LossExperience);

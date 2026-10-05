@@ -170,6 +170,7 @@
                                                         <th style="padding: 12px;">Rank</th>
                                                         <th style="padding: 12px;">Hero</th>
                                                         <th style="padding: 12px; text-align: center;">Level</th>
+                                                        <th style="padding: 12px; text-align: center;">Duels Won</th>
                                                         <th style="padding: 12px; text-align: right;">Gold Reserves</th>
                                                     </tr>
                                                 </thead>
@@ -186,8 +187,13 @@
                                                             <td style="padding: 14px; display: flex; align-items: center; gap: 12px;">
                                                                 <img src="@(string.IsNullOrEmpty(item.avatarUrl) ? "https://dicebear.com" + item.username : item.avatarUrl)" style="width: 30px; height: 30px; border-radius: 50%; border: 1px solid #475569; object-fit: cover;" />
                                                                 <span style="color: @(isCurrentUser ? "#818cf8" : "#f1f5f9");">@item.username @(isCurrentUser ? " (You)" : "")</span>
+                                                                @if (!string.IsNullOrEmpty(item.title))
+                                                                {
+                                                                    <span style="color: #fbbf24; font-size: 0.85rem; font-style: italic;">@item.title</span>
+                                                                }
                                                             </td>
                                                             <td style="padding: 14px; text-align: center; color: #38bdf8; font-weight: bold;">@item.level</td>
+                                                            <td style="padding: 14px; text-align: center; color: #22d3ee; font-weight: bold;">⚔️ @item.pvpWins</td>
                                                             <td style="padding: 14px; text-align: right; color: #fbbf24; font-weight: bold;">🪙 @item.gold</td>
                                                         </tr>
                                                     }
@@ -655,6 +661,9 @@
 
         [System.Text.Json.Serialization.JsonPropertyName("avatarUrl")]
         public string? avatarUrl { get; set; } 
+
+        public string? title { get; set; }
+        public int pvpWins { get; set; }
     }
 
     public class UploadResponse { public string avatarUrl { get; set; } = ""; }

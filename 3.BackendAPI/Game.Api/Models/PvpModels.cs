@@ -3,7 +3,8 @@ using Game.Core.Entities;
 
 namespace Game.Api.Models;
 
-public record PvpPlayerView(Guid Id, string Username, string? AvatarUrl, int Hp, int MaxHp, bool Shielded);
+/// <param name="Title">The title the player chose in the Gold Shop, such as "the Gladiator".</param>
+public record PvpPlayerView(Guid Id, string Username, string? Title, string? AvatarUrl, int Hp, int MaxHp, bool Shielded);
 
 /// <summary>A battle as one of its players sees it.</summary>
 public record PvpBattleView(
@@ -17,7 +18,8 @@ public record PvpBattleView(
     BattleCard? RechargingCard,
     PvpBattleStatus Status,
     bool? YouWon,
-    PvpEndReason? EndReason)
+    PvpEndReason? EndReason,
+    IReadOnlyList<BattleCardResponse> YourCards)
 {
     // TurnSecondsLeft lets the browser count down without trusting its own clock.
     public static PvpBattleView For(Guid viewerId, PvpBattle battle, Player you, Player opponent, DateTime now) =>
@@ -31,10 +33,11 @@ public record PvpBattleView(
             battle.RechargingCardOf(viewerId),
             battle.Status,
             battle.WinnerId is { } winner ? winner == viewerId : null,
-            battle.EndReason);
+            battle.EndReason,
+            BattleCards.All.Select(c => BattleCardResponse.From(battle.CardFor(viewerId, c.Card), battle.LevelOf(viewerId, c.Card))).ToList());
 
     private static PvpPlayerView PlayerView(PvpBattle battle, Player player) =>
-        new(player.Id, player.Username, player.AvatarUrl, battle.HpOf(player.Id), PvpBattle.PlayerMaxHp, battle.IsShielded(player.Id));
+        new(player.Id, player.Username, player.TitleName, player.AvatarUrl, battle.HpOf(player.Id), battle.MaxHpOf(player.Id), battle.IsShielded(player.Id));
 }
 
 /// <summary>The card just played, as one of the players sees it.</summary>

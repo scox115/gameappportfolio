@@ -41,6 +41,21 @@ public class PlayerConfiguration : IEntityTypeConfiguration<Player>
             upgrades.HasKey("PlayerId", nameof(CardUpgrade.Card));
         });
 
+        builder.Property(p => p.EquippedTitle)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+
+        // Titles bought in the Gold Shop, one row per title owned.
+        builder.OwnsMany(p => p.Titles, titles =>
+        {
+            titles.ToTable("PlayerTitles");
+            titles.WithOwner().HasForeignKey("PlayerId");
+            titles.Property(t => t.Title)
+                .HasConversion<string>()
+                .HasMaxLength(30);
+            titles.HasKey("PlayerId", nameof(OwnedTitle.Title));
+        });
+
         // Optimizes lookups by indexing the username field uniquely
         builder.HasIndex(p => p.Username)
             .IsUnique();

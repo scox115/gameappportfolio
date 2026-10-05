@@ -62,9 +62,10 @@
                 {
                     var recharging = battle.RechargingCard == card.Id;
                     var disabled = recharging || !battle.YourTurn || sending;
+                    var held = battle.YourCards?.FirstOrDefault(c => c.Card == card.Id);
                     <button @onclick="() => PlayCard(card.Id)" disabled="@disabled" title="@card.Hint"
                             style="background: @(disabled ? "#475569" : card.Color); width: 150px; height: 110px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: @(disabled ? "not-allowed" : "pointer"); opacity: @(disabled ? "0.6" : "1");">
-                        @card.Icon @card.Label<br /><small>@card.Effect</small><br />
+                        @card.Icon @card.Label@(held is { Level: > 1 } ? $" ★{held.Level}" : "")<br /><small>@(held is null ? card.Effect : ArenaCards.EffectOf(held.Damage, held.Heal))</small><br />
                         <small style="font-weight: normal;">@(recharging ? "⏳ Recharging" : card.Risk)</small>
                     </button>
                 }
@@ -276,6 +277,10 @@
         <div style="flex: 1; background: #0f172a; border-radius: 12px; padding: 15px; border: 1px solid #334155;">
             <div style="color: #94a3b8; font-size: 0.8rem;">@label</div>
             <div style="font-weight: bold; font-size: 1.1rem; color: #f1f5f9;">@player.Username @(player.Shielded ? "🛡️" : "")</div>
+            @if (!string.IsNullOrEmpty(player.Title))
+            {
+                <div style="color: #fbbf24; font-size: 0.85rem; font-style: italic;">👑 @player.Title</div>
+            }
             <div style="background: #334155; border-radius: 6px; height: 12px; margin-top: 8px; overflow: hidden;">
                 <div style="background: @color; height: 100%; width: @(player.Hp * 100 / Math.Max(1, player.MaxHp))%;"></div>
             </div>
@@ -293,9 +298,11 @@
     }
 
     // Shapes of the messages the server pushes (see Game.Api.Models.PvpModels).
-    private record PvpPlayerDto(Guid Id, string Username, string? AvatarUrl, int Hp, int MaxHp, bool Shielded);
+    private record PvpPlayerDto(Guid Id, string Username, string? Title, string? AvatarUrl, int Hp, int MaxHp, bool Shielded);
     private record PvpBattleDto(Guid Id, PvpPlayerDto You, PvpPlayerDto Opponent, bool YourTurn, int Turn,
-        DateTime TurnDeadline, int TurnSecondsLeft, string? RechargingCard, string Status, bool? YouWon, string? EndReason);
+        DateTime TurnDeadline, int TurnSecondsLeft, string? RechargingCard, string Status, bool? YouWon, string? EndReason,
+        List<PvpCardDto>? YourCards);
+    private record PvpCardDto(string Card, int Level, int Damage, int Heal);
     private record PvpTurnDto(int Turn, bool YourCard, string PlayerName, string CardName, bool CardFailed,
         string? CardFailedReason, int DamageDealt, int HealthRestored, bool AttackBlocked);
     private record PvpProfileDto(Guid Id, string Username, int Gold, int Level);

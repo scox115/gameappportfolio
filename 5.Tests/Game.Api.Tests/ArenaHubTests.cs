@@ -7,6 +7,7 @@ using System.Threading.Channels;
 using Game.Api.Hubs;
 using Game.Api.Models;
 using Game.Core.Battles;
+using Game.Core.Entities;
 using Game.Core.Services;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR;
@@ -187,6 +188,36 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
             Assert.Equal(battleId, (await aliceAgain.MatchFound.ReadAsync()).Battle.Id);
 
             await bob.ForfeitAsync(battleId);
+        }
+    }
+
+    [Fact]
+    public async Task UpgradesAndDuelElixirsCarryIntoTheDuel()
+    {
+        // Bob joins second, so he goes first (see the class comment).
+        var alice = await ConnectAsync();
+        var bob = await ConnectAsync();
+        await using (alice)
+        await using (bob)
+        {
+            (await bob.Http.PostAsJsonAsync("/api/shop/purchases", new { Item = "FireballUpgrade" })).EnsureSuccessStatusCode();
+            (await bob.Http.PostAsJsonAsync("/api/shop/purchases", new { Item = "DuelElixir" })).EnsureSuccessStatusCode();
+
+            await alice.FindOpponentAsync();
+            await bob.FindOpponentAsync();
+            await alice.MatchFound.ReadAsync();
+            var bobView = (await bob.MatchFound.ReadAsync()).Battle;
+
+            Assert.Equal(PvpBattle.BasePlayerMaxHp + Player.DuelElixirBonusHp, bobView.You.MaxHp);
+            Assert.Equal(PvpBattle.BasePlayerMaxHp, bobView.Opponent.MaxHp);
+            Assert.Equal(25, bobView.YourCards.Single(c => c.Card == BattleCard.Fireball).Damage);
+
+            await bob.PlayCardAsync(bobView.Id, BattleCard.Fireball);
+            var aliceUpdate = await alice.Updates.ReadAsync();
+            Assert.Equal(25, aliceUpdate.LastTurn!.DamageDealt);
+
+            await bob.Updates.ReadAsync();
+            await alice.ForfeitAsync(bobView.Id);
         }
     }
 

@@ -280,7 +280,7 @@ public class PveBattleLoadoutTests
     [Fact]
     public void AnUpgradedCardHitsHarder()
     {
-        var battle = PveBattle.Start(Guid.NewGuid(), Now, new PveLoadout(3, 1, 1, 0));
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, new BattleLoadout(3, 1, 1, 0));
 
         var turn = battle.PlayCard(BattleCard.Fireball, new AlwaysMin(), Now);
 
@@ -291,7 +291,7 @@ public class PveBattleLoadoutTests
     [Fact]
     public void AnElixirRaisesStartingAndMaximumHealth()
     {
-        var battle = PveBattle.Start(Guid.NewGuid(), Now, new PveLoadout(1, 2, 1, 25));
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, new BattleLoadout(1, 2, 1, 25));
 
         Assert.Equal(125, battle.PlayerHp);
         Assert.Equal(125, battle.PlayerMaxHp);
@@ -306,7 +306,7 @@ public class PveBattleLoadoutTests
     [Fact]
     public void Start_RejectsACardLevelOutOfRange()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => PveBattle.Start(Guid.NewGuid(), Now, new PveLoadout(4, 1, 1, 0)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => PveBattle.Start(Guid.NewGuid(), Now, new BattleLoadout(4, 1, 1, 0)));
     }
 }
 
@@ -323,7 +323,7 @@ public class PveBattleEnrageTests
     public void TheBossHitsHarderOnceBadlyHurt()
     {
         // Fully upgraded: Dragon Claw 45, Fireball 30. Every roll lands and the boss always Slashes.
-        var battle = PveBattle.Start(Guid.NewGuid(), Now, new PveLoadout(3, 1, 3, 0));
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, new BattleLoadout(3, 1, 3, 0));
         battle.PlayCard(BattleCard.DragonClaw, new AlwaysMin(), Now);
         battle.PlayCard(BattleCard.Fireball, new AlwaysMin(), Now);
 

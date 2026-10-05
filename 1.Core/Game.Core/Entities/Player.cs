@@ -6,8 +6,10 @@ public class Player
 {
     public const int MaxElixirs = 3;
     public const int ElixirBonusHp = 25;
+    public const int DuelElixirBonusHp = 15;
 
     private readonly List<CardUpgrade> _cardUpgrades = new();
+    private readonly List<OwnedTitle> _titles = new();
 
     public Guid Id { get; private set; }
     public string Username { get; private set; } = string.Empty;
@@ -19,8 +21,23 @@ public class Player
     /// <summary>Battle Elixirs bought in the shop; one is drunk at the start of each boss fight.</summary>
     public int Elixirs { get; private set; }
 
+    /// <summary>Duel Elixirs bought in the shop; one is drunk at the start of each PvP duel.</summary>
+    public int DuelElixirs { get; private set; }
+
     /// <summary>Cards upgraded in the Gold Shop. A card that isn't listed is level 1.</summary>
     public IReadOnlyCollection<CardUpgrade> CardUpgrades => _cardUpgrades;
+
+    /// <summary>PvP duels won; titles in the Gold Shop unlock as this grows.</summary>
+    public int PvpWins { get; private set; }
+
+    /// <summary>Titles bought in the Gold Shop.</summary>
+    public IReadOnlyCollection<OwnedTitle> Titles => _titles;
+
+    /// <summary>The title shown next to the player's name, if they chose one.</summary>
+    public PlayerTitle? EquippedTitle { get; private set; }
+
+    /// <summary>The equipped title as it reads after the name, or null.</summary>
+    public string? TitleName => EquippedTitle is { } title ? PlayerTitles.Get(title).Name : null;
 
     /// <summary>
     /// Changes whenever gold or purchases change; used as an optimistic concurrency token so two
@@ -67,6 +84,30 @@ public class Player
         Version = Guid.NewGuid();
     }
 
+    public void RecordPvpWin() => PvpWins++;
+
+    public bool OwnsTitle(PlayerTitle title) => _titles.Any(t => t.Title == title);
+
+    /// <summary>Adds a bought title and shows it straight away.</summary>
+    public void AddTitle(PlayerTitle title)
+    {
+        var definition = PlayerTitles.Get(title);
+        if (OwnsTitle(title)) throw new InvalidOperationException($"You already own \"{definition.Name}\".");
+        if (PvpWins < definition.DuelWinsNeeded)
+            throw new InvalidOperationException($"Win {definition.DuelWinsNeeded} duels to unlock \"{definition.Name}\" (you have {PvpWins}).");
+
+        _titles.Add(new OwnedTitle(title));
+        EquippedTitle = title;
+        Version = Guid.NewGuid();
+    }
+
+    /// <summary>Shows an owned title next to the player's name, or none when null.</summary>
+    public void EquipTitle(PlayerTitle? title)
+    {
+        if (title is { } chosen && !OwnsTitle(chosen)) throw new InvalidOperationException("You don't own that title.");
+        EquippedTitle = title;
+    }
+
     public int CardLevel(BattleCard card) =>
         _cardUpgrades.FirstOrDefault(u => u.Card == card)?.Level ?? 1;
 
@@ -93,11 +134,35 @@ public class Player
         Version = Guid.NewGuid();
     }
 
+    public void AddDuelElixir()
+    {
+        if (DuelElixirs >= MaxElixirs) throw new InvalidOperationException($"You can carry at most {MaxElixirs} duel elixirs.");
+        DuelElixirs++;
+        Version = Guid.NewGuid();
+    }
+
+    /// <summary>
+    /// What the player brings into a new duel: their card levels, plus a Duel Elixir's extra
+    /// health if they have one, which this uses up.
+    /// </summary>
+    public BattleLoadout TakeLoadoutForDuel()
+    {
+        var bonusHp = 0;
+        if (DuelElixirs > 0)
+        {
+            DuelElixirs--;
+            bonusHp = DuelElixirBonusHp;
+            Version = Guid.NewGuid();
+        }
+
+        return new BattleLoadout(CardLevel(BattleCard.Fireball), CardLevel(BattleCard.HolyShield), CardLevel(BattleCard.DragonClaw), bonusHp);
+    }
+
     /// <summary>
     /// What the player brings into a new boss fight: their card levels, plus an elixir's extra
     /// health if they have one, which this uses up.
     /// </summary>
-    public PveLoadout TakeLoadoutForBossFight()
+    public BattleLoadout TakeLoadoutForBossFight()
     {
         var bonusHp = 0;
         if (Elixirs > 0)
@@ -107,7 +172,7 @@ public class Player
             Version = Guid.NewGuid();
         }
 
-        return new PveLoadout(CardLevel(BattleCard.Fireball), CardLevel(BattleCard.HolyShield), CardLevel(BattleCard.DragonClaw), bonusHp);
+        return new BattleLoadout(CardLevel(BattleCard.Fireball), CardLevel(BattleCard.HolyShield), CardLevel(BattleCard.DragonClaw), bonusHp);
     }
 
     // --- ⭐ MUTATOR METHOD: INCREMENT EXPERIENCE & HANDLE LEVEL UPS ---

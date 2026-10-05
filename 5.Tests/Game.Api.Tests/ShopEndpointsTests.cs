@@ -7,6 +7,8 @@ using Game.Api.Models;
 using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Core.Shop;
+using Game.Infrastructure.Data;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Game.Api.Tests;
 
@@ -108,10 +110,67 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Titles_UnlockWithDuelWinsAndCanBeShownOrHidden()
+    {
+        var (client, playerId) = await SignedInPlayerAsync();
+
+        var locked = await BuyAsync(client, ShopItem.TitleDuelist);
+        Assert.Equal(HttpStatusCode.BadRequest, locked.StatusCode);
+        Assert.Contains("1 more duel", await locked.Content.ReadAsStringAsync());
+
+        await GiveDuelWinsAsync(playerId, 1);
+        var bought = await BuyAsync(client, ShopItem.TitleDuelist);
+        Assert.Equal(HttpStatusCode.OK, bought.StatusCode);
+        var shop = (await bought.Content.ReadFromJsonAsync<ShopResponse>(Json))!;
+        Assert.Equal(PlayerTitle.Duelist, shop.EquippedTitle);
+        Assert.Equal(1, shop.PvpWins);
+
+        var hidden = await client.PutAsJsonAsync("/api/shop/title", new EquipTitleRequest(null), Json);
+        Assert.Null((await hidden.Content.ReadFromJsonAsync<ShopResponse>(Json))!.EquippedTitle);
+
+        var notOwned = await client.PutAsJsonAsync("/api/shop/title", new EquipTitleRequest(PlayerTitle.Gladiator), Json);
+        Assert.Equal(HttpStatusCode.BadRequest, notOwned.StatusCode);
+    }
+
+    [Fact]
+    public async Task TheLeaderboardShowsTitles()
+    {
+        var (client, playerId) = await SignedInPlayerAsync();
+        await GiveDuelWinsAsync(playerId, 1);
+        await BuyAsync(client, ShopItem.TitleDuelist);
+
+        // New players start at level 1, so give this one a level to make the top 10.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FindAsync(playerId);
+            player!.AddExperience(10_000);
+            await db.SaveChangesAsync();
+        }
+
+        var board = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/players/leaderboard", Json);
+
+        Assert.Equal("the Duelist", board!.Single(r => r.Id == playerId).Title);
+    }
+
+    private sealed record LeaderboardRow(Guid Id, string Username, string? Title, int PvpWins);
+
+    private async Task GiveDuelWinsAsync(Guid playerId, int wins)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.FindAsync(playerId);
+        for (var i = 0; i < wins; i++) player!.RecordPvpWin();
+        await db.SaveChangesAsync();
+    }
+
     private static Task<HttpResponseMessage> BuyAsync(HttpClient client, ShopItem item) =>
         client.PostAsJsonAsync("/api/shop/purchases", new PurchaseRequest(item), Json);
 
-    private async Task<HttpClient> SignedInClientAsync()
+    private async Task<HttpClient> SignedInClientAsync() => (await SignedInPlayerAsync()).Client;
+
+    private async Task<(HttpClient Client, Guid PlayerId)> SignedInPlayerAsync()
     {
         var client = _factory.CreateClient();
         var username = $"shop{Guid.NewGuid():N}"[..20];
@@ -119,6 +178,6 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         response.EnsureSuccessStatusCode();
         var auth = (await response.Content.ReadFromJsonAsync<AuthResponse>(Json))!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
-        return client;
+        return (client, auth.Player.Id);
     }
 }
