@@ -27,6 +27,17 @@ jobs:
       - name: Restore
         run: dotnet restore GamePortfolioSolution.slnx
 
+      # Fails on any direct or transitive package with a published advisory (GitHub Advisory Database).
+      - name: Check for vulnerable packages
+        run: |
+          dotnet list GamePortfolioSolution.slnx package --vulnerable --include-transitive --format json > vulnerable.json
+          jq -r '.projects[] | .path as $project | .frameworks[]?
+            | ((.topLevelPackages // []) + (.transitivePackages // []))[]
+            | "::error::\(.id) \(.resolvedVersion) (\([.vulnerabilities[]?.severity] | join(", "))) in \($project | split("/") | last)"' vulnerable.json \
+            | sort -u | tee vulnerable.txt
+          if [ -s vulnerable.txt ]; then exit 1; fi
+          echo "No known vulnerable packages."
+
       - name: Build
         run: dotnet build GamePortfolioSolution.slnx --no-restore --configuration Release
 
