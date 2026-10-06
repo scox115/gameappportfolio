@@ -19,6 +19,12 @@ public class Player
     public const int StreakBonusPerWin = 10;
     public const int MaxStreakBonus = 50;
 
+    /// <summary>Gold a new hero starts with: enough for one card upgrade or a few elixirs.</summary>
+    public const int StartingGold = 200;
+
+    /// <summary>Boss wins per UTC day that pay the full reward; later wins that day pay less.</summary>
+    public const int FullRewardBossWinsPerDay = 5;
+
     public Guid Id { get; private set; }
     public string Username { get; private set; } = string.Empty;
     public int Gold { get; private set; }
@@ -64,6 +70,10 @@ public class Player
 
     /// <summary>Battles won in a row, boss fights and duels alike. A loss resets it.</summary>
     public int WinStreak { get; private set; }
+
+    /// <summary>Boss fights won on <see cref="BossWinsDay"/>, for the daily full-reward limit.</summary>
+    public int BossWinsToday { get; private set; }
+    public DateOnly? BossWinsDay { get; private set; }
 
     /// <summary>Progress on today's daily bounties.</summary>
     public IReadOnlyCollection<BountyProgress> Bounties => _bounties;
@@ -200,13 +210,14 @@ public class Player
     /// Counts a finished battle towards the win streak and today's bounties, and pays the streak
     /// bonus and any bounties it completes.
     /// </summary>
-    public BattleBonuses RecordBattle(DateOnly today, BattleKind kind, bool won)
+    /// <param name="payStreakBonus">False when the win still counts towards the streak but pays no bonus, such as a boss win past the daily limit.</param>
+    public BattleBonuses RecordBattle(DateOnly today, BattleKind kind, bool won, bool payStreakBonus = true)
     {
         var streakBonus = 0;
         if (won)
         {
             WinStreak++;
-            streakBonus = Math.Min((WinStreak - 1) * StreakBonusPerWin, MaxStreakBonus);
+            if (payStreakBonus) streakBonus = Math.Min((WinStreak - 1) * StreakBonusPerWin, MaxStreakBonus);
         }
         else
         {
@@ -233,6 +244,23 @@ public class Player
         if (bonuses.Gold > 0) AddGold(bonuses.Gold);
         Version = Guid.NewGuid();
         return bonuses;
+    }
+
+    /// <summary>Boss wins left today that pay the full reward.</summary>
+    public int FullRewardBossWinsLeft(DateOnly today) =>
+        BossWinsDay == today ? Math.Max(0, FullRewardBossWinsPerDay - BossWinsToday) : FullRewardBossWinsPerDay;
+
+    /// <summary>Counts a boss win. Returns true while it's within today's full-reward limit.</summary>
+    public bool RecordBossWin(DateOnly today)
+    {
+        var withinLimit = FullRewardBossWinsLeft(today) > 0;
+        if (BossWinsDay != today)
+        {
+            BossWinsDay = today;
+            BossWinsToday = 0;
+        }
+        BossWinsToday++;
+        return withinLimit;
     }
 
     public int CardLevel(BattleCard card) =>

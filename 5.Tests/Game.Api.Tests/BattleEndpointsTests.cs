@@ -1,3 +1,4 @@
+using Game.Core.Entities;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -101,8 +102,10 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(0, final.Reward.StreakBonus);
         Assert.Equal(MatchRulesEngine.WinGold + bountyGold, final.Reward.GoldEarned);
         var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
-        Assert.Equal(500 + MatchRulesEngine.WinGold + bountyGold, me!.Gold);
+        Assert.Equal(Player.StartingGold + MatchRulesEngine.WinGold + bountyGold, me!.Gold);
         Assert.Equal(1, me.WinStreak);
+        Assert.False(final.Reward.ReducedBossReward);
+        Assert.Equal(Player.FullRewardBossWinsPerDay - 1, final.Reward.FullRewardBossWinsLeft);
 
         var extraMove = await client.PostAsJsonAsync($"/api/battles/pve/{battle.Id}/turns", new { Card = "Fireball" });
         Assert.Equal(HttpStatusCode.Conflict, extraMove.StatusCode);
@@ -128,7 +131,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(BattleStatus.Lost, final.Battle.Status);
         Assert.Equal(0, final.Battle.PlayerHp);
         Assert.Equal(MatchRulesEngine.LossGold, final.Reward!.GoldEarned);
-        Assert.Equal(500 + MatchRulesEngine.LossGold, final.Reward.Player.Gold);
+        Assert.Equal(Player.StartingGold + MatchRulesEngine.LossGold, final.Reward.Player.Gold);
     }
 
     [Fact]

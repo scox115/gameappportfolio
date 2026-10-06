@@ -124,7 +124,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
             Assert.Equal(MatchRulesEngine.LossGold, aliceUpdate.Reward!.GoldEarned);
 
             var bobProfile = await bob.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
-            Assert.Equal(500 + MatchRulesEngine.WinGold, bobProfile!.Gold);
+            Assert.Equal(Player.StartingGold + MatchRulesEngine.WinGold, bobProfile!.Gold);
 
             var current = await bob.Http.GetAsync("/api/battles/pvp/current");
             Assert.Equal(HttpStatusCode.NoContent, current.StatusCode);
@@ -160,7 +160,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         await bob.MatchFound.ReadAsync();
         Assert.Equal(100, battle.Wager);
         var staked = await alice.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
-        Assert.Equal(400, staked!.Gold);
+        Assert.Equal(Player.StartingGold - 100, staked!.Gold);
 
         await alice.ForfeitAsync(battle.Id);
 
@@ -168,8 +168,8 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         var aliceReward = (await alice.Updates.ReadAsync()).Reward!;
         Assert.Equal(DuelWagers.Payout(100), bobReward.WagerResult);
         Assert.Equal(-100, aliceReward.WagerResult);
-        Assert.Equal(400 + MatchRulesEngine.WinGold + DuelWagers.Payout(100) + BonusGold(bobReward), bobReward.Player.Gold);
-        Assert.Equal(400 + MatchRulesEngine.LossGold + BonusGold(aliceReward), aliceReward.Player.Gold);
+        Assert.Equal(Player.StartingGold - 100 + MatchRulesEngine.WinGold + DuelWagers.Payout(100) + BonusGold(bobReward), bobReward.Player.Gold);
+        Assert.Equal(Player.StartingGold - 100 + MatchRulesEngine.LossGold + BonusGold(aliceReward), aliceReward.Player.Gold);
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         await using var alice = await ConnectAsync();
         await using var bob = await ConnectAsync();
 
-        Assert.True(await alice.FindWageredOpponentAsync(250));
+        Assert.True(await alice.FindWageredOpponentAsync(100));
         Assert.True(await bob.FindWageredOpponentAsync(50));
 
         await alice.Connection.InvokeAsync(nameof(ArenaHub.CancelSearch));
@@ -276,6 +276,8 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         await using (alice)
         await using (bob)
         {
+            var bobProfile = await bob.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+            await _factory.GiveGoldAsync(bobProfile!.Id, 100);
             (await bob.Http.PostAsJsonAsync("/api/shop/purchases", new { Item = "FireballUpgrade" })).EnsureSuccessStatusCode();
             (await bob.Http.PostAsJsonAsync("/api/shop/purchases", new { Item = "DuelElixir" })).EnsureSuccessStatusCode();
 

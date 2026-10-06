@@ -32,7 +32,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
 
         var shop = await client.GetFromJsonAsync<ShopResponse>("/api/shop", Json);
 
-        Assert.Equal(500, shop!.Gold);
+        Assert.Equal(Player.StartingGold, shop!.Gold);
         Assert.Equal(Enum.GetValues<ShopItem>().Length, shop.Offers.Count);
         Assert.Equal(150, shop.Offers.Single(o => o.Item == ShopItem.FireballUpgrade).Price);
         Assert.Equal(GoldShop.ElixirPrice, shop.Offers.Single(o => o.Item == ShopItem.BattleElixir).Price);
@@ -47,17 +47,18 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var shop = (await response.Content.ReadFromJsonAsync<ShopResponse>(Json))!;
-        Assert.Equal(350, shop.Gold);
+        Assert.Equal(Player.StartingGold - 150, shop.Gold);
         Assert.Equal(2, shop.Offers.Single(o => o.Item == ShopItem.DragonClawUpgrade).Owned);
 
         var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
-        Assert.Equal(350, me!.Gold);
+        Assert.Equal(Player.StartingGold - 150, me!.Gold);
     }
 
     [Fact]
     public async Task Buying_FailsWithAReasonWhenThePlayerRunsOutOfGold()
     {
-        var client = await SignedInClientAsync();
+        var (client, playerId) = await SignedInPlayerAsync();
+        await _factory.GiveGoldAsync(playerId, 500 - Player.StartingGold);
         await BuyAsync(client, ShopItem.FireballUpgrade);   // 500 -> 350
         await BuyAsync(client, ShopItem.FireballUpgrade);   // 350 -> 50
 
@@ -181,6 +182,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
     public async Task Cosmetics_CanBeBoughtWornAndTakenOff()
     {
         var (client, playerId) = await SignedInPlayerAsync();
+        await _factory.GiveGoldAsync(playerId, 500 - Player.StartingGold);
 
         var tooDear = await BuyAsync(client, ShopItem.FrameSilver);
         Assert.Equal(HttpStatusCode.BadRequest, tooDear.StatusCode);

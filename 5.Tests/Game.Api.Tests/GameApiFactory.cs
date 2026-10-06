@@ -18,6 +18,16 @@ public class GameApiFactory : WebApplicationFactory<Program>
     /// <summary>The API's clock; tests move it forward to run out a turn timer.</summary>
     public TestClock Clock { get; } = new();
 
+    /// <summary>Tops up a player's gold, for tests that need more than a new hero starts with.</summary>
+    public async Task GiveGoldAsync(Guid playerId, int amount)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.FindAsync(playerId) ?? throw new InvalidOperationException("No such player.");
+        player.AddGold(amount);
+        await db.SaveChangesAsync();
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");

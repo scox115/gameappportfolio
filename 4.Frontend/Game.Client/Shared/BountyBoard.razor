@@ -39,6 +39,10 @@
                 ? $"Your next win pays +{board.streakBonus} bonus gold."
                 : "Win battles in a row for up to +50 bonus gold per win.")
         </p>
+        <p style="color: #cbd5e1; margin: 8px 0 0; font-size: 0.95rem;">
+            ⚔️ Boss rewards: <b>@board.fullRewardBossWinsLeft of @board.fullRewardBossWinsPerDay</b> full-reward wins left today.
+            @(board.fullRewardBossWinsLeft == 0 ? "Boss wins pay 25 gold until tomorrow." : "")
+        </p>
     }
 </div>
 
@@ -70,6 +74,8 @@
         public DateTime resetsAt { get; set; }
         public int winStreak { get; set; }
         public int streakBonus { get; set; }
+        public int fullRewardBossWinsLeft { get; set; }
+        public int fullRewardBossWinsPerDay { get; set; }
         public List<BountyDto> bounties { get; set; } = new();
     }
 

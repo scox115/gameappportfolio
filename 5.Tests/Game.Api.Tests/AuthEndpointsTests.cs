@@ -1,3 +1,4 @@
+using Game.Core.Entities;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -24,7 +25,7 @@ public class AuthEndpointsTests : IClassFixture<GameApiFactory>
         var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
         Assert.False(string.IsNullOrEmpty(auth!.AccessToken));
         Assert.Equal(username, auth.Player.Username);
-        Assert.Equal(500, auth.Player.Gold);
+        Assert.Equal(Player.StartingGold, auth.Player.Gold);
     }
 
     [Fact]

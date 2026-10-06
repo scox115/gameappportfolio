@@ -96,6 +96,42 @@ public class MatchRulesEngineTests
         Assert.Throws<ArgumentException>(() => _engine.ProcessPveMatch(match, a, isVictory: true));
     }
 
+    [Fact]
+    public void BossWins_PayInFullOnlyUpToTheDailyLimit()
+    {
+        var player = NewPlayer();
+
+        var rewards = Enumerable.Range(0, Player.FullRewardBossWinsPerDay + 2)
+            .Select(_ => _engine.ProcessPveMatch(GameMatch.CreatePve(player.Id), player, isVictory: true))
+            .ToList();
+
+        var full = rewards.Take(Player.FullRewardBossWinsPerDay).ToList();
+        var reduced = rewards.Skip(Player.FullRewardBossWinsPerDay).ToList();
+        Assert.All(full, r => Assert.False(r.ReducedBossReward));
+        Assert.All(reduced, r =>
+        {
+            Assert.True(r.ReducedBossReward);
+            Assert.Equal(0, r.Bonuses.StreakBonus);
+            Assert.Equal(MatchRulesEngine.ReducedBossWinGold, r.Gold);
+            Assert.Equal(MatchRulesEngine.WinExperience, r.Experience);
+        });
+        Assert.Equal(0, player.FullRewardBossWinsLeft(FixedClock.QuietDay));
+    }
+
+    [Fact]
+    public void BossLosses_DontUseUpTheDailyLimit_AndTheLimitResetsTomorrow()
+    {
+        var player = NewPlayer();
+        for (var i = 0; i < 10; i++) _engine.ProcessPveMatch(GameMatch.CreatePve(player.Id), player, isVictory: false);
+        Assert.Equal(Player.FullRewardBossWinsPerDay, player.FullRewardBossWinsLeft(FixedClock.QuietDay));
+
+        for (var i = 0; i < Player.FullRewardBossWinsPerDay; i++) _engine.ProcessPveMatch(GameMatch.CreatePve(player.Id), player, isVictory: true);
+        Assert.Equal(0, player.FullRewardBossWinsLeft(FixedClock.QuietDay));
+
+        var tomorrow = new MatchRulesEngine(new FixedClock(FixedClock.QuietDay.AddDays(1)));
+        Assert.False(tomorrow.ProcessPveMatch(GameMatch.CreatePve(player.Id), player, isVictory: true).ReducedBossReward);
+    }
+
     // --- PvP ---
 
     [Fact]
