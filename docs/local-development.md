@@ -103,6 +103,15 @@ Both are written in one `SaveChanges`, and the message is acknowledged only afte
 - Traces, metrics and logs go out over OpenTelemetry. Open the dashboard at http://localhost:18888 to see each request's trace, the `game.battles.completed` and `game.telemetry.*` counters, and structured logs. Without `OTEL_EXPORTER_OTLP_ENDPOINT` set, nothing is exported.
 - Errors come back as [problem details](https://www.rfc-editor.org/rfc/rfc9457) JSON with a `traceId` you can search for in the dashboard.
 
+### Scheduled cleanup
+
+`DataCleanupWorker` deletes rows the game no longer needs. It runs a minute after the API starts, because in Azure the API scales to zero and might never be up at a fixed time of day, and then every six hours while it keeps running:
+
+- **Refresh tokens:** each sign-in and each token refresh adds one. They are deleted 7 days after they expire. A revoked token is kept until it would have expired, so reuse of a stolen token is still caught.
+- **Finished boss fights and duels:** their turn-by-turn state is deleted after 30 days. The result lives on in match history, the match record and the hero's stats. Battles still in progress are never touched: an unfinished boss fight waits for its player to come back, and `PvpTurnTimeoutWorker` settles duels.
+
+Rows go in batches of 1,000 with `ExecuteDeleteAsync` (one `DELETE ... WHERE Id IN (SELECT TOP (1000) ...)` per batch, using indexes added for it), so a big backlog never locks a table for long. Each run is a trace span named `Data cleanup`, the `game.cleanup.deleted` counter records what was deleted by kind, and a failed run is logged and retried at the next one. `DataCleanupTests` runs the deletes on SQLite, since the in-memory provider can't bulk delete. Change the schedule or retention in the `Cleanup` settings, or turn it off with `Cleanup:Enabled=false`.
+
 ### Caching
 
 The leaderboards, the player count, the arena stats and the class list are the same for every player, so the API caches them with [output caching](https://learn.microsoft.com/aspnet/core/performance/caching/output) instead of querying SQL on every visit (`3.BackendAPI/Game.Api/Caching/OutputCaching.cs`). They are cached even for signed-in players, which the built-in policy would refuse, because none of them depends on who is asking. Personal endpoints such as `/players/me` are never cached.
@@ -134,6 +143,8 @@ CI runs them on every pull request in the `browser-tests` job, and uploads the s
 | `ConnectionStrings:Redis` | none (cache in API memory) | none | yes, if set |
 | `RabbitMq:HostName` / `Port` / `VirtualHost` | `localhost` / `5672` / `/` | inherited | no |
 | `RabbitMq:UserName` / `Password` | none | `guest` / `guest` (RabbitMQ's local default) | in cloud |
+| `Cleanup:FirstRunDelay` / `Interval` | `00:01:00` / `06:00:00` | inherited | no |
+| `Cleanup:ExpiredTokenRetentionDays` / `FinishedBattleRetentionDays` / `BatchSize` | `7` / `30` / `1000` | inherited | no |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none (no export) | `http://localhost:4317` (the dashboard container) | no |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | none (no export) | none | set by the Azure deployment |
 | `ForwardedHeaders:TrustAllProxies` | `false` | `false` | `true` only behind Container Apps' ingress |

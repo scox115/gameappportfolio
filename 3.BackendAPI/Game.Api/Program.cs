@@ -283,6 +283,14 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddHostedService<MatchTelemetrySender>();
 builder.Services.AddHostedService<MatchConsumerWorker>();
 
+// Deletes expired refresh tokens and old finished battles soon after startup, then every few hours.
+builder.Services.AddOptions<CleanupOptions>()
+    .Bind(builder.Configuration.GetSection(CleanupOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services.AddScoped<DataCleanupService>();
+builder.Services.AddHostedService<DataCleanupWorker>();
+
 var app = builder.Build();
 
 // Unhandled exceptions become a 500 problem-details response instead of an empty body or stack trace,

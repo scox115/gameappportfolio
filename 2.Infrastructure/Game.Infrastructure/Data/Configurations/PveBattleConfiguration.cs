@@ -51,5 +51,6 @@ public class PveBattleConfiguration : IEntityTypeConfiguration<PveBattle>
 
         // Finds a player's battle in progress when they enter the arena.
         builder.HasIndex(b => new { b.PlayerId, b.Status });
+        builder.HasIndex(b => new { b.Status, b.CompletedAt }); // for the scheduled cleanup
     }
 }

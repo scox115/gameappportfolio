@@ -47,6 +47,7 @@ public class PvpBattleConfiguration : IEntityTypeConfiguration<PvpBattle>
         builder.HasIndex(b => new { b.PlayerOneId, b.Status });
         builder.HasIndex(b => new { b.PlayerTwoId, b.Status });
         builder.HasIndex(b => new { b.Status, b.TurnDeadline });
+        builder.HasIndex(b => new { b.Status, b.CompletedAt }); // for the scheduled cleanup
 
         // Duels started before loadouts existed are plain level-1, 100 HP fights.
         builder.Property(b => b.PlayerOneMaxHp).HasDefaultValue(PvpBattle.BasePlayerMaxHp);

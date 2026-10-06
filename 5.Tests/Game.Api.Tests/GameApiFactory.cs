@@ -44,6 +44,8 @@ public class GameApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("AntiCheat:RegistrationsPerHour", "100000");
         builder.UseSetting("AntiCheat:SignInsPerMinute", "100000");
         builder.UseSetting("AntiCheat:AvatarUploadsPerHour", "100000");
+        // The in-memory database can't bulk delete; DataCleanupTests runs the cleanup on SQLite instead.
+        builder.UseSetting("Cleanup:Enabled", "false");
         builder.UseSetting("RabbitMq:UserName", "test");
         builder.UseSetting("RabbitMq:Password", "test");
         builder.UseSetting("Jwt:SigningKey", "integration-tests-signing-key-that-is-long-enough");

@@ -35,6 +35,7 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
         builder.UseSetting("ConnectionStrings:DefaultConnection", "Server=unused-in-browser-tests");
         builder.UseSetting("ConnectionStrings:AzureBlobStorage", "UseDevelopmentStorage=true");
         builder.UseSetting("Cors:AllowedOrigins:0", _clientOrigin);
+        builder.UseSetting("Cleanup:Enabled", "false"); // the in-memory database can't bulk delete
         // Every browser comes from 127.0.0.1, so lift the per-address limits.
         builder.UseSetting("AntiCheat:RegistrationsPerHour", "100000");
         builder.UseSetting("AntiCheat:SignInsPerMinute", "100000");
