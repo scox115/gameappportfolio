@@ -15,6 +15,7 @@ using Game.Api.Auth;
 using Game.Api.Battles;
 using Game.Api.Hubs;
 using Game.Api.Versioning;
+using Game.Api.Caching;
 using Microsoft.AspNetCore.SignalR;
 using Game.Api.Messaging;
 using Game.Core.Battles;
@@ -111,7 +112,7 @@ builder.Services.AddSingleton(sp => Uri.TryCreate(blobConnectionString, UriKind.
 // Bind your Clean Architecture application interfaces to your infrastructure
 builder.Services.AddScoped<IStorageService, AzureBlobStorageService>();
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+builder.Services.AddDbContext<AppDbContext>((services, options) =>
 {
     options.UseSqlServer(
         sqlConnectionString,
@@ -123,6 +124,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     );
 
     //options.UseInMemoryDatabase("GamePortfolioDb");
+
+    options.AddOutputCacheEviction(services);
 });
 
 // --- 🔐 IDENTITY + JWT BEARER AUTHENTICATION ---
@@ -223,6 +226,9 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
+// Leaderboards, stats and the class list are cached in memory (or Redis, with ConnectionStrings:Redis).
+builder.Services.AddGameOutputCache(builder.Configuration);
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -300,6 +306,7 @@ app.UseCors("BlazorFrontendPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+app.UseOutputCache();
 
 // --- MAP MINIMAL ENDPOINTS HERE ---
 app.MapGameApi(); // /api/v1/..., plus the deprecated unversioned /api/... aliases

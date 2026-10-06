@@ -1,3 +1,4 @@
+using Game.Api.Caching;
 using Game.Api.Messaging;
 using Game.Api.Workers;
 using Game.Core.Battles;
@@ -52,7 +53,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
             // Swap SQL Server for the in-memory provider.
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
-            services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_databaseName));
+            services.AddDbContext<AppDbContext>((sp, options) => options
+                .UseInMemoryDatabase(_databaseName)
+                .AddOutputCacheEviction(sp));
 
             // The telemetry sender and consumer need a live broker; they aren't part of what these tests cover.
             services.Remove(services.Single(d => d.ImplementationType == typeof(MatchConsumerWorker)));

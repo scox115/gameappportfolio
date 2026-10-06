@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Game.Api.Auth;
+using Game.Api.Caching;
 using Game.Api.Models;
 using Game.Core.Battles;
 using Game.Core.Entities;
@@ -128,7 +129,8 @@ public static class PlayerEndpoints
 
         // GET: /api/players/stats
         group.MapGet("/stats", async (AppDbContext dbContext) =>
-            Results.Ok(new PlayerStatsResponse(await dbContext.Players.CountAsync())));
+            Results.Ok(new PlayerStatsResponse(await dbContext.Players.CountAsync())))
+            .CacheOutput(OutputCaching.Policies.PlayerCount);
 
         // GET: /api/players/leaderboard[?class=Paladin]
         group.MapGet("/leaderboard", async (AppDbContext dbContext, HeroClass? @class) =>
@@ -177,7 +179,8 @@ public static class PlayerEndpoints
             return Results.Ok(topPlayers.Select(p => LeaderboardRow(
                 p.Id, p.Username, p.EquippedTitle, p.Level, p.Gold, p.Rating, p.PvpWins, p.PvpLosses,
                 p.AvatarUrl, p.EquippedFrame, p.Class)));
-        });
+        })
+        .CacheOutput(OutputCaching.Policies.Leaderboard);
     }
 
     private static object LeaderboardRow(Guid id, string username, PlayerTitle? title, int level, int gold, int rating,
