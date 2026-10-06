@@ -75,7 +75,12 @@ builder.Services.AddSingleton<IConnectionFactory>(sp =>
         Port = rabbit.Port,
         VirtualHost = rabbit.VirtualHost,
         UserName = rabbit.UserName,
-        Password = rabbit.Password
+        Password = rabbit.Password,
+        // Give up on an unreachable broker quickly; the sender and consumer retry with backoff.
+        RequestedConnectionTimeout = TimeSpan.FromSeconds(5),
+        // Reconnect (and restart the consumer) on its own after a dropped connection.
+        AutomaticRecoveryEnabled = true,
+        TopologyRecoveryEnabled = true
     };
 });
 
@@ -227,6 +232,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // --- ⚙️ REGISTER NATIVE WORKER RUNTIME LOOPS ---
+builder.Services.AddHostedService<MatchTelemetrySender>();
 builder.Services.AddHostedService<MatchConsumerWorker>();
 
 var app = builder.Build();
