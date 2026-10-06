@@ -203,7 +203,7 @@
     {
         try
         {
-            var response = await Http.GetAsync("/api/battles/pvp/current");
+            var response = await Http.GetAsync("/api/v1/battles/pvp/current");
             if (response.StatusCode == System.Net.HttpStatusCode.OK
                 && await response.Content.ReadFromJsonAsync<PvpBattleDto>(JsonOptions) is { } current)
             {
@@ -268,7 +268,7 @@
     {
         try
         {
-            if (await Http.GetFromJsonAsync<PvpProfileDto>("/api/players/me", JsonOptions) is { } me)
+            if (await Http.GetFromJsonAsync<PvpProfileDto>("/api/v1/players/me", JsonOptions) is { } me)
             {
                 State.UpdateGold(me.Gold);
             }

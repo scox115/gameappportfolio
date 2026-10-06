@@ -4,6 +4,8 @@
 
 **Deploy it to Azure:** see [docs/azure-deployment.md](docs/azure-deployment.md).
 
+**API versioning:** every game route starts with `/api/v1`, so a breaking change can ship as v2 next to it; see [docs/api-versioning.md](docs/api-versioning.md).
+
 **Load testing:** one API replica (0.5 CPU, 1 GiB) handles about 200 players fighting at once with a p95 of 203 ms; see [docs/load-testing.md](docs/load-testing.md).
 
 **Security checks:** CI fails on any NuGet package with a known vulnerability, Dependabot opens weekly update PRs for NuGet packages and GitHub Actions, and CodeQL scans the C# code once the repository is public.

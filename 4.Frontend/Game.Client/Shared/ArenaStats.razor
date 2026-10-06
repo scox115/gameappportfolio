@@ -28,7 +28,7 @@
     {
         try
         {
-            days = await Http.GetFromJsonAsync<List<DayDto>>("/api/arena/stats?days=7");
+            days = await Http.GetFromJsonAsync<List<DayDto>>("/api/v1/arena/stats?days=7");
         }
         catch (Exception)
         {

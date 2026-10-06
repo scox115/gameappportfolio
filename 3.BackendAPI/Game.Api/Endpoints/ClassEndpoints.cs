@@ -12,12 +12,12 @@ public static class ClassEndpoints
     public static void MapClassEndpoints(this IEndpointRouteBuilder app)
     {
         // The playable classes, for the sign-up screen and the class switcher.
-        app.MapGet("/api/classes", () => Results.Ok(HeroClasses.All.Select(HeroClassResponse.From).ToList()))
+        app.MapGet("/classes", () => Results.Ok(HeroClasses.All.Select(HeroClassResponse.From).ToList()))
            .WithTags("Classes")
            .AllowAnonymous();
 
         // Switches the signed-in hero to another class for gold.
-        app.MapPut("/api/players/me/class", async (ChangeClassRequest request, ClaimsPrincipal user, AppDbContext dbContext) =>
+        app.MapPut("/players/me/class", async (ChangeClassRequest request, ClaimsPrincipal user, AppDbContext dbContext) =>
         {
             if (!Enum.IsDefined(request.Class))
             {

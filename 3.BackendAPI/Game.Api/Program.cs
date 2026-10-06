@@ -14,6 +14,7 @@ using Game.Api.Options;
 using Game.Api.Auth;
 using Game.Api.Battles;
 using Game.Api.Hubs;
+using Game.Api.Versioning;
 using Microsoft.AspNetCore.SignalR;
 using Game.Api.Messaging;
 using Game.Core.Battles;
@@ -38,8 +39,8 @@ builder.Services.AddGameHealthChecks();
 // Errors come back as RFC 7807 problem details (with a traceId to find them in the logs and traces).
 builder.Services.AddProblemDetails();
 
-builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddGameApiVersioning();
 builder.Services.AddSwaggerGen(options =>
 {
     // Adds an "Authorize" button to Swagger UI that sends the JWT as a bearer token.
@@ -48,7 +49,7 @@ builder.Services.AddSwaggerGen(options =>
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        Description = "Paste the accessToken returned by /api/auth/login."
+        Description = "Paste the accessToken returned by /api/v1/auth/login."
     });
     options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
@@ -286,7 +287,7 @@ app.UseStatusCodePages();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseGameApiSwaggerUI();
 }
 
 app.UseForwardedHeaders();
@@ -301,19 +302,10 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 // --- MAP MINIMAL ENDPOINTS HERE ---
-app.MapAuthEndpoints();
-app.MapPlayerEndpoints();
-app.MapBattleEndpoints();
-app.MapPvpEndpoints();
-app.MapShopEndpoints();
-app.MapClassEndpoints();
-app.MapBountyEndpoints();
-app.MapHistoryEndpoints();
+app.MapGameApi(); // /api/v1/..., plus the deprecated unversioned /api/... aliases
 app.MapGameHealthChecks();
 app.MapHub<ArenaHub>(ArenaHub.Path);
 app.MapHub<SessionHub>(SessionHub.Path);
-
-app.MapControllers();
 
 // --- AUTOMATIC RUNTIME DATABASE INITIALIZATION ---
 using (var scope = app.Services.CreateScope())

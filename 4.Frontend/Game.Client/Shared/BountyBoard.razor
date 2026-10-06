@@ -54,7 +54,7 @@
     {
         try
         {
-            board = await Http.GetFromJsonAsync<BountiesDto>("/api/bounties");
+            board = await Http.GetFromJsonAsync<BountiesDto>("/api/v1/bounties");
         }
         catch (Exception)
         {

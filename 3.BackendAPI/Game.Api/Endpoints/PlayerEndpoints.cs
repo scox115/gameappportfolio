@@ -29,7 +29,7 @@ public static class PlayerEndpoints
     public static void MapPlayerEndpoints(this IEndpointRouteBuilder app)
     {
         // Group all player routes under a standard API prefix path
-        var group = app.MapGroup("/api/players")
+        var group = app.MapGroup("/players")
                        .WithTags("Players"); // Categories routes cleanly in Swagger
 
         // GET Endpoint: The signed-in player's own profile

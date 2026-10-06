@@ -36,7 +36,7 @@ else
     {
         try
         {
-            status = await Http.GetFromJsonAsync<HeroicStatusDto>("/api/bounties");
+            status = await Http.GetFromJsonAsync<HeroicStatusDto>("/api/v1/bounties");
         }
         catch (Exception)
         {

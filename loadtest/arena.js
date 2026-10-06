@@ -95,9 +95,9 @@ let hero = null;
 function signUp(heroClass) {
   const username = `lt${__VU}x${Math.random().toString(36).slice(2, 10)}`;
   const res = http.post(
-    `${BASE_URL}/api/auth/register`,
+    `${BASE_URL}/api/v1/auth/register`,
     JSON.stringify({ username, password: PASSWORD, class: heroClass }),
-    { headers: { 'Content-Type': 'application/json' }, tags: { kind: 'signup', name: 'POST /api/auth/register' } },
+    { headers: { 'Content-Type': 'application/json' }, tags: { kind: 'signup', name: 'POST /api/v1/auth/register' } },
   );
   if (!check(res, { 'hero created': (r) => r.status === 201 })) {
     fail(`Sign-up failed with ${res.status}: ${res.body}`);
@@ -117,12 +117,12 @@ export function bossFighter() {
   if (!hero) hero = signUp('Sorcerer');
 
   // The town screen.
-  check(api('GET', '/api/players/me'), { 'profile loaded': (r) => r.status === 200 });
-  api('GET', '/api/players/leaderboard');
-  api('GET', '/api/players/me/matches?limit=5');
+  check(api('GET', '/api/v1/players/me'), { 'profile loaded': (r) => r.status === 200 });
+  api('GET', '/api/v1/players/leaderboard');
+  api('GET', '/api/v1/players/me/matches?limit=5');
 
   const started = Date.now();
-  let res = api('POST', '/api/battles/pve');
+  let res = api('POST', '/api/v1/battles/pve');
   if (!check(res, { 'battle started': (r) => r.status === 200 || r.status === 201 })) return;
   let battle = res.json();
 
@@ -132,7 +132,7 @@ export function bossFighter() {
     const card = battle.bossNextAttack >= battle.playerHp && battle.rechargingCard !== 'HolyShield'
       ? 'HolyShield'
       : battle.rechargingCard === 'DragonClaw' ? 'Fireball' : 'DragonClaw';
-    res = api('POST', `/api/battles/pve/${battle.id}/turns`, { card });
+    res = api('POST', `/api/v1/battles/pve/${battle.id}/turns`, { card });
     if (!check(res, { 'card played': (r) => r.status === 200 })) return;
     battle = res.json('battle');
   }

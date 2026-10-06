@@ -19,7 +19,7 @@ public class RateLimitTests : IClassFixture<GameApiFactory>
         var statuses = new List<HttpStatusCode>();
         for (var i = 0; i < 3; i++)
         {
-            var response = await client.PostAsJsonAsync("/api/auth/register",
+            var response = await client.PostAsJsonAsync("/api/v1/auth/register",
                 new { Username = $"rate{Guid.NewGuid():N}"[..20], Password = "Arena-Pass1" });
             statuses.Add(response.StatusCode);
         }
@@ -36,7 +36,7 @@ public class RateLimitTests : IClassFixture<GameApiFactory>
         var statuses = new List<HttpStatusCode>();
         for (var i = 0; i < 3; i++)
         {
-            var response = await client.PostAsJsonAsync("/api/auth/login", new { Username = "nobody-here", Password = "Wrong-Pass1" });
+            var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { Username = "nobody-here", Password = "Wrong-Pass1" });
             statuses.Add(response.StatusCode);
         }
 

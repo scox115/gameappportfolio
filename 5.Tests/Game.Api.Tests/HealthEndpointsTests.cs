@@ -61,7 +61,7 @@ public class HealthEndpointsTests : IClassFixture<GameApiFactory>
     [Fact]
     public async Task UnknownRoutes_ReturnProblemDetails()
     {
-        var response = await _factory.CreateClient().GetAsync("/api/does-not-exist");
+        var response = await _factory.CreateClient().GetAsync("/api/v1/does-not-exist");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);

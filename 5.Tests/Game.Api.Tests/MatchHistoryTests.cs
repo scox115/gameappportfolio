@@ -42,7 +42,7 @@ public class MatchHistoryTests
 
         Assert.Equal(ProjectionResult.Recorded, await ProjectAsync(factory, published));
 
-        var history = await client.GetFromJsonAsync<List<MatchHistoryItemResponse>>("/api/players/me/matches", Json);
+        var history = await client.GetFromJsonAsync<List<MatchHistoryItemResponse>>("/api/v1/players/me/matches", Json);
         var entry = Assert.Single(history!);
         Assert.True(entry.Won);
         Assert.Equal(MatchKind.Boss, entry.Kind);
@@ -50,7 +50,7 @@ public class MatchHistoryTests
         Assert.Equal(final.Reward.GoldEarned, entry.GoldEarned);
         Assert.Null(entry.RatingChange);
 
-        var today = (await client.GetFromJsonAsync<List<DailyArenaStatsResponse>>("/api/arena/stats?days=1", Json))!.Single();
+        var today = (await client.GetFromJsonAsync<List<DailyArenaStatsResponse>>("/api/v1/arena/stats?days=1", Json))!.Single();
         Assert.Equal((1, 1, 0), (today.BossFights, today.BossWins, today.Duels));
         Assert.Equal(final.Reward.GoldEarned, today.GoldPaid);
     }
@@ -65,8 +65,8 @@ public class MatchHistoryTests
 
         Assert.Equal(ProjectionResult.Recorded, await ProjectAsync(factory, duel));
 
-        var won = (await winnerClient.GetFromJsonAsync<List<MatchHistoryItemResponse>>("/api/players/me/matches", Json))!.Single();
-        var lost = (await loserClient.GetFromJsonAsync<List<MatchHistoryItemResponse>>("/api/players/me/matches", Json))!.Single();
+        var won = (await winnerClient.GetFromJsonAsync<List<MatchHistoryItemResponse>>("/api/v1/players/me/matches", Json))!.Single();
+        var lost = (await loserClient.GetFromJsonAsync<List<MatchHistoryItemResponse>>("/api/v1/players/me/matches", Json))!.Single();
         Assert.Equal((true, loserName, HeroClass.Ranger, 14), (won.Won, won.OpponentName, won.OpponentClass, won.RatingChange));
         Assert.Equal((false, winnerName, HeroClass.Paladin, -14), (lost.Won, lost.OpponentName, lost.OpponentClass, lost.RatingChange));
         Assert.Equal(50, won.WagerResult);
@@ -123,7 +123,7 @@ public class MatchHistoryTests
     {
         using var factory = new GameApiFactory();
 
-        var days = await factory.CreateClient().GetFromJsonAsync<List<DailyArenaStatsResponse>>("/api/arena/stats?days=3", Json);
+        var days = await factory.CreateClient().GetFromJsonAsync<List<DailyArenaStatsResponse>>("/api/v1/arena/stats?days=3", Json);
 
         var today = DateOnly.FromDateTime(factory.Clock.GetUtcNow().UtcDateTime);
         Assert.Equal([today, today.AddDays(-1), today.AddDays(-2)], days!.Select(d => d.Day));
@@ -135,7 +135,7 @@ public class MatchHistoryTests
     {
         using var factory = new GameApiFactory();
 
-        var response = await factory.CreateClient().GetAsync("/api/players/me/matches");
+        var response = await factory.CreateClient().GetAsync("/api/v1/players/me/matches");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -172,7 +172,7 @@ public class MatchHistoryTests
     {
         var client = factory.CreateClient();
         var username = $"hist{Guid.NewGuid():N}"[..20];
-        var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register", new { Username = username, Password });
         response.EnsureSuccessStatusCode();
         var auth = (await response.Content.ReadFromJsonAsync<AuthResponse>(Json))!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
@@ -182,7 +182,7 @@ public class MatchHistoryTests
     // FixedBattleRandom makes every card land, so alternating the two attacks always wins.
     private static async Task<PlayCardResponse> WinBossFightAsync(HttpClient client)
     {
-        var start = await client.PostAsync("/api/battles/pve", null);
+        var start = await client.PostAsync("/api/v1/battles/pve", null);
         start.EnsureSuccessStatusCode();
         var battle = (await start.Content.ReadFromJsonAsync<BattleStateResponse>(Json))!;
 
@@ -190,7 +190,7 @@ public class MatchHistoryTests
         for (var turn = 0; turn < 50; turn++)
         {
             var card = recharging == BattleCard.DragonClaw ? "Fireball" : "DragonClaw";
-            var response = await client.PostAsJsonAsync($"/api/battles/pve/{battle.Id}/turns", new { Card = card });
+            var response = await client.PostAsJsonAsync($"/api/v1/battles/pve/{battle.Id}/turns", new { Card = card });
             response.EnsureSuccessStatusCode();
             var result = (await response.Content.ReadFromJsonAsync<PlayCardResponse>(Json))!;
             if (result.Battle.Status != BattleStatus.InProgress)

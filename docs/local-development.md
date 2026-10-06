@@ -79,7 +79,7 @@ dotnet run --project 3.BackendAPI/Game.Api --launch-profile http     # API on ht
 dotnet run --project 4.Frontend/Game.Client --launch-profile http    # client on http://localhost:5091
 ```
 
-The API applies EF Core migrations on startup. Create a hero with **Register** (passwords need 8+ characters with upper case, lower case, a digit and a symbol). In Swagger (`/swagger`), call `/api/auth/login`, then paste the `accessToken` into **Authorize** to try the protected endpoints.
+The API applies EF Core migrations on startup. Create a hero with **Register** (passwords need 8+ characters with upper case, lower case, a digit and a symbol). In Swagger (`/swagger`), call `/api/v1/auth/login`, then paste the `accessToken` into **Authorize** to try the protected endpoints.
 
 ### Trying PvP
 
@@ -89,7 +89,7 @@ The lobby queue is kept in the API's memory, so it assumes one API instance. Sca
 
 ### Match history and arena stats (RabbitMQ)
 
-When a battle ends, the API saves the rewards, then publishes a `MatchCompletedEvent` (who fought, as which class, what each hero earned, how it ended) to the durable `match-completed-queue`. `MatchConsumerWorker` reads it and writes the read models behind **Recent Matches** on the town screen (`GET /api/players/me/matches`) and the stats strip on the leaderboard (`GET /api/arena/stats?days=7`):
+When a battle ends, the API saves the rewards, then publishes a `MatchCompletedEvent` (who fought, as which class, what each hero earned, how it ended) to the durable `match-completed-queue`. `MatchConsumerWorker` reads it and writes the read models behind **Recent Matches** on the town screen (`GET /api/v1/players/me/matches`) and the stats strip on the leaderboard (`GET /api/v1/arena/stats?days=7`):
 
 - `MatchHistory`: one row per hero per match. A unique index on (match, hero) means a message RabbitMQ delivers twice is only counted once.
 - `DailyArenaStats`: one row per UTC day, with a concurrency token so two API instances can't overwrite each other's counts.

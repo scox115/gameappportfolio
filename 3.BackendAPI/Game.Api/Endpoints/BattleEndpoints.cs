@@ -18,7 +18,7 @@ public static class BattleEndpoints
     {
         // The server runs the battle: the client only picks a card each turn, and the outcome
         // and rewards are decided here.
-        var group = app.MapGroup("/api/battles/pve")
+        var group = app.MapGroup("/battles/pve")
                        .WithTags("Battles")
                        .RequireAuthorization();
 
@@ -71,7 +71,7 @@ public static class BattleEndpoints
                 return Results.Conflict(new { message = "Your gold changed at the same moment. Try again." });
             }
 
-            return Results.Created($"/api/battles/pve/{battle.Id}", BattleStateResponse.From(battle));
+            return Results.Created($"/api/v1/battles/pve/{battle.Id}", BattleStateResponse.From(battle));
         });
 
         group.MapPost("/{battleId:guid}/turns", async (

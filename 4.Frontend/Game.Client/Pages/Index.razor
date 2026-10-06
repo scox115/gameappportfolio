@@ -462,7 +462,7 @@
         if (string.IsNullOrWhiteSpace(inputUsername) || string.IsNullOrEmpty(inputPassword)) return;
         try
         {
-            var res = await Http.PostAsJsonAsync("/api/auth/login", new { Username = inputUsername, Password = inputPassword });
+            var res = await Http.PostAsJsonAsync("/api/v1/auth/login", new { Username = inputUsername, Password = inputPassword });
             if (res.IsSuccessStatusCode)
             {
                 await StartSession(res);
@@ -482,7 +482,7 @@
         if (string.IsNullOrWhiteSpace(inputUsername) || string.IsNullOrEmpty(inputPassword)) return;
         try
         {
-            var res = await Http.PostAsJsonAsync("/api/auth/register", new { Username = inputUsername, Password = inputPassword, Class = chosenClass });
+            var res = await Http.PostAsJsonAsync("/api/v1/auth/register", new { Username = inputUsername, Password = inputPassword, Class = chosenClass });
             if (res.IsSuccessStatusCode)
             {
                 // Registration signs the new hero straight in.
@@ -539,7 +539,7 @@
             streamContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType);
             content.Add(streamContent, "File", selectedFile.Name);
 
-            var res = await Http.PostAsync("/api/players/me/avatar", content);
+            var res = await Http.PostAsync("/api/v1/players/me/avatar", content);
             if (res.IsSuccessStatusCode)
             {
                 var result = await res.Content.ReadFromJsonAsync<UploadResponse>();
@@ -564,7 +564,7 @@
     {
         try
         {
-            var res = await Http.PostAsync(heroic ? "/api/battles/pve?difficulty=Heroic" : "/api/battles/pve", null);
+            var res = await Http.PostAsync(heroic ? "/api/v1/battles/pve?difficulty=Heroic" : "/api/v1/battles/pve", null);
             if (!res.IsSuccessStatusCode)
             {
                 statusMsg = res.StatusCode == HttpStatusCode.BadRequest
@@ -597,7 +597,7 @@
         PlayCardResponseDto? result;
         try
         {
-            var res = await Http.PostAsJsonAsync($"/api/battles/pve/{battleId}/turns", new { Card = card });
+            var res = await Http.PostAsJsonAsync($"/api/v1/battles/pve/{battleId}/turns", new { Card = card });
             if (!res.IsSuccessStatusCode)
             {
                 logs.Add($"[API Rejection] The move was not accepted: {await res.Content.ReadAsStringAsync()}");
@@ -758,9 +758,9 @@
         try
         {
             leaderboardLoading = true;
-            var stats = Http.GetFromJsonAsync<PlayerStatsDto>("/api/players/stats");
+            var stats = Http.GetFromJsonAsync<PlayerStatsDto>("/api/v1/players/stats");
             var players = await Http.GetFromJsonAsync<List<PlayerProfileDto>>(
-                heroClass is null ? "/api/players/leaderboard" : $"/api/players/leaderboard?class={heroClass}");
+                heroClass is null ? "/api/v1/players/leaderboard" : $"/api/v1/players/leaderboard?class={heroClass}");
             var registered = (await stats)?.registeredPlayers;
             if (leaderboardClass != heroClass) return; // Another tab was picked while this one loaded
             leaderboardPlayers = players;

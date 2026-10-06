@@ -27,7 +27,7 @@ public class TokenRefresher(GameState state, ApiEndpoint api)
             // Another caller may have renewed it while this one waited.
             if (string.IsNullOrEmpty(state.AccessToken) || !NeedsRenewal()) return state.AccessToken;
 
-            var response = await _http.PostAsJsonAsync("/api/auth/refresh", new { state.RefreshToken });
+            var response = await _http.PostAsJsonAsync("/api/v1/auth/refresh", new { state.RefreshToken });
             var renewed = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<RefreshResponse>() : null;
             if (renewed is null)
             {
@@ -60,7 +60,7 @@ public class TokenRefresher(GameState state, ApiEndpoint api)
         if (string.IsNullOrEmpty(refreshToken)) return;
         try
         {
-            await _http.PostAsJsonAsync("/api/auth/logout", new { RefreshToken = refreshToken });
+            await _http.PostAsJsonAsync("/api/v1/auth/logout", new { RefreshToken = refreshToken });
         }
         catch (HttpRequestException)
         {

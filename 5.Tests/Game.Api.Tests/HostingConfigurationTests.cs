@@ -54,7 +54,7 @@ public class HostingConfigurationTests : IClassFixture<GameApiFactory>
             .UseSetting("Cors:AllowedOrigins:1", "https://play.example.com"));
         using var client = hosted.CreateClient();
 
-        using var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/players/me");
+        using var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/v1/players/me");
         preflight.Headers.Add("Origin", origin);
         preflight.Headers.Add("Access-Control-Request-Method", "GET");
         using var response = await client.SendAsync(preflight);
@@ -69,7 +69,7 @@ public class HostingConfigurationTests : IClassFixture<GameApiFactory>
             .UseSetting("Cors:AllowedOrigins:0", "https://swa-cardarena.azurestaticapps.net"));
         using var client = hosted.CreateClient();
 
-        using var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/players/me");
+        using var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/v1/players/me");
         preflight.Headers.Add("Origin", "https://evil.example.com");
         preflight.Headers.Add("Access-Control-Request-Method", "GET");
         using var response = await client.SendAsync(preflight);

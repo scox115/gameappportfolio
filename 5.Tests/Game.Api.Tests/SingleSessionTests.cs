@@ -42,8 +42,8 @@ public class SingleSessionTests : IClassFixture<GameApiFactory>
         var second = await LoginAsync(username);
         var client = _factory.CreateClient();
 
-        var oldRefresh = await client.PostAsJsonAsync("/api/auth/refresh", new { first.RefreshToken });
-        var newRefresh = await client.PostAsJsonAsync("/api/auth/refresh", new { second.RefreshToken });
+        var oldRefresh = await client.PostAsJsonAsync("/api/v1/auth/refresh", new { first.RefreshToken });
+        var newRefresh = await client.PostAsJsonAsync("/api/v1/auth/refresh", new { second.RefreshToken });
 
         Assert.Equal(HttpStatusCode.Unauthorized, oldRefresh.StatusCode);
         Assert.Equal(SessionClaims.SignedInElsewhere, oldRefresh.Headers.GetValues(SessionClaims.EndedHeader).Single());
@@ -86,12 +86,12 @@ public class SingleSessionTests : IClassFixture<GameApiFactory>
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        return await client.GetAsync("/api/players/me");
+        return await client.GetAsync("/api/v1/players/me");
     }
 
-    private Task<AuthResponse> RegisterAsync(string username) => SignInAsync("/api/auth/register", username);
+    private Task<AuthResponse> RegisterAsync(string username) => SignInAsync("/api/v1/auth/register", username);
 
-    private Task<AuthResponse> LoginAsync(string username) => SignInAsync("/api/auth/login", username);
+    private Task<AuthResponse> LoginAsync(string username) => SignInAsync("/api/v1/auth/login", username);
 
     private async Task<AuthResponse> SignInAsync(string url, string username)
     {

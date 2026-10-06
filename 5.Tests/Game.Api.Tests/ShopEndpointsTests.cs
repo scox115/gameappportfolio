@@ -30,7 +30,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = await SignedInClientAsync();
 
-        var shop = await client.GetFromJsonAsync<ShopResponse>("/api/shop", Json);
+        var shop = await client.GetFromJsonAsync<ShopResponse>("/api/v1/shop", Json);
 
         Assert.Equal(Player.StartingGold, shop!.Gold);
         Assert.Equal(Enum.GetValues<ShopItem>().Length, shop.Offers.Count);
@@ -50,7 +50,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(Player.StartingGold - 150, shop.Gold);
         Assert.Equal(2, shop.Offers.Single(o => o.Item == ShopItem.DragonClawUpgrade).Owned);
 
-        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
         Assert.Equal(Player.StartingGold - 150, me!.Gold);
     }
 
@@ -66,7 +66,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("150 gold", await response.Content.ReadAsStringAsync());
-        var shop = await client.GetFromJsonAsync<ShopResponse>("/api/shop", Json);
+        var shop = await client.GetFromJsonAsync<ShopResponse>("/api/v1/shop", Json);
         Assert.Equal(50, shop!.Gold);
     }
 
@@ -75,7 +75,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = await SignedInClientAsync();
 
-        var response = await client.PostAsJsonAsync("/api/shop/purchases", new { Item = 99 });
+        var response = await client.PostAsJsonAsync("/api/v1/shop/purchases", new { Item = 99 });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -87,7 +87,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         await BuyAsync(client, ShopItem.FireballUpgrade);
         await BuyAsync(client, ShopItem.BattleElixir);
 
-        var response = await client.PostAsync("/api/battles/pve", null);
+        var response = await client.PostAsync("/api/v1/battles/pve", null);
         var battle = (await response.Content.ReadFromJsonAsync<BattleStateResponse>(Json))!;
 
         Assert.Equal(PveBattle.BasePlayerMaxHp + Player.ElixirBonusHp, battle.PlayerHp);
@@ -97,18 +97,18 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         // A level-2 Fireball, plus the Sorcerer's class boost.
         Assert.Equal(HeroClasses.CardFor(HeroClass.Sorcerer, BattleCard.Fireball, 2).Damage, fireball.Damage);
 
-        var turn = await client.PostAsJsonAsync($"/api/battles/pve/{battle.Id}/turns", new { Card = "Fireball" });
+        var turn = await client.PostAsJsonAsync($"/api/v1/battles/pve/{battle.Id}/turns", new { Card = "Fireball" });
         var played = (await turn.Content.ReadFromJsonAsync<PlayCardResponse>(Json))!;
         Assert.Equal(fireball.Damage, played.TurnResult.DamageDealt);
 
-        var shop = await client.GetFromJsonAsync<ShopResponse>("/api/shop", Json);
+        var shop = await client.GetFromJsonAsync<ShopResponse>("/api/v1/shop", Json);
         Assert.Equal(0, shop!.Offers.Single(o => o.Item == ShopItem.BattleElixir).Owned);
     }
 
     [Fact]
     public async Task TheShopRequiresSignIn()
     {
-        var response = await _factory.CreateClient().GetAsync("/api/shop");
+        var response = await _factory.CreateClient().GetAsync("/api/v1/shop");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -129,10 +129,10 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(PlayerTitle.Duelist, shop.EquippedTitle);
         Assert.Equal(1, shop.PvpWins);
 
-        var hidden = await client.PutAsJsonAsync("/api/shop/title", new EquipTitleRequest(null), Json);
+        var hidden = await client.PutAsJsonAsync("/api/v1/shop/title", new EquipTitleRequest(null), Json);
         Assert.Null((await hidden.Content.ReadFromJsonAsync<ShopResponse>(Json))!.EquippedTitle);
 
-        var notOwned = await client.PutAsJsonAsync("/api/shop/title", new EquipTitleRequest(PlayerTitle.Gladiator), Json);
+        var notOwned = await client.PutAsJsonAsync("/api/v1/shop/title", new EquipTitleRequest(PlayerTitle.Gladiator), Json);
         Assert.Equal(HttpStatusCode.BadRequest, notOwned.StatusCode);
     }
 
@@ -152,7 +152,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
             await db.SaveChangesAsync();
         }
 
-        var board = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/players/leaderboard", Json);
+        var board = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/v1/players/leaderboard", Json);
 
         Assert.Equal("the Duelist", board!.Single(r => r.Id == playerId).Title);
     }
@@ -170,7 +170,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
             await db.SaveChangesAsync();
         }
 
-        var board = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/players/leaderboard", Json);
+        var board = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/v1/players/leaderboard", Json);
 
         Assert.Equal(board!.OrderByDescending(r => r.Rating).Select(r => r.Id), board.Select(r => r.Id));
         var top = board[0];
@@ -192,9 +192,9 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
             await db.SaveChangesAsync();
         }
 
-        var paladins = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/players/leaderboard?class=Paladin", Json);
-        var rangers = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/players/leaderboard?class=Ranger", Json);
-        var sorcerers = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/players/leaderboard?class=Sorcerer", Json);
+        var paladins = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/v1/players/leaderboard?class=Paladin", Json);
+        var rangers = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/v1/players/leaderboard?class=Ranger", Json);
+        var sorcerers = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/v1/players/leaderboard?class=Sorcerer", Json);
 
         Assert.Equal(playerId, paladins![0].Id);
         Assert.Equal((1_000, 0), (paladins[0].PvpWins, paladins[0].PvpLosses));
@@ -219,13 +219,13 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(Cosmetic.BronzeFrame, shop.EquippedFrame);
         Assert.Equal(0, shop.Gold);
 
-        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
         Assert.Equal(Cosmetic.BronzeFrame, me!.Frame);
 
-        var off = await client.PutAsJsonAsync("/api/shop/cosmetic", new EquipCosmeticRequest(CosmeticKind.AvatarFrame, null), Json);
+        var off = await client.PutAsJsonAsync("/api/v1/shop/cosmetic", new EquipCosmeticRequest(CosmeticKind.AvatarFrame, null), Json);
         Assert.Null((await off.Content.ReadFromJsonAsync<ShopResponse>(Json))!.EquippedFrame);
 
-        var notOwned = await client.PutAsJsonAsync("/api/shop/cosmetic", new EquipCosmeticRequest(CosmeticKind.CardSkin, Cosmetic.VoidCards), Json);
+        var notOwned = await client.PutAsJsonAsync("/api/v1/shop/cosmetic", new EquipCosmeticRequest(CosmeticKind.CardSkin, Cosmetic.VoidCards), Json);
         Assert.Equal(HttpStatusCode.BadRequest, notOwned.StatusCode);
     }
 
@@ -234,7 +234,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
     {
         var (client, _) = await SignedInPlayerAsync();
 
-        var bounties = await client.GetFromJsonAsync<BountiesResponse>("/api/bounties", Json);
+        var bounties = await client.GetFromJsonAsync<BountiesResponse>("/api/v1/bounties", Json);
 
         Assert.Equal(3, bounties!.Bounties.Count);
         Assert.All(bounties.Bounties, b => Assert.Equal(0, b.Progress));
@@ -254,7 +254,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
     }
 
     private static Task<HttpResponseMessage> BuyAsync(HttpClient client, ShopItem item) =>
-        client.PostAsJsonAsync("/api/shop/purchases", new PurchaseRequest(item), Json);
+        client.PostAsJsonAsync("/api/v1/shop/purchases", new PurchaseRequest(item), Json);
 
     private async Task<HttpClient> SignedInClientAsync() => (await SignedInPlayerAsync()).Client;
 
@@ -262,7 +262,7 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = _factory.CreateClient();
         var username = $"shop{Guid.NewGuid():N}"[..20];
-        var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register", new { Username = username, Password });
         response.EnsureSuccessStatusCode();
         var auth = (await response.Content.ReadFromJsonAsync<AuthResponse>(Json))!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);

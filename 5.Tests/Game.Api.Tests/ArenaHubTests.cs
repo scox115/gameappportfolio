@@ -125,10 +125,10 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
             Assert.Equal(MatchRulesEngine.WinGold, bobUpdate.Reward!.GoldEarned);
             Assert.Equal(MatchRulesEngine.LossGold, aliceUpdate.Reward!.GoldEarned);
 
-            var bobProfile = await bob.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+            var bobProfile = await bob.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
             Assert.Equal(Player.StartingGold + MatchRulesEngine.WinGold, bobProfile!.Gold);
 
-            var current = await bob.Http.GetAsync("/api/battles/pvp/current");
+            var current = await bob.Http.GetAsync("/api/v1/battles/pvp/current");
             Assert.Equal(HttpStatusCode.NoContent, current.StatusCode);
         }
     }
@@ -161,7 +161,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         var battle = (await alice.MatchFound.ReadAsync()).Battle;
         await bob.MatchFound.ReadAsync();
         Assert.Equal(100, battle.Wager);
-        var staked = await alice.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+        var staked = await alice.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
         Assert.Equal(Player.StartingGold - 100, staked!.Gold);
 
         // Bob joined second, so he moves first.
@@ -198,7 +198,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         Assert.Contains("Wagers can be", tooRich.Message);
 
         await using var bob = await ConnectAsync();
-        var shop = await bob.Http.PostAsJsonAsync("/api/shop/purchases", new { Item = "FireballUpgrade" }, Json);
+        var shop = await bob.Http.PostAsJsonAsync("/api/v1/shop/purchases", new { Item = "FireballUpgrade" }, Json);
         shop.EnsureSuccessStatusCode();
         var broke = await Assert.ThrowsAnyAsync<Exception>(() => bob.FindWageredOpponentAsync(500));
         Assert.Contains("You need 500 gold", broke.Message);
@@ -222,7 +222,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
             Assert.Equal(EloRating.StartingRating + points, bobUpdate.Battle.You.Rating);
             Assert.Equal(EloRating.StartingRating - points, bobUpdate.Battle.Opponent.Rating);
 
-            var aliceProfile = await alice.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+            var aliceProfile = await alice.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
             Assert.Equal(EloRating.StartingRating - points, aliceProfile!.Rating);
             Assert.Equal(1, aliceProfile.PvpLosses);
             Assert.Equal(0, aliceProfile.PvpWins);
@@ -261,7 +261,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         {
             await alice.DisposeAsync();
 
-            var current = await alice.Http.GetFromJsonAsync<PvpBattleView>("/api/battles/pvp/current", Json);
+            var current = await alice.Http.GetFromJsonAsync<PvpBattleView>("/api/v1/battles/pvp/current", Json);
             Assert.Equal(battleId, current!.Id);
 
             await using var aliceAgain = await ConnectAsync(alice.Http, alice.Token, alice.Username);
@@ -281,10 +281,10 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         await using (alice)
         await using (bob)
         {
-            var bobProfile = await bob.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+            var bobProfile = await bob.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
             await _factory.GiveGoldAsync(bobProfile!.Id, 100);
-            (await bob.Http.PostAsJsonAsync("/api/shop/purchases", new { Item = "FireballUpgrade" })).EnsureSuccessStatusCode();
-            (await bob.Http.PostAsJsonAsync("/api/shop/purchases", new { Item = "DuelElixir" })).EnsureSuccessStatusCode();
+            (await bob.Http.PostAsJsonAsync("/api/v1/shop/purchases", new { Item = "FireballUpgrade" })).EnsureSuccessStatusCode();
+            (await bob.Http.PostAsJsonAsync("/api/v1/shop/purchases", new { Item = "DuelElixir" })).EnsureSuccessStatusCode();
 
             await alice.FindOpponentAsync();
             await bob.FindOpponentAsync();
@@ -388,7 +388,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
     {
         var http = _factory.CreateClient();
         var username = $"duel{Guid.NewGuid():N}"[..20];
-        var response = await http.PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
+        var response = await http.PostAsJsonAsync("/api/v1/auth/register", new { Username = username, Password });
         response.EnsureSuccessStatusCode();
         var auth = (await response.Content.ReadFromJsonAsync<AuthResponse>(Json))!;
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
