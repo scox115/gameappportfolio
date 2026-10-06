@@ -84,6 +84,7 @@ jobs:
               apiIdentityName="${{ vars.AZURE_API_IDENTITY }}" \
               sqlAdminGroupName="${{ vars.AZURE_SQL_ADMIN_GROUP }}" \
               sqlAdminGroupObjectId="${{ vars.AZURE_SQL_ADMIN_GROUP_ID }}" \
+              sqlLocation="${{ vars.AZURE_SQL_LOCATION || 'centralus' }}" \
               jwtSigningKey="$JWT_SIGNING_KEY" \
               rabbitMqPassword="$RABBITMQ_PASSWORD" \
               registryUsername="$registry_user" \

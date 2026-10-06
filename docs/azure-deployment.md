@@ -83,3 +83,7 @@ You need an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/
   the error shows the name GitHub signed in with (for newer repositories it includes numeric IDs, like
   `repo:owner@123/repo@456:environment:production`). Run `infra/setup.ps1` again with the GitHub CLI
   signed in; it trusts both the `owner/repo` and the numeric-ID forms.
+- **`RegionDoesNotAllowProvisioning`** for the SQL server: Azure isn't accepting new SQL servers in that
+  region for your subscription. The database defaults to `centralus`; to use another region, add a
+  repository variable `AZURE_SQL_LOCATION` (for example `westus2` or `northcentralus`) and run the
+  workflow again. The rest of the app stays where it is.
