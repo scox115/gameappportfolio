@@ -1,0 +1,81 @@
+name: Load test
+
+# Runs the k6 load test (loadtest/arena.js) against a production-like copy of the API started
+# on the runner: the same container image Azure runs, limited to the same 0.5 CPU and 1 GiB,
+# with SQL Server, RabbitMQ and Azurite beside it. It never touches the live game.
+# Run it from the Actions tab; pull requests that change the load test run the smoke profile.
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: smoke (30 s), load (5 min at a steady crowd) or stress (7 min, keeps adding players)
+        type: choice
+        options: [load, stress, smoke]
+        default: load
+      boss_vus:
+        description: Peak boss fighters (blank = the profile's default)
+        required: false
+      duel_vus:
+        description: Duelists (blank = the profile's default)
+        required: false
+  pull_request:
+    branches: [main]
+    paths:
+      - loadtest/**
+      - .github/workflows/load-test.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: load-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PROFILE: ${{ inputs.profile || 'smoke' }}
+      BOSS_VUS: ${{ inputs.boss_vus }}
+      DUEL_VUS: ${{ inputs.duel_vus }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build the API image
+        run: >
+          dotnet publish 3.BackendAPI/Game.Api/Game.Api.csproj -c Release
+          -t:PublishContainer
+          -p:ContainerRepository=card-arena-api
+          -p:ContainerImageTags=loadtest
+          -p:ContainerFamily=noble-chiseled-extra
+
+      # k6 runs as a non-root user, so it needs a results folder it can write to.
+      - name: Run k6
+        run: |
+          mkdir -p loadtest/results && chmod 777 loadtest/results
+          docker compose -f loadtest/compose.yaml run --rm k6
+
+      - name: Show the results on the run page
+        if: always()
+        run: cat loadtest/results/summary.md >> "$GITHUB_STEP_SUMMARY" || echo "No summary was written." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: API logs
+        if: failure()
+        run: docker compose -f loadtest/compose.yaml logs --tail 200 api
+
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: load-test-${{ env.PROFILE }}
+          path: loadtest/results/
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f loadtest/compose.yaml down -v
