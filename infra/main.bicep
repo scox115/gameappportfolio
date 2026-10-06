@@ -363,5 +363,6 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
 output apiUrl string = 'https://${api.properties.configuration.ingress.fqdn}'
 output clientUrl string = 'https://${client.properties.defaultHostname}'
 output staticWebAppName string = client.name
+output apiContainerAppName string = api.name
 output sqlServer string = sqlServer.properties.fullyQualifiedDomainName
 output storageAccount string = storage.name
