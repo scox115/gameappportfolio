@@ -105,7 +105,7 @@
                             style="background: @(disabled ? "#475569" : CosmeticStyles.CardBackground(State.CardSkin, card.Color)); width: 150px; height: 110px; border-radius: 12px; position: relative; border: @(signature ? "2px solid #c7d2fe" : "none"); color: white; font-weight: bold; cursor: @(disabled ? "not-allowed" : "pointer"); opacity: @(disabled ? "0.6" : "1");">
                         @if (signature)
                         {
-                            <span style="position: absolute; top: 4px; right: 6px; font-size: 0.85rem;">@HeroClassIcons.For(State.HeroClass)</span>
+                            <span style="position: absolute; top: -10px; right: -10px; width: 26px; height: 26px; line-height: 26px; border-radius: 50%; background: #1e1b4b; border: 2px solid #c7d2fe; font-size: 0.8rem;">@HeroClassIcons.For(State.HeroClass)</span>
                         }
                         @card.Icon @card.Label@(held is { Level: > 1 } ? $" ★{held.Level}" : "")<br /><small>@(held is null ? card.Effect : ArenaCards.EffectOf(held.Damage, held.Heal))</small><br />
                         <small style="font-weight: normal;">@(recharging ? "⏳ Recharging" : held is null ? card.Risk : ArenaCards.RiskOf(card.Id, held.FailChance))</small>
