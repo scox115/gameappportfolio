@@ -87,8 +87,10 @@ $appId = Invoke-Az ad app list --display-name $DeployAppName --query '[0].appId'
 if (-not $appId) {
     $appId = Invoke-Az ad app create --display-name $DeployAppName --query appId --output tsv
 }
-$spId = & az ad sp show --id $appId --query id --output tsv 2>$null
-if ($LASTEXITCODE -ne 0 -or -not $spId) {
+# A lookup that finds nothing returns empty instead of an error, which Windows PowerShell 5.1
+# would turn into a terminating error under $ErrorActionPreference = 'Stop'.
+$spId = Invoke-Az ad sp list --display-name $DeployAppName --query "[0].id" --output tsv
+if (-not $spId) {
     $spId = Invoke-Az ad sp create --id $appId --query id --output tsv
 }
 
