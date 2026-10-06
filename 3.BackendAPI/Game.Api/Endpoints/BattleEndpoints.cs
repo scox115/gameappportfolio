@@ -108,16 +108,12 @@ public static class BattleEndpoints
 
                 // Rewards are settled in the same SaveChanges as the final turn.
                 var won = battle.Status == BattleStatus.Won;
-                var goldBefore = player.Gold;
                 match = GameMatch.CreatePve(player.Id);
                 dbContext.Matches.Add(match);
-                new MatchRulesEngine().ProcessPveMatch(match, player, won);
+                var earned = new MatchRulesEngine(timeProvider).ProcessPveMatch(match, player, won);
                 battle.AttachMatch(match.Id);
 
-                reward = new BattleRewardResponse(
-                    player.Gold - goldBefore,
-                    won ? MatchRulesEngine.WinExperience : MatchRulesEngine.LossExperience,
-                    PlayerProfileResponse.From(player));
+                reward = BattleRewardResponse.From(earned, player, isDuel: false);
             }
 
             try

@@ -57,12 +57,15 @@ public class PvpBattleService(
     }
 
     /// <summary>Returns true when the player is waiting in the lobby, false when a battle started or resumed.</summary>
-    public async Task<bool> FindOpponentAsync(Guid playerId)
+    public async Task<bool> FindOpponentAsync(Guid playerId, int wager = 0)
     {
-        if (!await dbContext.Players.AnyAsync(p => p.Id == playerId))
+        if (!DuelWagers.IsAllowed(wager))
         {
-            throw new HubException("Player profile not found.");
+            throw new HubException($"Wagers can be {string.Join(", ", DuelWagers.Stakes.Where(s => s > 0))} gold.");
         }
+
+        var player = await dbContext.Players.FindAsync(playerId)
+            ?? throw new HubException("Player profile not found.");
 
         // Coming back to an unfinished battle resumes it rather than starting another.
         var existing = await GetActiveBattleAsync(playerId);
@@ -74,28 +77,56 @@ public class PvpBattleService(
             return false;
         }
 
-        if (matchmaker.JoinOrPair(playerId) is not { } opponentId)
+        if (player.Gold < wager)
         {
-            return true;
+            throw new HubException($"You need {wager} gold to wager that, and you have {player.Gold}.");
         }
 
-        // A coin flip decides who goes first.
-        var (first, second) = random.Next(0, 2) == 0 ? (playerId, opponentId) : (opponentId, playerId);
-        var battle = await StartDuelAsync(first, second);
+        // The waiting player may have spent their gold since joining; if so they leave the lobby
+        // and this player takes the next opponent, or waits.
+        while (matchmaker.JoinOrPair(playerId, wager) is { } opponentId)
+        {
+            var opponent = await LoadPlayerAsync(opponentId);
+            if (opponent.Gold < wager)
+            {
+                await hub.Clients.User(opponentId.ToString())
+                    .SearchCancelled($"You no longer have the {wager} gold you wagered, so you've left the lobby.");
+                continue;
+            }
 
-        await BroadcastAsync(battle, lastTurn: null, rewards: null, (client, update) => client.MatchFound(update));
-        return false;
+            // A coin flip decides who goes first.
+            var (first, second) = random.Next(0, 2) == 0 ? (playerId, opponentId) : (opponentId, playerId);
+            var battle = await StartDuelAsync(first, second, wager);
+
+            await BroadcastAsync(battle, lastTurn: null, rewards: null, (client, update) => client.MatchFound(update));
+            return false;
+        }
+
+        return true;
     }
 
-    // Each player brings their upgraded cards and drinks a Duel Elixir if they have one. A shop
-    // purchase saved at the same moment changes the player row, so reload and try again.
-    private async Task<PvpBattle> StartDuelAsync(Guid first, Guid second)
+    // Each player brings their upgraded cards, drinks a Duel Elixir if they have one and pays their
+    // stake. A shop purchase saved at the same moment changes the player row, so reload and try again.
+    private async Task<PvpBattle> StartDuelAsync(Guid first, Guid second, int wager)
     {
         for (var attempt = 1; ; attempt++)
         {
             var firstPlayer = await LoadPlayerAsync(first);
             var secondPlayer = await LoadPlayerAsync(second);
-            var battle = PvpBattle.Start(first, second, Now, firstPlayer.TakeLoadoutForDuel(), secondPlayer.TakeLoadoutForDuel());
+            try
+            {
+                firstPlayer.StakeWager(wager);
+                secondPlayer.StakeWager(wager);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Both players have left the queue; tell each one, since only the caller gets the error.
+                await hub.Clients.Users(first.ToString(), second.ToString())
+                    .SearchCancelled("The duel couldn't start because a player no longer had the gold for the wager. Try again.");
+                throw new HubException(ex.Message);
+            }
+
+            var battle = PvpBattle.Start(first, second, Now, firstPlayer.TakeLoadoutForDuel(), secondPlayer.TakeLoadoutForDuel(), wager);
             dbContext.PvpBattles.Add(battle);
             try
             {
@@ -216,20 +247,15 @@ public class PvpBattleService(
         var loser = await dbContext.Players.FindAsync(loserId)
             ?? throw new InvalidOperationException($"Player {loserId} not found.");
 
-        var winnerGold = winner.Gold;
-        var loserGold = loser.Gold;
-        var winnerRating = winner.Rating;
-        var loserRating = loser.Rating;
-
         var match = new GameMatch(battle.PlayerOneId, battle.PlayerTwoId);
         dbContext.Matches.Add(match);
-        new MatchRulesEngine().ProcessMatchWin(match, winner, loser);
+        var settlement = new MatchRulesEngine(timeProvider).ProcessMatchWin(match, winner, loser, battle.Wager);
         battle.AttachMatch(match.Id);
 
         var rewards = new Dictionary<Guid, BattleRewardResponse>
         {
-            [winnerId] = new(winner.Gold - winnerGold, MatchRulesEngine.WinExperience, PlayerProfileResponse.From(winner), winner.Rating - winnerRating),
-            [loserId] = new(loser.Gold - loserGold, MatchRulesEngine.LossExperience, PlayerProfileResponse.From(loser), loser.Rating - loserRating)
+            [winnerId] = BattleRewardResponse.From(settlement.Winner, winner, isDuel: true),
+            [loserId] = BattleRewardResponse.From(settlement.Loser, loser, isDuel: true)
         };
         return (match, rewards);
     }

@@ -1,3 +1,4 @@
+using Game.Core.Bounties;
 using Game.Core.Entities;
 using Game.Core.Services;
 using Microsoft.EntityFrameworkCore;
@@ -60,6 +61,37 @@ public class PlayerConfiguration : IEntityTypeConfiguration<Player>
                 .HasConversion<string>()
                 .HasMaxLength(30);
             titles.HasKey("PlayerId", nameof(OwnedTitle.Title));
+        });
+
+        builder.Property(p => p.EquippedFrame)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+
+        builder.Property(p => p.EquippedCardSkin)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+
+        // Prestige cosmetics bought in the Gold Shop, one row per item owned.
+        builder.OwnsMany(p => p.Cosmetics, cosmetics =>
+        {
+            cosmetics.ToTable("PlayerCosmetics");
+            cosmetics.WithOwner().HasForeignKey("PlayerId");
+            cosmetics.Property(c => c.Cosmetic)
+                .HasConversion<string>()
+                .HasMaxLength(30);
+            cosmetics.HasKey("PlayerId", nameof(OwnedCosmetic.Cosmetic));
+        });
+
+        // Progress on today's daily bounties. The day is part of the key so yesterday's rows can be
+        // replaced by today's in the same save.
+        builder.OwnsMany(p => p.Bounties, bounties =>
+        {
+            bounties.ToTable("PlayerBounties");
+            bounties.WithOwner().HasForeignKey("PlayerId");
+            bounties.Property(b => b.Bounty)
+                .HasConversion<string>()
+                .HasMaxLength(30);
+            bounties.HasKey("PlayerId", nameof(BountyProgress.Day), nameof(BountyProgress.Bounty));
         });
 
         // Optimizes lookups by indexing the username field uniquely

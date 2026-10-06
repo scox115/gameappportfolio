@@ -6,7 +6,8 @@ namespace Game.Core.Tests.Services;
 public class MatchRulesEngineTests
 {
     private const int StartingGold = 500;
-    private readonly MatchRulesEngine _engine = new();
+    // A day whose bounties all need more than one battle, so a single battle pays only its base reward.
+    private readonly MatchRulesEngine _engine = new(new FixedClock(FixedClock.QuietDay));
 
     private static Player NewPlayer(string name = "hero") => new(name, StartingGold);
 
@@ -125,7 +126,7 @@ public class MatchRulesEngineTests
         var loser = NewPlayer("b");
         var match = new GameMatch(winner.Id, loser.Id);
 
-        var points = _engine.ProcessMatchWin(match, winner, loser);
+        var points = _engine.ProcessMatchWin(match, winner, loser).Winner.RatingChange;
 
         Assert.Equal(EloRating.KFactor / 2, points);
         Assert.Equal(EloRating.StartingRating + points, winner.Rating);

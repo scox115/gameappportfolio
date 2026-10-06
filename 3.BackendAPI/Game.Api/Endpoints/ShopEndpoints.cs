@@ -93,5 +93,35 @@ public static class ShopEndpoints
             await dbContext.SaveChangesAsync();
             return Results.Ok(ShopResponse.For(player));
         });
+
+        // Chooses which owned avatar frame or card skin to wear (or none of that kind).
+        group.MapPut("/cosmetic", async (EquipCosmeticRequest request, ClaimsPrincipal user, AppDbContext dbContext) =>
+        {
+            if (!Enum.IsDefined(request.Kind) || request.Cosmetic is { } cosmetic && !Enum.IsDefined(cosmetic))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(EquipCosmeticRequest.Cosmetic)] = ["Unknown cosmetic."]
+                });
+            }
+
+            var player = await dbContext.Players.FindAsync(user.GetPlayerId());
+            if (player is null)
+            {
+                return Results.NotFound("Player profile not found.");
+            }
+
+            try
+            {
+                player.EquipCosmetic(request.Kind, request.Cosmetic);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "Can't wear that");
+            }
+
+            await dbContext.SaveChangesAsync();
+            return Results.Ok(ShopResponse.For(player));
+        });
     }
 }

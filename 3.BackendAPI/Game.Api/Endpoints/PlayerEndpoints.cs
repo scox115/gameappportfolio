@@ -101,7 +101,7 @@ public static class PlayerEndpoints
                 .ThenByDescending(p => p.Level)
                 .ThenByDescending(p => p.ExperiencePoints)
                 .Take(10)
-                .Select(p => new { p.Id, p.Username, p.Level, p.Gold, p.AvatarUrl, p.EquippedTitle, p.PvpWins, p.PvpLosses, p.Rating })
+                .Select(p => new { p.Id, p.Username, p.Level, p.Gold, p.AvatarUrl, p.EquippedTitle, p.PvpWins, p.PvpLosses, p.Rating, p.EquippedFrame })
                 .ToListAsync();
 
             return Results.Ok(topPlayers.Select(p => new
@@ -114,7 +114,8 @@ public static class PlayerEndpoints
                 rating = p.Rating,
                 pvpWins = p.PvpWins,
                 pvpLosses = p.PvpLosses,
-                avatarUrl = p.AvatarUrl
+                avatarUrl = p.AvatarUrl,
+                frame = p.EquippedFrame
             }));
         });
     }

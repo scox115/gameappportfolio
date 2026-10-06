@@ -1,0 +1,84 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+@* Today's bounties and the player's win streak. The server tracks progress and pays rewards
+   automatically after each battle; this panel only shows where the player stands. *@
+<div style="max-width: 1100px; margin: 25px auto 0; background: #1e293b; padding: 25px 30px; border-radius: 16px; border: 1px solid #334155;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px;">
+        <h4 style="margin: 0; color: #f1f5f9; font-size: 1.2rem;">📜 Daily Bounties</h4>
+        @if (board is not null)
+        {
+            <span style="color: #94a3b8; font-size: 0.9rem;">New bounties in @UntilReset()</span>
+        }
+    </div>
+
+    @if (board is null)
+    {
+        <p style="color: #94a3b8;">@(loadFailed ? "The bounty board is unavailable right now." : "Reading the bounty board...")</p>
+    }
+    else
+    {
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px; margin-top: 15px;">
+            @foreach (var bounty in board.bounties)
+            {
+                <div style="background: #0f172a; border: 1px solid @(bounty.completed ? "#166534" : "#334155"); border-radius: 12px; padding: 15px;">
+                    <div style="font-weight: bold; color: #f1f5f9;">@(bounty.completed ? "✅ " : "")@bounty.name</div>
+                    <div style="background: #334155; border-radius: 6px; height: 8px; margin: 10px 0 6px; overflow: hidden;">
+                        <div style="background: @(bounty.completed ? "#22c55e" : "#fbbf24"); height: 100%; width: @(bounty.progress * 100 / Math.Max(1, bounty.goal))%;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem;">
+                        <span style="color: #94a3b8;">@bounty.progress / @bounty.goal</span>
+                        <span style="color: #fbbf24; font-weight: bold;">@(bounty.completed ? "Paid" : "Reward") 🪙 @bounty.reward</span>
+                    </div>
+                </div>
+            }
+        </div>
+        <p style="color: #cbd5e1; margin: 15px 0 0; font-size: 0.95rem;">
+            🔥 Win streak: <b>@board.winStreak</b>.
+            @(board.streakBonus > 0
+                ? $"Your next win pays +{board.streakBonus} bonus gold."
+                : "Win battles in a row for up to +50 bonus gold per win.")
+        </p>
+    }
+</div>
+
+@code {
+    private BountiesDto? board;
+    private bool loadFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            board = await Http.GetFromJsonAsync<BountiesDto>("/api/bounties");
+        }
+        catch (Exception)
+        {
+            loadFailed = true;
+        }
+    }
+
+    private string UntilReset()
+    {
+        var left = board!.resetsAt.ToUniversalTime() - DateTime.UtcNow;
+        if (left <= TimeSpan.Zero) return "a moment";
+        return left.TotalHours >= 1 ? $"{(int)left.TotalHours}h {left.Minutes}m" : $"{Math.Max(1, left.Minutes)}m";
+    }
+
+    private class BountiesDto
+    {
+        public DateTime resetsAt { get; set; }
+        public int winStreak { get; set; }
+        public int streakBonus { get; set; }
+        public List<BountyDto> bounties { get; set; } = new();
+    }
+
+    private class BountyDto
+    {
+        public string name { get; set; } = "";
+        public int goal { get; set; }
+        public int progress { get; set; }
+        public int reward { get; set; }
+        public bool completed { get; set; }
+    }
+}

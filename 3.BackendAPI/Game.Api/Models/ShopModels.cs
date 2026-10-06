@@ -14,11 +14,18 @@ public record ShopOfferResponse(ShopItem Item, string Name, string Description, 
 }
 
 /// <param name="EquippedTitle">The title shown after the player's name, or null.</param>
-public record ShopResponse(int Gold, int PvpWins, PlayerTitle? EquippedTitle, IReadOnlyList<ShopOfferResponse> Offers)
+/// <param name="EquippedFrame">The avatar frame the player wears, or null.</param>
+/// <param name="EquippedCardSkin">The card skin the player uses, or null.</param>
+public record ShopResponse(
+    int Gold, int PvpWins, PlayerTitle? EquippedTitle, Cosmetic? EquippedFrame, Cosmetic? EquippedCardSkin, IReadOnlyList<ShopOfferResponse> Offers)
 {
     public static ShopResponse For(Player player) =>
-        new(player.Gold, player.PvpWins, player.EquippedTitle, GoldShop.OffersFor(player).Select(ShopOfferResponse.From).ToList());
+        new(player.Gold, player.PvpWins, player.EquippedTitle, player.EquippedFrame, player.EquippedCardSkin,
+            GoldShop.OffersFor(player).Select(ShopOfferResponse.From).ToList());
 }
+
+/// <param name="Cosmetic">The owned cosmetic to wear, or null to wear none of this kind.</param>
+public record EquipCosmeticRequest(CosmeticKind Kind, Cosmetic? Cosmetic);
 
 /// <param name="Title">The owned title to show, or null to show none.</param>
 public record EquipTitleRequest(PlayerTitle? Title);

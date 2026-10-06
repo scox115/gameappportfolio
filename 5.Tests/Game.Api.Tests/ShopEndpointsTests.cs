@@ -177,6 +177,43 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(1, top.PvpLosses);
     }
 
+    [Fact]
+    public async Task Cosmetics_CanBeBoughtWornAndTakenOff()
+    {
+        var (client, playerId) = await SignedInPlayerAsync();
+
+        var tooDear = await BuyAsync(client, ShopItem.FrameSilver);
+        Assert.Equal(HttpStatusCode.BadRequest, tooDear.StatusCode);
+
+        var bought = await BuyAsync(client, ShopItem.FrameBronze);
+        Assert.Equal(HttpStatusCode.OK, bought.StatusCode);
+        var shop = (await bought.Content.ReadFromJsonAsync<ShopResponse>(Json))!;
+        Assert.Equal(Cosmetic.BronzeFrame, shop.EquippedFrame);
+        Assert.Equal(0, shop.Gold);
+
+        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+        Assert.Equal(Cosmetic.BronzeFrame, me!.Frame);
+
+        var off = await client.PutAsJsonAsync("/api/shop/cosmetic", new EquipCosmeticRequest(CosmeticKind.AvatarFrame, null), Json);
+        Assert.Null((await off.Content.ReadFromJsonAsync<ShopResponse>(Json))!.EquippedFrame);
+
+        var notOwned = await client.PutAsJsonAsync("/api/shop/cosmetic", new EquipCosmeticRequest(CosmeticKind.CardSkin, Cosmetic.VoidCards), Json);
+        Assert.Equal(HttpStatusCode.BadRequest, notOwned.StatusCode);
+    }
+
+    [Fact]
+    public async Task TodaysBounties_ShowProgressAndTheWinStreak()
+    {
+        var (client, _) = await SignedInPlayerAsync();
+
+        var bounties = await client.GetFromJsonAsync<BountiesResponse>("/api/bounties", Json);
+
+        Assert.Equal(3, bounties!.Bounties.Count);
+        Assert.All(bounties.Bounties, b => Assert.Equal(0, b.Progress));
+        Assert.Equal(0, bounties.WinStreak);
+        Assert.True(bounties.ResetsAt > DateTime.UtcNow);
+    }
+
     private sealed record LeaderboardRow(Guid Id, string Username, string? Title, int Rating, int PvpWins, int PvpLosses);
 
     private async Task GiveDuelWinsAsync(Guid playerId, int wins)

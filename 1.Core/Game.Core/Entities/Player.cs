@@ -1,4 +1,5 @@
 using Game.Core.Battles;
+using Game.Core.Bounties;
 using Game.Core.Services;
 
 namespace Game.Core.Entities;
@@ -11,6 +12,12 @@ public class Player
 
     private readonly List<CardUpgrade> _cardUpgrades = new();
     private readonly List<OwnedTitle> _titles = new();
+    private readonly List<OwnedCosmetic> _cosmetics = new();
+    private readonly List<BountyProgress> _bounties = new();
+
+    /// <summary>Extra gold per win in a row after the first, up to <see cref="MaxStreakBonus"/>.</summary>
+    public const int StreakBonusPerWin = 10;
+    public const int MaxStreakBonus = 50;
 
     public Guid Id { get; private set; }
     public string Username { get; private set; } = string.Empty;
@@ -45,6 +52,21 @@ public class Player
 
     /// <summary>The equipped title as it reads after the name, or null.</summary>
     public string? TitleName => EquippedTitle is { } title ? PlayerTitles.Get(title).Name : null;
+
+    /// <summary>Cosmetics bought in the Gold Shop.</summary>
+    public IReadOnlyCollection<OwnedCosmetic> Cosmetics => _cosmetics;
+
+    /// <summary>The avatar frame the player wears, if any.</summary>
+    public Cosmetic? EquippedFrame { get; private set; }
+
+    /// <summary>The card skin the player uses, if any.</summary>
+    public Cosmetic? EquippedCardSkin { get; private set; }
+
+    /// <summary>Battles won in a row, boss fights and duels alike. A loss resets it.</summary>
+    public int WinStreak { get; private set; }
+
+    /// <summary>Progress on today's daily bounties.</summary>
+    public IReadOnlyCollection<BountyProgress> Bounties => _bounties;
 
     /// <summary>
     /// Changes whenever gold or purchases change; used as an optimistic concurrency token so two
@@ -127,6 +149,90 @@ public class Player
     {
         if (title is { } chosen && !OwnsTitle(chosen)) throw new InvalidOperationException("You don't own that title.");
         EquippedTitle = title;
+    }
+
+    public bool OwnsCosmetic(Cosmetic cosmetic) => _cosmetics.Any(c => c.Cosmetic == cosmetic);
+
+    /// <summary>Adds a bought cosmetic and puts it on straight away.</summary>
+    public void AddCosmetic(Cosmetic cosmetic)
+    {
+        var definition = CosmeticCatalog.Get(cosmetic);
+        if (OwnsCosmetic(cosmetic)) throw new InvalidOperationException($"You already own the {definition.Name}.");
+
+        _cosmetics.Add(new OwnedCosmetic(cosmetic));
+        Wear(definition.Kind, cosmetic);
+        Version = Guid.NewGuid();
+    }
+
+    /// <summary>Wears an owned cosmetic of this kind, or none when null.</summary>
+    public void EquipCosmetic(CosmeticKind kind, Cosmetic? cosmetic)
+    {
+        if (!Enum.IsDefined(kind)) throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown cosmetic kind.");
+        if (cosmetic is { } chosen)
+        {
+            if (!OwnsCosmetic(chosen)) throw new InvalidOperationException("You don't own that.");
+            if (CosmeticCatalog.Get(chosen).Kind != kind) throw new InvalidOperationException("That doesn't go there.");
+        }
+        Wear(kind, cosmetic);
+    }
+
+    private void Wear(CosmeticKind kind, Cosmetic? cosmetic)
+    {
+        if (kind == CosmeticKind.AvatarFrame) EquippedFrame = cosmetic;
+        else EquippedCardSkin = cosmetic;
+    }
+
+    /// <summary>Takes a duel wager's stake. The winner's payout comes back in the match rewards.</summary>
+    public void StakeWager(int stake)
+    {
+        if (!DuelWagers.IsAllowed(stake)) throw new ArgumentOutOfRangeException(nameof(stake), stake, "That isn't one of the wager amounts.");
+        if (Gold < stake) throw new InvalidOperationException($"You need {stake} gold to wager that, and you have {Gold}.");
+        if (stake > 0) DeductGold(stake);
+    }
+
+    /// <summary>Today's bounties and the player's progress on each.</summary>
+    public IReadOnlyList<BountyStatus> BountiesFor(DateOnly today) =>
+        DailyBounties.For(today)
+            .Select(b => new BountyStatus(b, _bounties.FirstOrDefault(p => p.Day == today && p.Bounty == b.Bounty)?.Progress ?? 0))
+            .ToList();
+
+    /// <summary>
+    /// Counts a finished battle towards the win streak and today's bounties, and pays the streak
+    /// bonus and any bounties it completes.
+    /// </summary>
+    public BattleBonuses RecordBattle(DateOnly today, BattleKind kind, bool won)
+    {
+        var streakBonus = 0;
+        if (won)
+        {
+            WinStreak++;
+            streakBonus = Math.Min((WinStreak - 1) * StreakBonusPerWin, MaxStreakBonus);
+        }
+        else
+        {
+            WinStreak = 0;
+        }
+
+        _bounties.RemoveAll(p => p.Day != today);
+        var completed = new List<BountyDefinition>();
+        foreach (var bounty in DailyBounties.For(today).Where(b => b.Counts(kind, won)))
+        {
+            var progress = _bounties.FirstOrDefault(p => p.Bounty == bounty.Bounty);
+            if (progress is null)
+            {
+                progress = new BountyProgress(today, bounty.Bounty);
+                _bounties.Add(progress);
+            }
+            if (progress.Progress >= bounty.Goal) continue;
+
+            progress.Advance();
+            if (progress.Progress == bounty.Goal) completed.Add(bounty);
+        }
+
+        var bonuses = new BattleBonuses(streakBonus, completed);
+        if (bonuses.Gold > 0) AddGold(bonuses.Gold);
+        Version = Guid.NewGuid();
+        return bonuses;
     }
 
     public int CardLevel(BattleCard card) =>

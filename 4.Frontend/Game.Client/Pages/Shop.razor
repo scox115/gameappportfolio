@@ -4,7 +4,7 @@
 @inject HttpClient Http
 @inject SoundEffects Sounds
 
-@* The Gold Shop: spend battle winnings on card upgrades and Battle Elixirs.
+@* The Gold Shop: spend battle winnings on card upgrades, elixirs, titles and prestige cosmetics.
    The server sets every price and checks the player's gold; this page only shows the offers. *@
 <div style="max-width: 1000px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -13,6 +13,7 @@
     </div>
     <p style="color: #94a3b8; margin: 0 0 20px;">
         Upgrades make your cards stronger in boss fights and PvP duels. Titles show off your duel wins (you have @pvpWins).
+        Prestige frames and card skins are for the heroes with gold to burn: they change how you look, never how you fight.
     </p>
 
     @if (!string.IsNullOrEmpty(message))
@@ -39,18 +40,40 @@
                 {
                     var look = Look(offer.item);
                     var isTitle = offer.item.StartsWith("Title");
-                    var ownedTitle = isTitle && offer.owned > 0;
-                    var equipped = ownedTitle && equippedTitle == TitleOf(offer.item);
+                    var cosmetic = CosmeticStyles.CosmeticOf(offer.item);
+                    var ownedTitle = (isTitle || cosmetic is not null) && offer.owned > 0;
+                    var equipped = ownedTitle && (isTitle ? equippedTitle == TitleOf(offer.item) : cosmetic == equippedFrame || cosmetic == equippedCardSkin);
                     var soldOut = offer.price is null;
                     var buyable = !soldOut && offer.lockedReason is null && offer.price <= State.Gold;
                     <div style="background: #0f172a; border: 1px solid @(soldOut && !ownedTitle ? "#334155" : look.Color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 8px;">
-                        <div style="font-size: 2rem;">@look.Icon</div>
+                        @if (cosmetic is null)
+                        {
+                            <div style="font-size: 2rem;">@look.Icon</div>
+                        }
+                        else if (offer.item.StartsWith("Frame"))
+                        {
+                            <img src="@(string.IsNullOrEmpty(State.AvatarUrl) ? "https://dicebear.com" + State.Username : State.AvatarUrl)" alt=""
+                                 style="width: 48px; height: 48px; border-radius: 50%; background: #1e293b; object-fit: cover; @CosmeticStyles.Frame(cosmetic)" />
+                        }
+                        else
+                        {
+                            <div style="display: flex; gap: 6px;">
+                                @foreach (var card in ArenaCards.Hand)
+                                {
+                                    <div style="width: 38px; height: 50px; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: @CosmeticStyles.CardBackground(cosmetic, card.Color);">@card.Icon</div>
+                                }
+                            </div>
+                        }
                         <div style="font-weight: bold; color: #f1f5f9;">@offer.name</div>
                         <div style="color: #94a3b8; font-size: 0.9rem; flex: 1;">@offer.description</div>
                         <div style="color: #cbd5e1; font-size: 0.9rem;">
                             @if (isTitle)
                             {
                                 <span>@(ownedTitle ? (equipped ? "✅ Showing after your name" : "Owned") : offer.lockedReason ?? "Unlocked")</span>
+                            }
+                            else if (cosmetic is not null)
+                            {
+                                <span>@(ownedTitle ? (equipped ? "✅ Wearing it" : "Owned") : "Prestige item")</span>
                             }
                             else if (offer.item.EndsWith("Elixir"))
                             {
@@ -63,9 +86,9 @@
                         </div>
                         @if (ownedTitle)
                         {
-                            <button @onclick="() => ShowTitle(equipped ? null : TitleOf(offer.item))" disabled="@buying"
+                            <button @onclick="() => (isTitle ? ShowTitle(equipped ? null : TitleOf(offer.item)) : Wear(offer.item, equipped ? null : cosmetic))" disabled="@buying"
                                     style="background: @(equipped ? "#334155" : look.Color); color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
-                                @(equipped ? "Hide title" : "Show this title")
+                                @(isTitle ? (equipped ? "Hide title" : "Show this title") : (equipped ? "Take it off" : "Wear it"))
                             </button>
                         }
                         else
@@ -90,6 +113,8 @@
     private List<ShopOfferDto>? offers;
     private int pvpWins;
     private string? equippedTitle;
+    private string? equippedFrame;
+    private string? equippedCardSkin;
 
     private record ShopSection(string Heading, Func<string, bool> Includes);
 
@@ -97,7 +122,8 @@
     [
         new("⚔️ Card Upgrades (boss fights and duels)", item => item.EndsWith("Upgrade")),
         new("🧪 Elixirs", item => item.EndsWith("Elixir")),
-        new("👑 Duel Titles", item => item.StartsWith("Title"))
+        new("👑 Duel Titles", item => item.StartsWith("Title")),
+        new("✨ Prestige (looks only)", item => CosmeticStyles.CosmeticOf(item) is not null)
     ];
     private bool loadFailed;
     private bool buying;
@@ -132,6 +158,7 @@
                     "BattleElixir" => "Bought a Battle Elixir. You'll drink it at the start of your next boss fight.",
                     "DuelElixir" => "Bought a Duel Elixir. You'll drink it at the start of your next PvP duel.",
                     _ when offer.item.StartsWith("Title") => $"You are now {State.Username}, {offer.name.Replace("Title: ", "")}!",
+                    _ when CosmeticStyles.CosmeticOf(offer.item) is not null => $"You're now wearing the {offer.name}!",
                     _ => $"{offer.name.Replace(" Upgrade", "")} is now level {offer.owned + 1}!"
                 };
                 messageIsError = false;
@@ -185,6 +212,37 @@
         }
     }
 
+    private async Task Wear(string item, string? cosmetic)
+    {
+        buying = true;
+        message = null;
+        try
+        {
+            var kind = item.StartsWith("Frame") ? "AvatarFrame" : "CardSkin";
+            var response = await Http.PutAsJsonAsync("/api/shop/cosmetic", new { Kind = kind, Cosmetic = cosmetic });
+            if (response.IsSuccessStatusCode && await response.Content.ReadFromJsonAsync<ShopDto>() is { } shop)
+            {
+                Show(shop);
+                message = cosmetic is null ? "Taken off." : "Looking good.";
+                messageIsError = false;
+            }
+            else
+            {
+                message = "Couldn't change your look. Please try again.";
+                messageIsError = true;
+            }
+        }
+        catch (Exception)
+        {
+            message = "Couldn't reach the shop. Please try again.";
+            messageIsError = true;
+        }
+        finally
+        {
+            buying = false;
+        }
+    }
+
     // "TitleGladiator" (the shop item) sells "Gladiator" (the title).
     private static string TitleOf(string item) => item["Title".Length..];
 
@@ -193,7 +251,10 @@
         offers = shop.offers;
         pvpWins = shop.pvpWins;
         equippedTitle = shop.equippedTitle;
+        equippedFrame = shop.equippedFrame;
+        equippedCardSkin = shop.equippedCardSkin;
         State.UpdateGold(shop.gold);
+        State.UpdateCosmetics(shop.equippedFrame, shop.equippedCardSkin);
     }
 
     private record ItemLook(string Icon, string Color, Func<int, string> Stat);
@@ -206,6 +267,8 @@
         "DragonClawUpgrade" => new("🐉", "#7c3aed", level => $"{35 + (level - 1) * 5} DMG"),
         "BattleElixir" => new("🧪", "#059669", _ => ""),
         "DuelElixir" => new("⚗️", "#0891b2", _ => ""),
+        _ when item.StartsWith("Frame") => new("🖼️", "#a855f7", _ => ""),
+        _ when item.StartsWith("CardSkin") => new("🃏", "#db2777", _ => ""),
         _ => new("👑", "#ca8a04", _ => "")
     };
 
@@ -214,6 +277,8 @@
         public int gold { get; set; }
         public int pvpWins { get; set; }
         public string? equippedTitle { get; set; }
+        public string? equippedFrame { get; set; }
+        public string? equippedCardSkin { get; set; }
         public List<ShopOfferDto> offers { get; set; } = new();
     }
 
