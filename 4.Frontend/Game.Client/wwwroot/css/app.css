@@ -113,3 +113,8 @@ code {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+/* A clear ring for keyboard users on the dark game screens (mouse clicks don't show it). */
+button:focus-visible, input:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+    outline: 3px solid #fbbf24;
+    outline-offset: 2px;
+}

@@ -57,7 +57,7 @@
                         }
                         else if (offer.item.StartsWith("Frame"))
                         {
-                            <img src="@(string.IsNullOrEmpty(State.AvatarUrl) ? "https://dicebear.com" + State.Username : State.AvatarUrl)" alt=""
+                            <img src="@Avatars.For(State.AvatarUrl, State.Username)" alt=""
                                  style="width: 48px; height: 48px; border-radius: 50%; background: #1e293b; object-fit: cover; @CosmeticStyles.Frame(cosmetic)" />
                         }
                         else
@@ -269,14 +269,14 @@
     // Matches the battle cards: each level above 1 adds 5 damage or healing.
     private static ItemLook Look(string item) => item switch
     {
-        "FireballUpgrade" => new("🔥", "#ea580c", level => $"{20 + (level - 1) * 5} DMG"),
+        "FireballUpgrade" => new("🔥", "#c2410c", level => $"{20 + (level - 1) * 5} DMG"),
         "HolyShieldUpgrade" => new("🛡️", "#2563eb", level => $"{15 + (level - 1) * 5} HEAL"),
         "DragonClawUpgrade" => new("🐉", "#7c3aed", level => $"{35 + (level - 1) * 5} DMG"),
-        "BattleElixir" => new("🧪", "#059669", _ => ""),
-        "DuelElixir" => new("⚗️", "#0891b2", _ => ""),
-        _ when item.StartsWith("Frame") => new("🖼️", "#a855f7", _ => ""),
-        _ when item.StartsWith("CardSkin") => new("🃏", "#db2777", _ => ""),
-        _ => new("👑", "#ca8a04", _ => "")
+        "BattleElixir" => new("🧪", "#047857", _ => ""),
+        "DuelElixir" => new("⚗️", "#0e7490", _ => ""),
+        _ when item.StartsWith("Frame") => new("🖼️", "#9333ea", _ => ""),
+        _ when item.StartsWith("CardSkin") => new("🃏", "#be185d", _ => ""),
+        _ => new("👑", "#a16207", _ => "")
     };
 
     private class ShopDto

@@ -24,14 +24,14 @@
                     <span style="font-weight: bold; color: @(m.won ? "#4ade80" : "#f87171"); min-width: 40px;">@(m.won ? "WIN" : "LOSS")</span>
                     <span style="color: #f1f5f9; flex: 1; min-width: 180px;">
                         @(m.kind == "Duel" ? "🆚" : m.difficulty == "Heroic" ? "👑" : "😈") @m.opponentName @(m.opponentClass is null ? "" : HeroClassIcons.For(m.opponentClass))
-                        <span style="color: #64748b;"> · you as @HeroClassIcons.For(m.heroClass) @m.heroClass · @Describe(m)</span>
+                        <span style="color: #94a3b8;"> · you as @HeroClassIcons.For(m.heroClass) @m.heroClass · @Describe(m)</span>
                     </span>
                     @if (m.ratingChange is { } rating && rating != 0)
                     {
                         <span style="color: @(rating > 0 ? "#22d3ee" : "#f87171"); font-weight: bold;">🏅 @(rating > 0 ? "+" : "")@rating</span>
                     }
                     <span style="color: #fbbf24; font-weight: bold;">🪙 @Signed(m.goldEarned + m.wagerResult)</span>
-                    <span style="color: #64748b; min-width: 70px; text-align: right;" title="@DateTime.SpecifyKind(m.playedAt, DateTimeKind.Utc).ToLocalTime().ToString("g")">@Ago(m.playedAt)</span>
+                    <span style="color: #94a3b8; min-width: 70px; text-align: right;" title="@DateTime.SpecifyKind(m.playedAt, DateTimeKind.Utc).ToLocalTime().ToString("g")">@Ago(m.playedAt)</span>
                 </div>
             }
         </div>
