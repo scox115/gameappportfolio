@@ -95,14 +95,28 @@ if (-not $spId) {
 }
 
 # Only the workflow's "production" environment in this repository can sign in as the app.
-$subject = "repo:${GitHubRepo}:environment:production"
+# GitHub names the repository in its sign-in token either as "owner/repo" or, for newer
+# repositories, with their numeric IDs ("owner@123/repo@456"), so trust both forms.
+$credentials = [ordered]@{ 'github-production' = "repo:${GitHubRepo}:environment:production" }
+$hasGh = $null -ne (Get-Command gh -ErrorAction SilentlyContinue)
+if ($hasGh) {
+    $ids = @(& gh api "repos/$GitHubRepo" --jq '.owner.id, .id')
+    if ($LASTEXITCODE -ne 0 -or $ids.Count -ne 2) { throw "gh api repos/$GitHubRepo failed." }
+    $owner, $repo = $GitHubRepo.Split('/')
+    $credentials['github-production-ids'] = "repo:${owner}@$($ids[0])/${repo}@$($ids[1]):environment:production"
+}
+else {
+    Write-Host '  GitHub CLI not found, so only the owner/repo sign-in name is trusted.' -ForegroundColor Yellow
+}
 $subjects = @(Invoke-Az ad app federated-credential list --id $appId --query '[].subject' --output tsv)
-if ($subjects -notcontains $subject) {
+foreach ($name in $credentials.Keys) {
+    if ($subjects -contains $credentials[$name]) { continue }
+    Write-Host "  trusting $($credentials[$name])"
     $credentialFile = [System.IO.Path]::GetTempFileName()
     @{
-        name      = 'github-production'
+        name      = $name
         issuer    = 'https://token.actions.githubusercontent.com'
-        subject   = $subject
+        subject   = $credentials[$name]
         audiences = @('api://AzureADTokenExchange')
     } | ConvertTo-Json | Set-Content -Path $credentialFile -Encoding ASCII
     Invoke-Az ad app federated-credential create --id $appId --parameters "@$credentialFile" | Out-Null
@@ -130,7 +144,6 @@ $variables = [ordered]@{
     AZURE_SQL_ADMIN_GROUP_ID = $sqlGroupId
 }
 
-$hasGh = $null -ne (Get-Command gh -ErrorAction SilentlyContinue)
 if ($hasGh) {
     Write-Host "Saving settings to GitHub ($GitHubRepo)" -ForegroundColor Cyan
     foreach ($name in $variables.Keys) {
