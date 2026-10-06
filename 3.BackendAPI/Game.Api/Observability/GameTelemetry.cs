@@ -24,6 +24,9 @@ public static class GameTelemetry
     private static readonly Counter<long> TelemetryDropped = Meter.CreateCounter<long>(
         "game.telemetry.dropped", unit: "{message}", description: "Match events dropped because the backlog was full.");
 
+    private static readonly Counter<long> CleanupDeleted = Meter.CreateCounter<long>(
+        "game.cleanup.deleted", unit: "{row}", description: "Rows the scheduled data cleanup deleted.");
+
     /// <param name="kind">"pve" or "pvp".</param>
     /// <param name="outcome">For boss fights "victory" or "defeat"; for duels how it ended, such as "Knockout".</param>
     public static void BattleCompleted(string kind, string outcome, string? difficulty = null) =>
@@ -35,4 +38,8 @@ public static class GameTelemetry
     public static void TelemetryMessageSent() => TelemetrySent.Add(1);
 
     public static void TelemetryMessageDropped() => TelemetryDropped.Add(1);
+
+    /// <param name="kind">"refresh_token", "boss_fight" or "duel".</param>
+    public static void RowsCleanedUp(string kind, int count) =>
+        CleanupDeleted.Add(count, new KeyValuePair<string, object?>("game.cleanup.kind", kind));
 }

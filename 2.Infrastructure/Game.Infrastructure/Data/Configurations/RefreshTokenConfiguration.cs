@@ -19,6 +19,7 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
 
         builder.HasIndex(t => t.TokenHash).IsUnique();
         builder.HasIndex(t => t.UserId);
+        builder.HasIndex(t => t.ExpiresAt); // for the scheduled cleanup
 
         // Deleting an account deletes its tokens.
         builder.HasOne<ApplicationUser>()
