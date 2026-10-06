@@ -58,7 +58,7 @@ public static class AuthEndpoints
 
             var session = await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier);
             return Results.Created("/api/players/me", session);
-        });
+        }).RequireRateLimiting(RateLimits.Registration);
 
         group.MapPost("/login", async (
             LoginRequest request,
@@ -97,7 +97,7 @@ public static class AuthEndpoints
             }
 
             return Results.Ok(await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier));
-        });
+        }).RequireRateLimiting(RateLimits.SignIn);
 
         // Trades a refresh token for a new access token and a new refresh token.
         group.MapPost("/refresh", async (

@@ -200,6 +200,13 @@ public class Player
         if (stake > 0) DeductGold(stake);
     }
 
+    /// <summary>Gives back a wager's stake when the duel didn't count.</summary>
+    public void RefundWager(int stake)
+    {
+        if (!DuelWagers.IsAllowed(stake)) throw new ArgumentOutOfRangeException(nameof(stake), stake, "That isn't one of the wager amounts.");
+        if (stake > 0) AddGold(stake);
+    }
+
     /// <summary>Today's bounties and the player's progress on each.</summary>
     public IReadOnlyList<BountyStatus> BountiesFor(DateOnly today) =>
         DailyBounties.For(today)

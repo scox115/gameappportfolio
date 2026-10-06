@@ -162,6 +162,8 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         var staked = await alice.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
         Assert.Equal(Player.StartingGold - 100, staked!.Gold);
 
+        // Bob joined second, so he moves first.
+        await PlayMovesAsync(bob, alice, battle.Id, 2 * DuelRewardRules.MinMovesEach);
         await alice.ForfeitAsync(battle.Id);
 
         var bobReward = (await bob.Updates.ReadAsync()).Reward!;
@@ -207,6 +209,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         await using (alice)
         await using (bob)
         {
+            await PlayMovesAsync(bob, alice, battleId, 2 * DuelRewardRules.MinMovesEach);
             await alice.ForfeitAsync(battleId);
 
             var bobUpdate = await bob.Updates.ReadAsync();
@@ -305,6 +308,63 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         var connection = BuildConnection(accessToken: null);
 
         await Assert.ThrowsAnyAsync<Exception>(() => connection.StartAsync());
+    }
+
+    [Fact]
+    public async Task AnInstantForfeit_DoesntCount_AndRefundsTheWager()
+    {
+        await using var alice = await ConnectAsync();
+        await using var bob = await ConnectAsync();
+        await alice.FindWageredOpponentAsync(50);
+        await bob.FindWageredOpponentAsync(50);
+        var battle = (await alice.MatchFound.ReadAsync()).Battle;
+        await bob.MatchFound.ReadAsync();
+
+        await alice.ForfeitAsync(battle.Id);
+
+        var bobReward = (await bob.Updates.ReadAsync()).Reward!;
+        var aliceReward = (await alice.Updates.ReadAsync()).Reward!;
+        Assert.Contains("doesn't count", bobReward.NoRewardReason);
+        Assert.Equal(0, bobReward.GoldEarned);
+        Assert.Equal(Player.StartingGold, bobReward.Player.Gold);
+        Assert.Equal(Player.StartingGold, aliceReward.Player.Gold);
+        Assert.Equal(EloRating.StartingRating, bobReward.Player.Rating);
+        Assert.Equal(0, bobReward.Player.PvpWins);
+    }
+
+    [Fact]
+    public async Task OnlyTheFirstFewDuelsADayAgainstTheSameOpponentCount()
+    {
+        await using var alice = await ConnectAsync();
+        await using var bob = await ConnectAsync();
+
+        var rewards = new List<BattleRewardResponse>();
+        for (var i = 0; i <= DuelRewardRules.RewardedDuelsPerOpponentPerDay; i++)
+        {
+            await alice.FindOpponentAsync();
+            await bob.FindOpponentAsync();
+            var battleId = (await alice.MatchFound.ReadAsync()).Battle.Id;
+            await bob.MatchFound.ReadAsync();
+            await PlayMovesAsync(bob, alice, battleId, 2 * DuelRewardRules.MinMovesEach);
+            await alice.ForfeitAsync(battleId);
+            rewards.Add((await bob.Updates.ReadAsync()).Reward!);
+            await alice.Updates.ReadAsync();
+        }
+
+        Assert.All(rewards.Take(DuelRewardRules.RewardedDuelsPerOpponentPerDay), r => Assert.Null(r.NoRewardReason));
+        Assert.Contains("against this opponent today", rewards.Last().NoRewardReason);
+        Assert.Equal(DuelRewardRules.RewardedDuelsPerOpponentPerDay, rewards.Last().Player.PvpWins);
+    }
+
+    // Plays Fireball back and forth, starting with whoever's turn it is, and drains both players' updates.
+    private static async Task PlayMovesAsync(ArenaPlayer first, ArenaPlayer second, Guid battleId, int moves)
+    {
+        for (var move = 0; move < moves; move++)
+        {
+            await (move % 2 == 0 ? first : second).PlayCardAsync(battleId, BattleCard.Fireball);
+            await first.Updates.ReadAsync();
+            await second.Updates.ReadAsync();
+        }
     }
 
     // Streak bonuses and any bounty today's duel completed.

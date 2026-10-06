@@ -34,6 +34,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
 
         builder.UseSetting("ConnectionStrings:DefaultConnection", "Server=unused-in-tests");
         builder.UseSetting("ConnectionStrings:AzureBlobStorage", "UseDevelopmentStorage=true");
+        // Every test client shares one address, so lift the per-address limits (RateLimitTests sets its own).
+        builder.UseSetting("AntiCheat:RegistrationsPerHour", "100000");
+        builder.UseSetting("AntiCheat:SignInsPerMinute", "100000");
         builder.UseSetting("RabbitMq:UserName", "test");
         builder.UseSetting("RabbitMq:Password", "test");
         builder.UseSetting("Jwt:SigningKey", "integration-tests-signing-key-that-is-long-enough");

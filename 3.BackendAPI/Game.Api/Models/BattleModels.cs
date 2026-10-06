@@ -61,6 +61,7 @@ public record BattleTurnResponse(
 /// <param name="WagerResult">PvP only: the wager payout won, or the stake lost as a negative number; null for a friendly duel or a boss fight.</param>
 /// <param name="ReducedBossReward">The boss win came after today's full-reward wins were used, so it paid less.</param>
 /// <param name="FullRewardBossWinsLeft">Boss fights only: full-reward boss wins left today.</param>
+/// <param name="NoRewardReason">PvP only: why this duel paid nothing, such as a practice duel or a very early forfeit.</param>
 public record BattleRewardResponse(
     int GoldEarned,
     int ExperienceEarned,
@@ -70,8 +71,13 @@ public record BattleRewardResponse(
     IReadOnlyList<BountyRewardResponse>? BountiesCompleted = null,
     int? WagerResult = null,
     bool ReducedBossReward = false,
-    int? FullRewardBossWinsLeft = null)
+    int? FullRewardBossWinsLeft = null,
+    string? NoRewardReason = null)
 {
+    /// <summary>A duel that didn't count (see <see cref="DuelRewardRules"/>): nothing earned, any stake refunded.</summary>
+    public static BattleRewardResponse NotCounted(Player player, string reason) =>
+        new(0, 0, PlayerProfileResponse.From(player), RatingChange: 0, BountiesCompleted: [], NoRewardReason: reason);
+
     public static BattleRewardResponse From(BattleReward reward, Player player, bool isDuel, int? fullRewardBossWinsLeft = null) =>
         new(reward.Gold,
             reward.Experience,
