@@ -13,6 +13,9 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      # Test tooling only touches the test projects, so even major versions come as one PR.
+      test-tools:
+        patterns: ["xunit*", "Microsoft.NET.Test.Sdk", "coverlet*"]
       microsoft:
         patterns: ["Microsoft.*", "System.*"]
         update-types: [minor, patch]
