@@ -76,3 +76,10 @@ You need an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/
   1. Allow your IP address: `az sql server firewall-rule create -g rg-card-arena -s <sql-server-name> -n my-pc --start-ip-address <your-ip> --end-ip-address <your-ip>`.
   2. Connect to `<sql-server-name>.database.windows.net` with **Microsoft Entra MFA** authentication as yourself. You are in the admin group.
 - **Tear it all down:** `az group delete --name rg-card-arena`. The Entra group and deploy app stay; delete them in Entra ID if you're done for good.
+
+## Troubleshooting
+
+- **`AADSTS700213: No matching federated identity record found`** when the workflow signs in to Azure:
+  the error shows the name GitHub signed in with (for newer repositories it includes numeric IDs, like
+  `repo:owner@123/repo@456:environment:production`). Run `infra/setup.ps1` again with the GitHub CLI
+  signed in; it trusts both the `owner/repo` and the numeric-ID forms.
