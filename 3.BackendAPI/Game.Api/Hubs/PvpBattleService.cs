@@ -1,3 +1,4 @@
+using Game.Api.Observability;
 using Game.Api.Messaging;
 using Game.Api.Models;
 using Game.Core.Battles;
@@ -240,6 +241,7 @@ public class PvpBattleService(
         {
             var winnerId = match.WinnerPlayerId!.Value;
             await telemetry.PublishAsync(new MatchCompletedEvent(match.Id, winnerId, battle.OpponentOf(winnerId)));
+            GameTelemetry.BattleCompleted("pvp", battle.EndReason?.ToString() ?? "Unknown");
             logger.LogInformation("PvP battle {BattleId} won by {WinnerId} ({Reason})", battle.Id, winnerId, battle.EndReason);
         }
     }
