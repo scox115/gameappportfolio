@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Game.Api.Auth;
 using Game.Api.Models;
+using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Core.Interfaces;
 using Game.Infrastructure.Data;
@@ -105,7 +106,7 @@ public static class PlayerEndpoints
                 .ThenByDescending(p => p.Level)
                 .ThenByDescending(p => p.ExperiencePoints)
                 .Take(10)
-                .Select(p => new { p.Id, p.Username, p.Level, p.Gold, p.AvatarUrl, p.EquippedTitle, p.PvpWins, p.PvpLosses, p.Rating, p.EquippedFrame })
+                .Select(p => new { p.Id, p.Username, p.Level, p.Gold, p.AvatarUrl, p.EquippedTitle, p.PvpWins, p.PvpLosses, p.Rating, p.EquippedFrame, p.Class })
                 .ToListAsync();
 
             return Results.Ok(topPlayers.Select(p => new
@@ -119,7 +120,8 @@ public static class PlayerEndpoints
                 pvpWins = p.PvpWins,
                 pvpLosses = p.PvpLosses,
                 avatarUrl = p.AvatarUrl,
-                frame = p.EquippedFrame
+                frame = p.EquippedFrame,
+                heroClass = HeroClasses.Get(p.Class).Name
             }));
         });
     }

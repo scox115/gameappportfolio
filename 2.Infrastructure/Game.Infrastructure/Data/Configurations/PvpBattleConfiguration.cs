@@ -17,6 +17,16 @@ public class PvpBattleConfiguration : IEntityTypeConfiguration<PvpBattle>
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(b => b.PlayerOneClass)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(b => b.PlayerTwoClass)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
         builder.Property(b => b.EndReason)
             .HasConversion<string>()
             .HasMaxLength(20);

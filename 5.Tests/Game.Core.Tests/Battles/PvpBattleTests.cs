@@ -208,7 +208,8 @@ public class PvpBattleLoadoutTests
     [Fact]
     public void EachPlayerFightsWithTheirOwnUpgradesAndHealth()
     {
-        var battle = PvpBattle.Start(Alice, Bob, Now, new BattleLoadout(3, 1, 1, 15), BattleLoadout.Basic);
+        // Paladins: their class boost is on Holy Shield, so Fireball keeps its base damage here.
+        var battle = PvpBattle.Start(Alice, Bob, Now, new BattleLoadout(3, 1, 1, 15, HeroClass.Paladin), new BattleLoadout(1, 1, 1, 0, HeroClass.Paladin));
 
         Assert.Equal(115, battle.HpOf(Alice));
         Assert.Equal(115, battle.MaxHpOf(Alice));
@@ -226,7 +227,7 @@ public class PvpBattleLoadoutTests
     [Fact]
     public void HealingStopsAtThePlayersOwnMaximum()
     {
-        var battle = PvpBattle.Start(Alice, Bob, Now, BattleLoadout.Basic, new BattleLoadout(1, 2, 1, 15));
+        var battle = PvpBattle.Start(Alice, Bob, Now, new BattleLoadout(1, 1, 1, 0, HeroClass.Paladin), new BattleLoadout(1, 2, 1, 15));
         battle.PlayCard(Alice, BattleCard.Fireball, new Lands(), Now);   // Bob 115 -> 95
 
         var heal = battle.PlayCard(Bob, BattleCard.HolyShield, new Lands(), Now);

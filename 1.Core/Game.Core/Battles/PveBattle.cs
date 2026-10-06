@@ -8,7 +8,8 @@ public enum BattleStatus
 }
 
 /// <summary>What a player brings into a boss fight or a duel from the Gold Shop.</summary>
-public record BattleLoadout(int FireballLevel, int HolyShieldLevel, int DragonClawLevel, int BonusHp)
+public record BattleLoadout(int FireballLevel, int HolyShieldLevel, int DragonClawLevel, int BonusHp,
+    HeroClass Class = HeroClass.Sorcerer)
 {
     public static readonly BattleLoadout Basic = new(1, 1, 1, 0);
 }
@@ -65,12 +66,15 @@ public class PveBattle
     public Guid PlayerId { get; private set; }
     public BossDifficulty Difficulty { get; private set; }
 
+    /// <summary>The player's class, which strengthens one signature card.</summary>
+    public HeroClass Class { get; private set; }
+
     /// <summary>The boss's health, damage and move chances for this battle's difficulty.</summary>
     public BossProfile Boss => BossProfile.For(Difficulty);
 
     public int PlayerHp { get; private set; }
 
-    /// <summary>Base health plus any Battle Elixir drunk before the fight.</summary>
+    /// <summary>Base health plus the class's bonus and any Battle Elixir drunk before the fight.</summary>
     public int PlayerMaxHp { get; private set; }
 
     // Card levels are fixed when the battle starts, so buying an upgrade mid-fight changes nothing.
@@ -109,12 +113,13 @@ public class PveBattle
         if (loadout.BonusHp < 0) throw new ArgumentOutOfRangeException(nameof(loadout), "Bonus health can't be negative.");
         var boss = BossProfile.For(difficulty);
 
-        var maxHp = BasePlayerMaxHp + loadout.BonusHp;
+        var maxHp = BasePlayerMaxHp + HeroClasses.Get(loadout.Class).BonusHp + loadout.BonusHp;
         var battle = new PveBattle
         {
             Id = Guid.NewGuid(),
             PlayerId = playerId,
             Difficulty = difficulty,
+            Class = loadout.Class,
             PlayerHp = maxHp,
             PlayerMaxHp = maxHp,
             FireballLevel = loadout.FireballLevel,
@@ -143,7 +148,7 @@ public class PveBattle
     };
 
     /// <summary>The card as the player holds it in this battle, upgrades included.</summary>
-    public BattleCardDefinition CardFor(BattleCard card) => BattleCards.AtLevel(card, LevelOf(card));
+    public BattleCardDefinition CardFor(BattleCard card) => HeroClasses.CardFor(Class, card, LevelOf(card));
 
     public bool IsFinished => Status != BattleStatus.InProgress;
 

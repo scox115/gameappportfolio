@@ -32,6 +32,9 @@ public class Player
     public int Level { get; private set; } = 1;
     public string? AvatarUrl { get; private set; }
 
+    /// <summary>The hero's class, which strengthens one signature card in every battle.</summary>
+    public HeroClass Class { get; private set; } = HeroClass.Sorcerer;
+
     /// <summary>Battle Elixirs bought in the shop; one is drunk at the start of each boss fight.</summary>
     public int Elixirs { get; private set; }
 
@@ -103,6 +106,24 @@ public class Player
         Username = username;
         Gold = startingGold;
         ExperiencePoints = 0;
+    }
+
+    /// <summary>Picks the class at sign-up, for free.</summary>
+    public void ChooseStartingClass(HeroClass heroClass)
+    {
+        HeroClasses.Get(heroClass);
+        Class = heroClass;
+    }
+
+    /// <summary>Switches to another class for <see cref="HeroClasses.ChangePrice"/> gold.</summary>
+    public void ChangeClass(HeroClass heroClass)
+    {
+        HeroClasses.Get(heroClass);
+        if (heroClass == Class) throw new InvalidOperationException($"You're already a {HeroClasses.Get(heroClass).Name}.");
+        if (Gold < HeroClasses.ChangePrice)
+            throw new InvalidOperationException($"Changing class costs {HeroClasses.ChangePrice} gold, and you have {Gold}.");
+        DeductGold(HeroClasses.ChangePrice);
+        Class = heroClass;
     }
 
     public void UpdateAvatar(string url)
@@ -334,7 +355,7 @@ public class Player
             Version = Guid.NewGuid();
         }
 
-        return new BattleLoadout(CardLevel(BattleCard.Fireball), CardLevel(BattleCard.HolyShield), CardLevel(BattleCard.DragonClaw), bonusHp);
+        return new BattleLoadout(CardLevel(BattleCard.Fireball), CardLevel(BattleCard.HolyShield), CardLevel(BattleCard.DragonClaw), bonusHp, Class);
     }
 
     /// <summary>
@@ -351,7 +372,7 @@ public class Player
             Version = Guid.NewGuid();
         }
 
-        return new BattleLoadout(CardLevel(BattleCard.Fireball), CardLevel(BattleCard.HolyShield), CardLevel(BattleCard.DragonClaw), bonusHp);
+        return new BattleLoadout(CardLevel(BattleCard.Fireball), CardLevel(BattleCard.HolyShield), CardLevel(BattleCard.DragonClaw), bonusHp, Class);
     }
 
     // --- ⭐ MUTATOR METHOD: INCREMENT EXPERIENCE & HANDLE LEVEL UPS ---

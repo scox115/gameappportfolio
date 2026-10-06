@@ -63,9 +63,11 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
             var aliceUpdate = await alice.Updates.ReadAsync();
             Assert.True(bobUpdate.LastTurn!.YourCard);
             Assert.False(aliceUpdate.LastTurn!.YourCard);
-            Assert.Equal(20, aliceUpdate.LastTurn.DamageDealt);
-            Assert.Equal(80, aliceUpdate.Battle.You.Hp);
-            Assert.Equal(80, bobUpdate.Battle.Opponent.Hp);
+            // Both are new Sorcerers, whose class boosts Fireball.
+            var fireball = HeroClasses.CardFor(HeroClass.Sorcerer, BattleCard.Fireball, 1).Damage;
+            Assert.Equal(fireball, aliceUpdate.LastTurn.DamageDealt);
+            Assert.Equal(100 - fireball, aliceUpdate.Battle.You.Hp);
+            Assert.Equal(100 - fireball, bobUpdate.Battle.Opponent.Hp);
             Assert.True(aliceUpdate.Battle.YourTurn);
         }
     }
@@ -291,11 +293,12 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
 
             Assert.Equal(PvpBattle.BasePlayerMaxHp + Player.DuelElixirBonusHp, bobView.You.MaxHp);
             Assert.Equal(PvpBattle.BasePlayerMaxHp, bobView.Opponent.MaxHp);
-            Assert.Equal(25, bobView.YourCards.Single(c => c.Card == BattleCard.Fireball).Damage);
+            var upgraded = HeroClasses.CardFor(HeroClass.Sorcerer, BattleCard.Fireball, 2).Damage;
+            Assert.Equal(upgraded, bobView.YourCards.Single(c => c.Card == BattleCard.Fireball).Damage);
 
             await bob.PlayCardAsync(bobView.Id, BattleCard.Fireball);
             var aliceUpdate = await alice.Updates.ReadAsync();
-            Assert.Equal(25, aliceUpdate.LastTurn!.DamageDealt);
+            Assert.Equal(upgraded, aliceUpdate.LastTurn!.DamageDealt);
 
             await bob.Updates.ReadAsync();
             await alice.ForfeitAsync(bobView.Id);

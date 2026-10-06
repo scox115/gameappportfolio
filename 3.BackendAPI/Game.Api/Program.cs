@@ -254,6 +254,7 @@ app.MapPlayerEndpoints();
 app.MapBattleEndpoints();
 app.MapPvpEndpoints();
 app.MapShopEndpoints();
+app.MapClassEndpoints();
 app.MapBountyEndpoints();
 app.MapHub<ArenaHub>(ArenaHub.Path);
 app.MapHub<SessionHub>(SessionHub.Path);

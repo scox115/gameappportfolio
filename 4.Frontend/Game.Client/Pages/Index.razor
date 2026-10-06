@@ -68,6 +68,9 @@
                                    style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
                         </div>
 
+                    <!-- NEW HEROES PICK A CLASS; SIGNING IN KEEPS THE CLASS ALREADY CHOSEN -->
+                    <ClassPicker @bind-Selected="chosenClass" Heading="Class (for new heroes):" />
+
                         <div style="display: flex; gap: 15px;">
                             <button @onclick="HandleLogin"
                                     style="flex: 1; background: #4f46e5; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Play
@@ -96,7 +99,7 @@
                                     <img src="@(string.IsNullOrEmpty(State.AvatarUrl) ? "https://dicebear.com" + State.Username : State.AvatarUrl)"
                                          style="width: 160px; height: 160px; border-radius: 50%; @CosmeticStyles.Frame(State.Frame, 5, "4px solid #6366f1") object-fit: cover; background: #0f172a; margin-bottom: 15px;" />
                                     <h2 style="margin: 0; color: #f1f5f9;">@State.Username</h2>
-                                    <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 5px;">Class: Full-Stack Sorcerer</p>
+                                    <ClassSwitcher />
                     
                                     <button @onclick="() => EnterArena()"
                                             style="width: 100%; background: #dc2626; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(220,38,38,0.3);">
@@ -198,6 +201,10 @@
                                                             <td style="padding: 14px; display: flex; align-items: center; gap: 12px;">
                                                                 <img src="@(string.IsNullOrEmpty(item.avatarUrl) ? "https://dicebear.com" + item.username : item.avatarUrl)" style="width: 30px; height: 30px; border-radius: 50%; @CosmeticStyles.Frame(item.frame, 2, "1px solid #475569") object-fit: cover;" />
                                                                 <span style="color: @(isCurrentUser ? "#818cf8" : "#f1f5f9");">@item.username @(isCurrentUser ? " (You)" : "")</span>
+                                                                @if (item.heroClass is { } heroClass)
+                                                                {
+                                                                    <span title="@heroClass">@HeroClassIcons.For(heroClass)</span>
+                                                                }
                                                                 @if (!string.IsNullOrEmpty(item.title))
                                                                 {
                                                                     <span style="color: #fbbf24; font-size: 0.85rem; font-style: italic;">@item.title</span>
@@ -267,7 +274,7 @@
                                                         title="@card.Hint"
                                                         style="background: @(recharging ? "#475569" : CosmeticStyles.CardBackground(State.CardSkin, card.Color)); width: 150px; height: 110px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: @(recharging ? "not-allowed" : "pointer"); opacity: @(recharging ? "0.6" : "1");">
                                                     @card.Icon @card.Label@(held is { level: > 1 } ? $" ★{held.level}" : "")<br /><small>@(held is null ? card.Effect : ArenaCards.EffectOf(held.damage, held.heal))</small><br />
-                                                    <small style="font-weight: normal;">@(recharging ? "⏳ Recharging" : card.Risk)</small>
+                                                    <small style="font-weight: normal;">@(recharging ? "⏳ Recharging" : held is null ? card.Risk : ArenaCards.RiskOf(card.Id, held.failChance))</small>
                                                 </button>
                                             }
                                                     </div>
@@ -325,6 +332,7 @@
 @code {
     private string inputUsername = string.Empty;
     private string inputPassword = string.Empty;
+    private string chosenClass = "Sorcerer";
     private string statusMsg = string.Empty;
     private bool uploading = false;
     private IBrowserFile? selectedFile;
@@ -392,7 +400,7 @@
         if (string.IsNullOrWhiteSpace(inputUsername) || string.IsNullOrEmpty(inputPassword)) return;
         try
         {
-            var res = await Http.PostAsJsonAsync("/api/auth/register", new { Username = inputUsername, Password = inputPassword });
+            var res = await Http.PostAsJsonAsync("/api/auth/register", new { Username = inputUsername, Password = inputPassword, Class = chosenClass });
             if (res.IsSuccessStatusCode)
             {
                 // Registration signs the new hero straight in.
@@ -411,6 +419,7 @@
 
         statusMsg = string.Empty;
         inputPassword = string.Empty;
+        State.UpdateClass(auth.player.@class);
         State.SetPlayerSession(new SessionTokens(auth.accessToken, auth.expiresAt, auth.refreshToken), auth.player.id, auth.player.username, auth.player.gold, auth.player.level, auth.player.avatarUrl);
         State.UpdateCosmetics(auth.player.frame, auth.player.cardSkin);
     }
@@ -708,6 +717,13 @@
         [System.Text.Json.Serialization.JsonPropertyName("level")]
         public int level { get; set; } 
 
+        [System.Text.Json.Serialization.JsonPropertyName("class")]
+        public string @class { get; set; } = "Sorcerer";
+
+        // The leaderboard sends the class's display name.
+        [System.Text.Json.Serialization.JsonPropertyName("heroClass")]
+        public string? heroClass { get; set; }
+
         [System.Text.Json.Serialization.JsonPropertyName("avatarUrl")]
         public string? avatarUrl { get; set; } 
 
@@ -749,6 +765,7 @@
         public int level { get; set; } = 1;
         public int damage { get; set; }
         public int heal { get; set; }
+        public int failChance { get; set; }
     }
 
     public class BattleTurnDto

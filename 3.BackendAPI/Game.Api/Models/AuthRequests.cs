@@ -1,6 +1,7 @@
 namespace Game.Api.Models;
 
-public record RegisterRequest(string Username, string Password);
+/// <param name="Class">The hero's class; Sorcerer when left out.</param>
+public record RegisterRequest(string Username, string Password, Game.Core.Battles.HeroClass? Class = null);
 
 public record LoginRequest(string Username, string Password);
 

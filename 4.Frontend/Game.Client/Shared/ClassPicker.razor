@@ -1,0 +1,64 @@
+@using System.Net.Http.Json
+@using Game.Client.Services
+@inject HttpClient Http
+
+@* Lets a hero pick one of the playable classes. The class list and its rules come from the server. *@
+@if (classes is { Count: > 0 })
+{
+    <div style="margin-bottom: 20px;">
+        @if (!string.IsNullOrEmpty(Heading))
+        {
+            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">@Heading</label>
+        }
+        <div style="display: flex; gap: 10px;">
+            @foreach (var option in classes.Where(c => c.id != Exclude))
+            {
+                var selected = option.id == Selected;
+                <button type="button" @onclick="() => Pick(option.id)" title="@option.description"
+                        aria-pressed="@(selected ? "true" : "false")"
+                        style="flex: 1; background: @(selected ? "#312e81" : "#0f172a"); color: white; padding: 10px 6px; border: 2px solid @(selected ? "#818cf8" : "#334155"); border-radius: 10px; cursor: pointer; font-weight: bold;">
+                    <div style="font-size: 1.4rem;">@HeroClassIcons.For(option.id)</div>
+                    @option.name
+                </button>
+            }
+        </div>
+        @if (classes.FirstOrDefault(c => c.id == Selected) is { } picked)
+        {
+            <p style="color: #94a3b8; font-size: 0.85rem; margin: 8px 0 0;">@picked.description</p>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string? Selected { get; set; }
+    [Parameter] public EventCallback<string> SelectedChanged { get; set; }
+    [Parameter] public string? Heading { get; set; }
+
+    /// <summary>A class to leave out, such as the one the hero already has.</summary>
+    [Parameter] public string? Exclude { get; set; }
+
+    private List<HeroClassDto>? classes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            classes = await Http.GetFromJsonAsync<List<HeroClassDto>>("/api/classes");
+        }
+        catch (Exception)
+        {
+            // Without the list, new heroes start as Sorcerers.
+        }
+    }
+
+    private Task Pick(string heroClass) => SelectedChanged.InvokeAsync(heroClass);
+
+    public class HeroClassDto
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("class")]
+        public string id { get; set; } = "";
+        public string name { get; set; } = "";
+        public string description { get; set; } = "";
+        public int changePrice { get; set; }
+    }
+}

@@ -23,6 +23,9 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
 
     private readonly GameApiFactory _factory;
 
+    // New heroes are Sorcerers, whose class boosts Fireball.
+    private static readonly int Fireball = HeroClasses.CardFor(HeroClass.Sorcerer, BattleCard.Fireball, 1).Damage;
+
     public BattleEndpointsTests(GameApiFactory factory) => _factory = factory;
 
     [Fact]
@@ -51,7 +54,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(first.Id, resumed!.Id);
-        Assert.Equal(PveBattle.BossMaxHp - 20, resumed.BossHp);
+        Assert.Equal(PveBattle.BossMaxHp - Fireball, resumed.BossHp);
     }
 
     [Fact]
@@ -63,10 +66,10 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         var result = await PlayAsync(client, battle.Id, "Fireball");
 
         Assert.False(result.TurnResult.CardFailed);
-        Assert.Equal(20, result.TurnResult.DamageDealt);
+        Assert.Equal(Fireball, result.TurnResult.DamageDealt);
         Assert.Equal("Slash", result.TurnResult.BossMoveName);
         Assert.Equal(PveBattle.OpeningBossAttack, result.TurnResult.BossDamage);
-        Assert.Equal(PveBattle.BossMaxHp - 20, result.Battle.BossHp);
+        Assert.Equal(PveBattle.BossMaxHp - Fireball, result.Battle.BossHp);
         Assert.Equal(85, result.Battle.PlayerHp);
         Assert.Equal("Slash", result.Battle.BossNextMoveName);
         Assert.Null(result.Reward);
