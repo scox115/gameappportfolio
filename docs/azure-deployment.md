@@ -93,6 +93,19 @@ The game always answers on its `*.azurestaticapps.net` address. To give it your 
 
 Use a subdomain: a bare domain like `example.com` needs a different kind of validation that this setup doesn't do.
 
+## Email alerts (optional)
+
+Add a repository variable `ALERT_EMAIL` with your address and run **Deploy to Azure**. The deploy then adds:
+
+- **Server errors:** an email when 5 or more player requests fail with a 5xx status within 15 minutes.
+  Application Insights > **Failures** shows which endpoint failed and the exception behind it.
+- **Crash loop:** an email when the API container restarts 3 or more times within 15 minutes. Check the
+  Container App's **Log stream** and **Revisions**.
+
+Each alert emails again when it resolves. Azure sends a confirmation email when you're added to the alert
+group. Together they cost well under $1 a month: about $0.50 for the error check, which runs every
+15 minutes, and $0.10 for the restart check. Removing the variable stops new deploys from creating them, but existing rules stay until you delete them in the portal under Monitor > Alerts > Alert rules.
+
 ## Troubleshooting
 
 - **`AADSTS700213: No matching federated identity record found`** when the workflow signs in to Azure:

@@ -59,6 +59,9 @@ param registryPassword string = ''
 @description('Optional address for the game, such as play.example.com. Add a CNAME record pointing it at the Static Web App\'s default host name first; leave empty to use only the default address.')
 param customDomain string = ''
 
+@description('Optional email address for alerts when the live API fails. Leave empty for no alerts.')
+param alertEmail string = ''
+
 var suffix = uniqueString(resourceGroup().id)
 var tags = { app: 'kings-of-the-card-arena' }
 var databaseName = 'GameDb'
@@ -371,6 +374,97 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
         ]
       }
     }
+  }
+}
+
+// --- Alerts ---
+// Email is free up to 1,000 a month. The log alert runs every 15 minutes (about $0.50 a month) and the
+// metric alert costs about $0.10 a month.
+
+var alertsEnabled = !empty(alertEmail)
+
+resource alertEmails 'Microsoft.Insights/actionGroups@2023-01-01' = if (alertsEnabled) {
+  name: 'ag-${appName}-email'
+  location: 'global'
+  tags: tags
+  properties: {
+    groupShortName: 'cardarena'
+    enabled: true
+    emailReceivers: [
+      {
+        name: 'owner'
+        emailAddress: alertEmail
+        useCommonAlertSchema: true
+      }
+    ]
+  }
+}
+
+// Health probes aren't traced, so these are real players' requests failing.
+resource serverErrorsAlert 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' = if (alertsEnabled) {
+  name: 'alert-${appName}-server-errors'
+  location: location
+  tags: tags
+  properties: {
+    displayName: 'Card Arena API is returning server errors'
+    description: 'Five or more requests failed with a 5xx status in the last 15 minutes. Open Application Insights > Failures to see which endpoint and exception.'
+    severity: 1
+    enabled: true
+    scopes: [appInsights.id]
+    evaluationFrequency: 'PT15M'
+    windowSize: 'PT15M'
+    criteria: {
+      allOf: [
+        {
+          query: 'requests | where toint(resultCode) >= 500'
+          timeAggregation: 'Count'
+          operator: 'GreaterThanOrEqual'
+          threshold: 5
+          failingPeriods: {
+            numberOfEvaluationPeriods: 1
+            minFailingPeriodsToAlert: 1
+          }
+        }
+      ]
+    }
+    autoMitigate: true
+    actions: {
+      actionGroups: [alertEmails.id]
+    }
+  }
+}
+
+// Repeated restarts mean the container is crashing or failing its liveness probe. Scaling to zero
+// when idle doesn't count as a restart.
+resource restartsAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (alertsEnabled) {
+  name: 'alert-${appName}-api-restarts'
+  location: 'global'
+  tags: tags
+  properties: {
+    description: 'The API container restarted 3 or more times in 15 minutes. Check the Container App\'s Log stream and revision status.'
+    severity: 1
+    enabled: true
+    scopes: [api.id]
+    evaluationFrequency: 'PT5M'
+    windowSize: 'PT15M'
+    criteria: {
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+      allOf: [
+        {
+          criterionType: 'StaticThresholdCriterion'
+          name: 'restarts'
+          metricNamespace: 'Microsoft.App/containerApps'
+          metricName: 'RestartCount'
+          timeAggregation: 'Total'
+          operator: 'GreaterThanOrEqual'
+          threshold: 3
+        }
+      ]
+    }
+    autoMitigate: true
+    actions: [
+      { actionGroupId: alertEmails.id }
+    ]
   }
 }
 
