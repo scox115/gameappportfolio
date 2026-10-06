@@ -19,13 +19,17 @@ public record BattleStateResponse(
     BattleCard? RechargingCard,
     int Turn,
     BattleStatus Status,
-    IReadOnlyList<BattleCardResponse> Cards)
+    IReadOnlyList<BattleCardResponse> Cards,
+    BossDifficulty Difficulty,
+    string BossName,
+    int EnrageBelowPercent)
 {
     public static BattleStateResponse From(PveBattle battle) =>
-        new(battle.Id, battle.PlayerHp, battle.PlayerMaxHp, battle.BossHp, PveBattle.BossMaxHp, battle.IsEnraged,
+        new(battle.Id, battle.PlayerHp, battle.PlayerMaxHp, battle.BossHp, battle.Boss.MaxHp, battle.IsEnraged,
             battle.BossNextMove, BossMoves.NameOf(battle.BossNextMove), battle.BossNextAttack,
             battle.RechargingCard, battle.Turn, battle.Status,
-            BattleCards.All.Select(c => BattleCardResponse.From(battle.CardFor(c.Card), battle.LevelOf(c.Card))).ToList());
+            BattleCards.All.Select(c => BattleCardResponse.From(battle.CardFor(c.Card), battle.LevelOf(c.Card))).ToList(),
+            battle.Difficulty, battle.Boss.Name, battle.Boss.EnrageBelowPercent);
 }
 
 /// <summary>A card as the player holds it in this battle, with any Gold Shop upgrade applied.</summary>

@@ -43,6 +43,8 @@ public record BattleTurnResult(
 public class PveBattle
 {
     public const int BasePlayerMaxHp = 100;
+
+    // The normal boss's numbers. The Heroic boss's are in BossProfile.Heroic.
     public const int BossMaxHp = 160;
     public const int OpeningBossAttack = 15;
 
@@ -61,6 +63,11 @@ public class PveBattle
 
     public Guid Id { get; private set; }
     public Guid PlayerId { get; private set; }
+    public BossDifficulty Difficulty { get; private set; }
+
+    /// <summary>The boss's health, damage and move chances for this battle's difficulty.</summary>
+    public BossProfile Boss => BossProfile.For(Difficulty);
+
     public int PlayerHp { get; private set; }
 
     /// <summary>Base health plus any Battle Elixir drunk before the fight.</summary>
@@ -94,25 +101,28 @@ public class PveBattle
 
     private PveBattle() { }
 
-    public static PveBattle Start(Guid playerId, DateTime startedAt, BattleLoadout? loadout = null)
+    public static PveBattle Start(Guid playerId, DateTime startedAt, BattleLoadout? loadout = null,
+        BossDifficulty difficulty = BossDifficulty.Normal)
     {
         if (playerId == Guid.Empty) throw new ArgumentException("Player id cannot be empty.", nameof(playerId));
         loadout ??= BattleLoadout.Basic;
         if (loadout.BonusHp < 0) throw new ArgumentOutOfRangeException(nameof(loadout), "Bonus health can't be negative.");
+        var boss = BossProfile.For(difficulty);
 
         var maxHp = BasePlayerMaxHp + loadout.BonusHp;
         var battle = new PveBattle
         {
             Id = Guid.NewGuid(),
             PlayerId = playerId,
+            Difficulty = difficulty,
             PlayerHp = maxHp,
             PlayerMaxHp = maxHp,
             FireballLevel = loadout.FireballLevel,
             HolyShieldLevel = loadout.HolyShieldLevel,
             DragonClawLevel = loadout.DragonClawLevel,
-            BossHp = BossMaxHp,
+            BossHp = boss.MaxHp,
             BossNextMove = BossMove.Slash,
-            BossNextAttack = OpeningBossAttack,
+            BossNextAttack = boss.OpeningAttack,
             Turn = 1,
             Status = BattleStatus.InProgress,
             StartedAt = startedAt,
@@ -138,7 +148,7 @@ public class PveBattle
     public bool IsFinished => Status != BattleStatus.InProgress;
 
     /// <summary>The boss is badly hurt and fights harder.</summary>
-    public bool IsEnraged => BossHp * 100 < BossMaxHp * EnrageBelowPercent;
+    public bool IsEnraged => BossHp * 100 < Boss.MaxHp * Boss.EnrageBelowPercent;
 
     /// <summary>The card that is recharging this turn, if any.</summary>
     public BattleCard? RechargingCard =>
@@ -186,7 +196,7 @@ public class PveBattle
         var bossHealed = 0;
         if (move == BossMove.LifeDrain)
         {
-            bossHealed = Math.Min(bossDamage, BossMaxHp - BossHp);
+            bossHealed = Math.Min(bossDamage, Boss.MaxHp - BossHp);
             BossHp += bossHealed;
         }
 
@@ -199,8 +209,8 @@ public class PveBattle
 
         // 3. The boss announces its next, stronger move.
         Turn++;
-        (BossNextMove, BossNextAttack) = RollNextMove(Turn, random);
-        if (IsEnraged) BossNextAttack = BossNextAttack * EnrageDamagePercent / 100;
+        (BossNextMove, BossNextAttack) = RollNextMove(Boss, Turn, random);
+        if (IsEnraged) BossNextAttack = BossNextAttack * Boss.EnrageDamagePercent / 100;
 
         return new BattleTurnResult(turn, definition, cardFailed, damageDealt, healthRestored,
             move, bossDamage, blocked, bossHealed, Status);
@@ -217,13 +227,13 @@ public class PveBattle
     private static bool Fails(int failChance, IBattleRandom random) =>
         random.Next(0, 100) >= 100 - failChance;
 
-    private static (BossMove Move, int Damage) RollNextMove(int turn, IBattleRandom random)
+    private static (BossMove Move, int Damage) RollNextMove(BossProfile boss, int turn, IBattleRandom random)
     {
         var roll = random.Next(0, 100);
-        var baseDamage = BossAttackBase + (turn * BossAttackGrowthPerTurn) + random.Next(0, BossAttackVariance + 1);
+        var baseDamage = boss.AttackBase + (turn * boss.AttackGrowthPerTurn) + random.Next(0, boss.AttackVariance + 1);
 
-        if (roll < 100 - CrushingBlowChance - LifeDrainChance) return (BossMove.Slash, baseDamage);
-        if (roll < 100 - LifeDrainChance) return (BossMove.CrushingBlow, baseDamage * 8 / 5);
+        if (roll < 100 - boss.CrushingBlowChance - boss.LifeDrainChance) return (BossMove.Slash, baseDamage);
+        if (roll < 100 - boss.LifeDrainChance) return (BossMove.CrushingBlow, baseDamage * 8 / 5);
         return (BossMove.LifeDrain, baseDamage * 3 / 4);
     }
 

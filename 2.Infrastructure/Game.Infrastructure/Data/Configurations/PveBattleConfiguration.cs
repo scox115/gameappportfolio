@@ -22,6 +22,14 @@ public class PveBattleConfiguration : IEntityTypeConfiguration<PveBattle>
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(b => b.Difficulty)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        // The boss's numbers come from code, not the database.
+        builder.Ignore(b => b.Boss);
+
         builder.Property(b => b.LastCardPlayed)
             .HasConversion<string>()
             .HasMaxLength(20);

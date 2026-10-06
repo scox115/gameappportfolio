@@ -24,6 +24,10 @@ public class MatchRulesEngine(TimeProvider timeProvider)
     /// <summary>What a boss win pays once the player has used today's full-reward wins.</summary>
     public const int ReducedBossWinGold = 25;
 
+    // The Heroic boss pays much more, but only for the first win each day.
+    public const int HeroicWinGold = 300;
+    public const int HeroicWinExperience = 150;
+
     public MatchRulesEngine() : this(TimeProvider.System) { }
 
     // Daily bounties roll over at midnight UTC.
@@ -72,7 +76,8 @@ public class MatchRulesEngine(TimeProvider timeProvider)
     /// Settles a PvE match against an AI boss: finalizes the match and pays the player
     /// either the win reward or the consolation reward, never both.
     /// </summary>
-    public BattleReward ProcessPveMatch(GameMatch match, Player player, bool isVictory)
+    public BattleReward ProcessPveMatch(GameMatch match, Player player, bool isVictory,
+        BossDifficulty difficulty = BossDifficulty.Normal)
     {
         ArgumentNullException.ThrowIfNull(match);
         ArgumentNullException.ThrowIfNull(player);
@@ -85,9 +90,14 @@ public class MatchRulesEngine(TimeProvider timeProvider)
         match.CompleteMatch(isVictory ? player.Id : GameMatch.AiBossId);
 
         // Boss fights can be replayed endlessly, so only the first few wins each day pay in full.
-        var fullReward = !isVictory || player.RecordBossWin(Today);
-        var gold = !isVictory ? LossGold : fullReward ? WinGold : ReducedBossWinGold;
-        var experience = isVictory ? WinExperience : LossExperience;
+        // The Heroic boss has its own limit of one, and doesn't use up the normal boss's wins.
+        var heroic = difficulty == BossDifficulty.Heroic;
+        var fullReward = !isVictory || (heroic ? player.RecordHeroicWin(Today) : player.RecordBossWin(Today));
+        var gold = !isVictory ? LossGold
+            : !fullReward ? ReducedBossWinGold
+            : heroic ? HeroicWinGold : WinGold;
+        var experience = !isVictory ? LossExperience
+            : heroic && fullReward ? HeroicWinExperience : WinExperience;
         player.AddGold(gold);
         player.AddExperience(experience);
         var bonuses = player.RecordBattle(Today, BattleKind.BossFight, isVictory, payStreakBonus: fullReward);

@@ -98,7 +98,7 @@
                                     <h2 style="margin: 0; color: #f1f5f9;">@State.Username</h2>
                                     <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 5px;">Class: Full-Stack Sorcerer</p>
                     
-                                    <button @onclick="EnterArena"
+                                    <button @onclick="() => EnterArena()"
                                             style="width: 100%; background: #dc2626; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(220,38,38,0.3);">
                                         ⚔️ LAUNCH BATTLE ARENA
                                     </button>
@@ -110,6 +110,11 @@
                                             style="width: 100%; background: #b45309; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(180,83,9,0.3);">
                                         🪙 GOLD SHOP
                                     </button>
+                                    <HeroicChallenge OnFight="() => EnterArena(heroic: true)" />
+                                    @if (!string.IsNullOrEmpty(statusMsg))
+                                    {
+                                        <p style="color: #f87171; margin: 15px 0 0;">@statusMsg</p>
+                                    }
                                 </div>
 
                                 <!-- CLOUD UPLOADER BOX -->
@@ -214,11 +219,11 @@
                                     <div
                                         style="max-width: 900px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
                                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                                            <h3 style="margin: 0; color: #ef4444;">😈 Boss: The Shadow Overlord</h3>
+                                            <h3 style="margin: 0; color: @(heroic ? "#f59e0b" : "#ef4444");">@(heroic ? "👑" : "😈") Boss: @bossName</h3>
                                             <div style="font-size: 1.2rem; font-weight: bold; white-space: nowrap;">
                                                 @if (bossEnraged)
                                                 {
-                                                    <span title="Below 40% health the boss's attacks hit 50% harder." style="background: #7f1d1d; color: #fecaca; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem; margin-right: 12px;">😡 ENRAGED</span>
+                                                    <span title="Below @enrageBelowPercent% health the boss's attacks hit 50% harder." style="background: #7f1d1d; color: #fecaca; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem; margin-right: 12px;">😡 ENRAGED</span>
                                                 }
                                                 <span style="color: #ef4444; margin-right: 20px;">Boss HP: @enemyHp / @enemyMaxHp</span>
                                                 <span style="color: #3b82f6;">Your HP: @playerHp / @playerMaxHp</span>
@@ -270,7 +275,7 @@
                                                 <div style="font-size: 3rem; line-height: 1;">@(battleResult.won ? "🏆" : "💀")</div>
                                                 <h2 style="margin: 10px 0 5px; color: @(battleResult.won ? "#4ade80" : "#f87171"); letter-spacing: 2px;">@(battleResult.won ? "VICTORY" : "DEFEAT")</h2>
                                                 <p style="color: #cbd5e1; margin: 0 0 20px;">
-                                                    @(battleResult.won ? "The Shadow Overlord has fallen!" : "The Shadow Overlord prevails... this time.")
+                                                    @(battleResult.won ? $"{bossName} has fallen!" : $"{bossName} prevails... this time.")
                                                 </p>
 
                                                 <div style="display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; font-weight: bold;">
@@ -280,7 +285,13 @@
 
                                                 <RewardBonuses StreakBonus="battleResult.streakBonus" Bounties="battleResult.bounties" />
 
-                                                @if (battleResult.reducedBossReward)
+                                                @if (heroic && battleResult.won)
+                                                {
+                                                    <div style="color: #94a3b8; margin-bottom: 15px;">@(battleResult.reducedBossReward
+                                                        ? "You've already claimed today's Heroic reward, so this win paid 25 gold. It comes back tomorrow."
+                                                        : "👑 Heroic victory! That was today's Heroic reward; it comes back tomorrow.")</div>
+                                                }
+                                                else if (battleResult.reducedBossReward)
                                                 {
                                                     <div style="color: #94a3b8; margin-bottom: 15px;">You've used today's 5 full-reward boss wins, so this one paid 25 gold. Full rewards come back tomorrow.</div>
                                                 }
@@ -297,7 +308,7 @@
                                                 <div style="display: flex; justify-content: center; gap: 15px;">
                                                     <button @onclick="ReturnToTown"
                                                             style="background: #334155; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🏰 Return to Town</button>
-                                                    <button @onclick="EnterArena"
+                                                    <button @onclick="() => EnterArena(heroic)"
                                                             style="background: #dc2626; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">⚔️ Fight Again</button>
                                                 </div>
                                             </div>
@@ -321,6 +332,9 @@
     private List<BattleCardDto> heldCards = new(); // The cards as upgraded in the Gold Shop
     private int enemyHp = 160;
     private int enemyMaxHp = 160;
+    private bool heroic; // Fighting the Heroic boss, for players with every card maxed out
+    private string bossName = "The Shadow Overlord";
+    private int enrageBelowPercent = 40;
     private bool bossEnraged; // Below 40% health the boss's attacks hit 50% harder
     private int enemyIntentAttack = 15; // Damage of the boss's announced move
     private string bossNextMove = "Slash";
@@ -436,16 +450,19 @@
 
     // --- ⚔️ SERVER-AUTHORITATIVE TURN-BASED COMBAT ---
     // The API owns the battle: we send the chosen card and replay what the server decided.
-    private async Task EnterArena()
+    private async Task EnterArena(bool heroic = false)
     {
         try
         {
-            var res = await Http.PostAsync("/api/battles/pve", null);
+            var res = await Http.PostAsync(heroic ? "/api/battles/pve?difficulty=Heroic" : "/api/battles/pve", null);
             if (!res.IsSuccessStatusCode)
             {
-                statusMsg = "The arena gates are closed. Please try again.";
+                statusMsg = res.StatusCode == HttpStatusCode.BadRequest
+                    ? await ReadValidationMessage(res)
+                    : "The arena gates are closed. Please try again.";
                 return;
             }
+            statusMsg = string.Empty;
 
             var battle = await res.Content.ReadFromJsonAsync<BattleStateDto>();
             if (battle is null) return;
@@ -492,7 +509,7 @@
         // 1. SHOW THE PLAYER'S CARD
         if (turn.cardFailed)
         {
-            logs.Add($"🌀 Turn {turn.turn}: Your {turn.cardName} was {turn.cardFailedReason} by the Shadow Overlord!");
+            logs.Add($"🌀 Turn {turn.turn}: Your {turn.cardName} was {turn.cardFailedReason} by {bossName}!");
             await Sounds.PlayAsync(Sound.Miss);
         }
         else if (turn.damageDealt > 0)
@@ -512,7 +529,7 @@
         if (turn.bossDamage is int bossDamage)
         {
             StateHasChanged();
-            logs.Add($"⏳ The Shadow Overlord winds up a {turn.bossMoveName}...");
+            logs.Add($"⏳ {bossName} winds up a {turn.bossMoveName}...");
             await Task.Delay(1000);
             if (turn.attackBlocked)
             {
@@ -526,7 +543,7 @@
             }
             if (turn.bossHealed > 0)
             {
-                logs.Add($"🩸 The Shadow Overlord drains {turn.bossHealed} HP back.");
+                logs.Add($"🩸 {bossName} drains {turn.bossHealed} HP back.");
                 await Sounds.PlayAsync(Sound.Drain);
             }
         }
@@ -535,7 +552,7 @@
         ApplyBattleState(result.battle);
         if (bossEnraged && !wasEnraged && result.battle.status == "InProgress")
         {
-            logs.Add("😡 The Shadow Overlord is badly hurt and flies into a rage! Its attacks now hit 50% harder.");
+            logs.Add($"😡 {bossName} is badly hurt and flies into a rage! Its attacks now hit 50% harder.");
             await Sounds.PlayAsync(Sound.Drain);
         }
 
@@ -546,7 +563,7 @@
             return;
         }
 
-        logs.Add($"⚠️ The Shadow Overlord prepares {bossNextMoveName} for {enemyIntentAttack} DMG.");
+        logs.Add($"⚠️ {bossName} prepares {bossNextMoveName} for {enemyIntentAttack} DMG.");
 
         // 4. UNLOCK CONTROLS
         isPlayerTurn = true;
@@ -561,6 +578,9 @@
         heldCards = battle.cards;
         enemyHp = battle.bossHp;
         enemyMaxHp = battle.bossMaxHp;
+        heroic = battle.difficulty == "Heroic";
+        bossName = battle.bossName;
+        enrageBelowPercent = battle.enrageBelowPercent;
         bossEnraged = battle.bossEnraged;
         enemyIntentAttack = battle.bossNextAttack;
         bossNextMove = battle.bossNextMove;
@@ -577,7 +597,7 @@
         _ = Sounds.PlayAsync(won ? Sound.Victory : Sound.Defeat);
         logs.Add(won
             ? "🏆 VICTORY! The server confirmed your win."
-            : "💀 DEFEAT! The Shadow Overlord prevails.");
+            : $"💀 DEFEAT! {bossName} prevails.");
 
         var levelBefore = State.Level;
         if (result.reward is { } reward)
@@ -709,6 +729,9 @@
         public int turn { get; set; }
         public string status { get; set; } = "";
         public List<BattleCardDto> cards { get; set; } = new();
+        public string difficulty { get; set; } = "Normal";
+        public string bossName { get; set; } = "The Shadow Overlord";
+        public int enrageBelowPercent { get; set; } = 40;
     }
 
     public class BattleCardDto
