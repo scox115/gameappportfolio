@@ -23,6 +23,7 @@ Every merge to `main` that passes CI is deployed to Azure by [`.github/workflows
 | Storage account | Standard LRS | a few cents |
 | Key Vault | Standard | a few cents |
 | Log Analytics + Application Insights | Pay as you go, capped at 0.15 GB a day | $0 within the 5 GB monthly free allowance |
+| App Configuration (optional, for feature flags) | Free: one store per subscription, 1,000 requests a day | $0 |
 
 These are estimates. Set a [budget alert](https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-acm-create-budgets) on the resource group (for example $5) so you hear about any surprise. You can claim only one free SQL database per subscription.
 
@@ -92,6 +93,18 @@ The game always answers on its `*.azurestaticapps.net` address. To give it your 
    10 to 20 minutes to start working. The API accepts requests from both addresses.
 
 Use a subdomain: a bare domain like `example.com` needs a different kind of validation that this setup doesn't do.
+
+## Feature flags (optional)
+
+Three parts of the game can be switched off without a deploy: `Duels`, `HeroicBoss` and `GoldShop`. While one is off, its button in town is replaced by a "closed for now" note and the API refuses it with a 503. Duels and boss fights already under way play out. All three are on by default (`FeatureManagement` in `appsettings.json`).
+
+To flip them in Azure, the deploy can add a free-tier Azure App Configuration store:
+
+1. Register its resource provider once (the deploy app isn't allowed to): `az provider register --namespace Microsoft.AppConfiguration`. Running `infra/setup.ps1` again does this too.
+2. Add a repository variable `APP_CONFIGURATION` with the value `true`, then run **Deploy to Azure**.
+3. In the portal, open the `appcs-cardarena-...` App Configuration store, then **Operations > Feature manager > Create**. Name the flag `GoldShop`, `Duels` or `HeroicBoss`, and leave **Enable feature flag** unticked to switch that feature off. Tick it, or delete the flag, to switch it back on.
+
+The API checks the store for changes at most every two minutes while players are using it, so a change shows within a couple of minutes. Flags not in the store keep their `appsettings.json` defaults, and if the store can't be reached the API starts with those defaults. The store accepts Entra ID only (no access keys): the API reads it with its managed identity, and the SQL admins group can edit it.
 
 ## Email alerts (optional)
 

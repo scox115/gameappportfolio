@@ -121,15 +121,27 @@
                                             style="width: 100%; background: #dc2626; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(220,38,38,0.3);">
                                         ⚔️ LAUNCH BATTLE ARENA
                                     </button>
-                                    <button @onclick="() => State.ChangeScreen(GameScreen.PvpArena)"
-                                            style="width: 100%; background: #0e7490; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(14,116,144,0.3);">
-                                        🆚 FIND AN OPPONENT
-                                    </button>
-                                    <button @onclick="() => State.ChangeScreen(GameScreen.Shop)"
-                                            style="width: 100%; background: #b45309; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(180,83,9,0.3);">
-                                        🪙 GOLD SHOP
-                                    </button>
-                                    <HeroicChallenge OnFight="() => EnterArena(heroic: true)" />
+                                    <FeatureGate Feature="@FeatureFlags.Duels">
+                                        <ChildContent>
+                                            <button @onclick="() => State.ChangeScreen(GameScreen.PvpArena)"
+                                                    style="width: 100%; background: #0e7490; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(14,116,144,0.3);">
+                                                🆚 FIND AN OPPONENT
+                                            </button>
+                                        </ChildContent>
+                                        <Off><p style="color: #94a3b8; font-size: 0.85rem; margin: 15px 0 0;">🆚 Duels are closed for now. Check back soon!</p></Off>
+                                    </FeatureGate>
+                                    <FeatureGate Feature="@FeatureFlags.GoldShop">
+                                        <ChildContent>
+                                            <button @onclick="() => State.ChangeScreen(GameScreen.Shop)"
+                                                    style="width: 100%; background: #b45309; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(180,83,9,0.3);">
+                                                🪙 GOLD SHOP
+                                            </button>
+                                        </ChildContent>
+                                        <Off><p style="color: #94a3b8; font-size: 0.85rem; margin: 15px 0 0;">🪙 The Gold Shop is closed for now. Check back soon!</p></Off>
+                                    </FeatureGate>
+                                    <FeatureGate Feature="@FeatureFlags.HeroicBoss">
+                                        <HeroicChallenge OnFight="() => EnterArena(heroic: true)" />
+                                    </FeatureGate>
                                     @if (!string.IsNullOrEmpty(statusMsg))
                                     {
                                         <p style="color: #f87171; margin: 15px 0 0;">@statusMsg</p>

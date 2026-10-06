@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Game.E2E.Tests;
@@ -28,6 +29,9 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
 
     public string BaseUrl { get; }
 
+    /// <summary>Flips feature flags while the API runs, the way Azure App Configuration does.</summary>
+    public FeatureSwitches Features { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -44,6 +48,7 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
         builder.UseSetting("RabbitMq:Password", "test");
         builder.UseSetting("Jwt:SigningKey", "browser-tests-signing-key-that-is-long-enough");
         builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        builder.ConfigureAppConfiguration(configuration => configuration.Add(Features));
 
         builder.ConfigureServices(services =>
         {
@@ -71,6 +76,17 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
         foreach (var descriptor in services.Where(d => d.ServiceType == typeof(T)).ToList())
         {
             services.Remove(descriptor);
+        }
+    }
+
+    public sealed class FeatureSwitches : ConfigurationProvider, IConfigurationSource
+    {
+        public IConfigurationProvider Build(IConfigurationBuilder builder) => this;
+
+        public void Set(string feature, bool enabled)
+        {
+            Data[$"FeatureManagement:{feature}"] = enabled.ToString();
+            OnReload();
         }
     }
 

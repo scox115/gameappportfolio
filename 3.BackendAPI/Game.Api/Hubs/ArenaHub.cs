@@ -1,7 +1,9 @@
 using Game.Api.Auth;
+using Game.Api.Features;
 using Game.Core.Battles;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.FeatureManagement;
 
 namespace Game.Api.Hubs;
 
@@ -10,15 +12,32 @@ namespace Game.Api.Hubs;
 /// Results come back to both players through <see cref="IArenaClient"/>.
 /// </summary>
 [Authorize]
-public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker) : Hub<IArenaClient>
+public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatureManager features) : Hub<IArenaClient>
 {
     public const string Path = "/hubs/arena";
 
     /// <summary>Joins the lobby. Returns true when waiting, false when a battle started or resumed.</summary>
-    public Task<bool> FindOpponent() => battles.FindOpponentAsync(PlayerId, network: Network);
+    public async Task<bool> FindOpponent()
+    {
+        await EnsureDuelsAreOnAsync();
+        return await battles.FindOpponentAsync(PlayerId, network: Network);
+    }
 
     /// <summary>Joins the lobby staking gold on the duel; only players with the same wager are paired.</summary>
-    public Task<bool> FindWageredOpponent(int wager) => battles.FindOpponentAsync(PlayerId, wager, Network);
+    public async Task<bool> FindWageredOpponent(int wager)
+    {
+        await EnsureDuelsAreOnAsync();
+        return await battles.FindOpponentAsync(PlayerId, wager, Network);
+    }
+
+    // Switching duels off stops new ones; duels already under way play out.
+    private async Task EnsureDuelsAreOnAsync()
+    {
+        if (!await features.IsEnabledAsync(GameFeatures.Duels))
+        {
+            throw new HubException("Duels are switched off for now. Please try again later.");
+        }
+    }
 
     public void CancelSearch() => matchmaker.Leave(PlayerId);
 

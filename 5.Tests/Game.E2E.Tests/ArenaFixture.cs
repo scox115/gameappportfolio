@@ -13,6 +13,8 @@ public sealed class ArenaFixture : IAsyncLifetime
 
     public string ClientUrl => _client!.BaseUrl;
 
+    public ApiHost.FeatureSwitches Features => _api!.Features;
+
     public async Task InitializeAsync()
     {
         var wwwroot = await ClientHost.PublishAsync();

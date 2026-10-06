@@ -16,6 +16,7 @@ using Game.Api.Battles;
 using Game.Api.Hubs;
 using Game.Api.Versioning;
 using Game.Api.Caching;
+using Game.Api.Features;
 using Microsoft.AspNetCore.SignalR;
 using Game.Api.Messaging;
 using Game.Core.Battles;
@@ -35,6 +36,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.AddObservability();
+builder.AddGameFeatures(); // feature flags, from appsettings or Azure App Configuration
 builder.Services.AddGameHealthChecks();
 
 // Errors come back as RFC 7807 problem details (with a traceId to find them in the logs and traces).
@@ -297,6 +299,7 @@ var app = builder.Build();
 // and bare error status codes (404, 405...) get a problem-details body too.
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseGameFeatures();
 
 if (app.Environment.IsDevelopment())
 {
