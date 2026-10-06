@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using Game.Api.Endpoints;
+using Game.Api.Features;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -92,6 +93,7 @@ public static class ApiVersioning
         group.MapClassEndpoints();
         group.MapBountyEndpoints();
         group.MapHistoryEndpoints();
+        group.MapFeatureEndpoints();
         return group;
     }
 

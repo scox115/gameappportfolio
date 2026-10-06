@@ -1,0 +1,25 @@
+@inject FeatureFlags Flags
+
+@* Shows its content only while a feature flag is on, and Off (if given) while it's switched off. *@
+@if (enabled == true)
+{
+    @ChildContent
+}
+else if (enabled == false)
+{
+    @Off
+}
+
+@code {
+    [Parameter, EditorRequired] public string Feature { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Off { get; set; }
+
+    private bool? enabled;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        enabled = Flags.Fresh?.IsOn(Feature);
+        enabled = (await Flags.GetAsync()).IsOn(Feature);
+    }
+}

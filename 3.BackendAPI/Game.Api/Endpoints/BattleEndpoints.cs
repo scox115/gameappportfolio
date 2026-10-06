@@ -1,6 +1,7 @@
 using Game.Api.Observability;
 using System.Security.Claims;
 using Game.Api.Auth;
+using Game.Api.Features;
 using Game.Api.Messaging;
 using Game.Api.Models;
 using Game.Core.Battles;
@@ -9,6 +10,7 @@ using Game.Core.Events;
 using Game.Core.Services;
 using Game.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.FeatureManagement;
 
 namespace Game.Api.Endpoints;
 
@@ -25,7 +27,7 @@ public static class BattleEndpoints
         // Enter the arena. Returns the player's unfinished battle if there is one, so leaving
         // and coming back can't be used to re-roll a bad fight. ?difficulty=Heroic picks the
         // Heroic boss, which needs every card fully upgraded.
-        group.MapPost("/", async (ClaimsPrincipal user, AppDbContext dbContext, TimeProvider timeProvider,
+        group.MapPost("/", async (ClaimsPrincipal user, AppDbContext dbContext, TimeProvider timeProvider, IFeatureManager features,
             BossDifficulty difficulty = BossDifficulty.Normal) =>
         {
             var playerId = user.GetPlayerId();
@@ -49,6 +51,11 @@ public static class BattleEndpoints
                 {
                     [nameof(difficulty)] = ["Unknown difficulty."]
                 });
+            }
+
+            if (difficulty == BossDifficulty.Heroic && !await features.IsEnabledAsync(GameFeatures.HeroicBoss))
+            {
+                return GameFeatures.SwitchedOff(GameFeatures.HeroicBoss);
             }
 
             if (difficulty == BossDifficulty.Heroic && !player.CanFightHeroicBoss)

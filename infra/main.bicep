@@ -62,10 +62,14 @@ param customDomain string = ''
 @description('Optional email address for alerts when the live API fails. Leave empty for no alerts.')
 param alertEmail string = ''
 
+@description('Set to true to keep feature flags in Azure App Configuration (free tier), so they can be flipped without a deploy.')
+param appConfiguration string = ''
+
 var suffix = uniqueString(resourceGroup().id)
 var tags = { app: 'kings-of-the-card-arena' }
 var databaseName = 'GameDb'
 var usePrivateRegistry = !empty(registryUsername)
+var featureFlagStoreEnabled = toLower(appConfiguration) == 'true'
 
 resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: apiIdentityName
@@ -132,6 +136,45 @@ resource apiReadsSecrets 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
     roleDefinitionId: keyVaultSecretsUser
     principalId: apiIdentity.properties.principalId
     principalType: 'ServicePrincipal'
+  }
+}
+
+// --- Feature flags ---
+
+// The free tier allows one store per subscription, 10 MB and 1,000 requests a day; the API checks for
+// changes at most every two minutes, and only while it's running. Flags that aren't in the store keep
+// the defaults from appsettings.json (everything on), so an empty store changes nothing.
+resource flags 'Microsoft.AppConfiguration/configurationStores@2024-05-01' = if (featureFlagStoreEnabled) {
+  name: 'appcs-${appName}-${take(suffix, 8)}'
+  location: location
+  tags: tags
+  sku: { name: 'free' }
+  properties: {
+    disableLocalAuth: true // Entra ID only: no access keys to leak
+  }
+}
+
+var appConfigDataReader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '516239f1-63e1-4d78-a4de-a74fb236a071')
+var appConfigDataOwner = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5ae67dd6-50cb-40e7-96ff-dc2bfa4b606b')
+
+resource apiReadsFlags 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (featureFlagStoreEnabled) {
+  name: guid(flags.id, apiIdentity.id, appConfigDataReader)
+  scope: flags
+  properties: {
+    roleDefinitionId: appConfigDataReader
+    principalId: apiIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// The admins group (you) flips flags in the portal under App Configuration > Feature manager.
+resource adminsEditFlags 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (featureFlagStoreEnabled) {
+  name: guid(flags.id, sqlAdminGroupObjectId, appConfigDataOwner)
+  scope: flags
+  properties: {
+    roleDefinitionId: appConfigDataOwner
+    principalId: sqlAdminGroupObjectId
+    principalType: 'Group'
   }
 }
 
@@ -267,7 +310,7 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
     type: 'UserAssigned'
     userAssignedIdentities: { '${apiIdentity.id}': {} }
   }
-  dependsOn: [apiReadsSecrets, apiWritesBlobs, allowAzureServices, database]
+  dependsOn: [apiReadsSecrets, apiWritesBlobs, apiReadsFlags, allowAzureServices, database]
   properties: {
     managedEnvironmentId: environment.id
     configuration: {
@@ -323,7 +366,9 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'Cors__AllowedOrigins__0', value: 'https://${client.properties.defaultHostname}' }
           ], empty(customDomain) ? [] : [
             { name: 'Cors__AllowedOrigins__1', value: 'https://${customDomain}' }
-          ])
+          ], featureFlagStoreEnabled ? [
+            { name: 'AppConfig__Endpoint', value: flags!.properties.endpoint }
+          ] : [])
           probes: [
             {
               // Database migrations run before the API starts listening, and a paused database can

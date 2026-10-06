@@ -103,6 +103,10 @@ Both are written in one `SaveChanges`, and the message is acknowledged only afte
 - Traces, metrics and logs go out over OpenTelemetry. Open the dashboard at http://localhost:18888 to see each request's trace, the `game.battles.completed` and `game.telemetry.*` counters, and structured logs. Without `OTEL_EXPORTER_OTLP_ENDPOINT` set, nothing is exported.
 - Errors come back as [problem details](https://www.rfc-editor.org/rfc/rfc9457) JSON with a `traceId` you can search for in the dashboard.
 
+### Feature flags
+
+`Duels`, `HeroicBoss` and `GoldShop` can be switched off with [Microsoft.FeatureManagement](https://learn.microsoft.com/azure/azure-app-configuration/feature-management-dotnet-reference) (`3.BackendAPI/Game.Api/Features/GameFeatures.cs`). Try it with `dotnet user-secrets set "FeatureManagement:GoldShop" false --project 3.BackendAPI/Game.Api` and restart the API: the Gold Shop button in town becomes a "closed for now" note, and `/api/v1/shop` answers 503. The client asks `GET /api/v1/features` which features are on. In Azure the flags can live in Azure App Configuration and change without a restart; see [azure-deployment.md](azure-deployment.md#feature-flags-optional). `FeatureFlagTests` (API and browser) cover both.
+
 ### Scheduled cleanup
 
 `DataCleanupWorker` deletes rows the game no longer needs. It runs a minute after the API starts, because in Azure the API scales to zero and might never be up at a fixed time of day, and then every six hours while it keeps running:
@@ -143,6 +147,8 @@ CI runs them on every pull request in the `browser-tests` job, and uploads the s
 | `ConnectionStrings:Redis` | none (cache in API memory) | none | yes, if set |
 | `RabbitMq:HostName` / `Port` / `VirtualHost` | `localhost` / `5672` / `/` | inherited | no |
 | `RabbitMq:UserName` / `Password` | none | `guest` / `guest` (RabbitMQ's local default) | in cloud |
+| `FeatureManagement:Duels` / `HeroicBoss` / `GoldShop` | `true` | inherited | no |
+| `AppConfig:Endpoint` | none (flags from appsettings) | none | no; set by the Azure deployment when `APP_CONFIGURATION` is `true` |
 | `Cleanup:FirstRunDelay` / `Interval` | `00:01:00` / `06:00:00` | inherited | no |
 | `Cleanup:ExpiredTokenRetentionDays` / `FinishedBattleRetentionDays` / `BatchSize` | `7` / `30` / `1000` | inherited | no |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none (no export) | `http://localhost:4317` (the dashboard container) | no |

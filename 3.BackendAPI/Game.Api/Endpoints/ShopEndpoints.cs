@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Game.Api.Auth;
+using Game.Api.Features;
 using Game.Api.Models;
 using Game.Core.Shop;
 using Game.Infrastructure.Data;
@@ -13,7 +14,8 @@ public static class ShopEndpoints
     {
         var group = app.MapGroup("/shop")
                        .WithTags("Shop")
-                       .RequireAuthorization();
+                       .RequireAuthorization()
+                       .RequireFeature(GameFeatures.GoldShop);
 
         // What's for sale, priced for the signed-in player.
         group.MapGet("/", async (ClaimsPrincipal user, AppDbContext dbContext) =>

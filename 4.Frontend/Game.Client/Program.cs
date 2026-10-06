@@ -22,6 +22,7 @@ builder.Services.AddSingleton(new IdleTimeoutSettings(TimeSpan.FromMinutes(idleT
 builder.Services.AddScoped<GameState>();
 builder.Services.AddScoped<TokenRefresher>();
 builder.Services.AddScoped<SoundEffects>();
+builder.Services.AddScoped<FeatureFlags>();
 builder.Services.AddScoped(sp => new HttpClient(new AuthTokenHandler(sp.GetRequiredService<GameState>(), sp.GetRequiredService<TokenRefresher>()))
 {
     BaseAddress = apiBaseAddress
