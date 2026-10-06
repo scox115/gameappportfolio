@@ -157,6 +157,10 @@
                                     <div style="text-align: center; margin-bottom: 25px;">
                                         <h3 style="margin: 0; color: #fbbf24; font-size: 1.8rem; font-weight: 800;">🏆 GLOBAL HERO RANKINGS</h3>
                                         <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 5px;">Ranked by PvP rating: beat stronger heroes to climb faster</p>
+                                        @if (registeredPlayers is { } total)
+                                        {
+                                            <p style="color: #22d3ee; font-weight: bold; margin: 10px 0 0;">👥 @total.ToString("N0") registered hero@(total == 1 ? "" : "es")</p>
+                                        }
                                     </div>
 
                                     @if (leaderboardLoading)
@@ -349,6 +353,7 @@
     // Leaderboard state references
     private bool leaderboardLoading = false;
     private List<PlayerProfileDto>? leaderboardPlayers;
+    private int? registeredPlayers;
 
     protected override void OnInitialized()
     {
@@ -638,7 +643,9 @@
         try
         {
             leaderboardLoading = true;
+            var stats = Http.GetFromJsonAsync<PlayerStatsDto>("/api/players/stats");
             leaderboardPlayers = await Http.GetFromJsonAsync<List<PlayerProfileDto>>("/api/players/leaderboard");
+            registeredPlayers = (await stats)?.registeredPlayers;
         }
         catch
         {
@@ -713,6 +720,8 @@
     }
 
     public class UploadResponse { public string avatarUrl { get; set; } = ""; }
+
+    private record PlayerStatsDto(int registeredPlayers);
 
     public class BattleStateDto
     {

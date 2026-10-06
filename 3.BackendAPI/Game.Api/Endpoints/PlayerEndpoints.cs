@@ -92,6 +92,10 @@ public static class PlayerEndpoints
         .RequireAuthorization()
         .DisableAntiforgery();
 
+        // GET: /api/players/stats
+        group.MapGet("/stats", async (AppDbContext dbContext) =>
+            Results.Ok(new PlayerStatsResponse(await dbContext.Players.CountAsync())));
+
         // GET: /api/players/leaderboard
         group.MapGet("/leaderboard", async (AppDbContext dbContext) =>
         {

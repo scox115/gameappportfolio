@@ -21,3 +21,6 @@ public record AuthResponse(
     string RefreshToken,
     DateTimeOffset RefreshTokenExpiresAt,
     PlayerProfileResponse Player);
+
+/// <param name="RegisteredPlayers">Every hero who has signed up.</param>
+public record PlayerStatsResponse(int RegisteredPlayers);

@@ -117,6 +117,18 @@ public class AuthEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task PlayerStats_CountsEveryRegisteredHero()
+    {
+        var client = _factory.CreateClient();
+        var before = await client.GetFromJsonAsync<PlayerStatsResponse>("/api/players/stats");
+
+        await RegisterAsync(client, NewUsername());
+        var after = await client.GetFromJsonAsync<PlayerStatsResponse>("/api/players/stats");
+
+        Assert.Equal(before!.RegisteredPlayers + 1, after!.RegisteredPlayers);
+    }
+
     private static async Task<AuthResponse> RegisterAsync(HttpClient client, string username)
     {
         var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
