@@ -51,10 +51,19 @@ From the town screen, **Find an Opponent** puts you in the lobby. To play both s
 
 The lobby queue is kept in the API's memory, so it assumes one API instance. Scaling out needs a shared queue and an Azure SignalR Service backplane.
 
+### Match history and arena stats (RabbitMQ)
+
+When a battle ends, the API saves the rewards, then publishes a `MatchCompletedEvent` (who fought, as which class, what each hero earned, how it ended) to the durable `match-completed-queue`. `MatchConsumerWorker` reads it and writes the read models behind **Recent Matches** on the town screen (`GET /api/players/me/matches`) and the stats strip on the leaderboard (`GET /api/arena/stats?days=7`):
+
+- `MatchHistory`: one row per hero per match. A unique index on (match, hero) means a message RabbitMQ delivers twice is only counted once.
+- `DailyArenaStats`: one row per UTC day, with a concurrency token so two API instances can't overwrite each other's counts.
+
+Both are written in one `SaveChanges`, and the message is acknowledged only afterwards. If the database is unavailable, the event is requeued and retried up to five times. The consumer never changes gold, XP or ratings. If RabbitMQ is down, battles still work: events wait in the API's memory and appear in history once the broker is back. Open http://localhost:15672 (guest/guest) to watch the queue.
+
 ### Health checks and monitoring
 
 - `GET /health/live` answers 200 while the API process is running; it checks nothing else (for restart probes).
-- `GET /health/ready` checks the database, blob storage and RabbitMQ. It returns 503 only when the database is unreachable. Blob storage or RabbitMQ being down shows as `Degraded` with a 200, because the game still works without avatar uploads or telemetry.
+- `GET /health/ready` checks the database, blob storage and RabbitMQ. It returns 503 only when the database is unreachable. Blob storage or RabbitMQ being down shows as `Degraded` with a 200, because the game still works without avatar uploads or match history.
 - Traces, metrics and logs go out over OpenTelemetry. Open the dashboard at http://localhost:18888 to see each request's trace, the `game.battles.completed` and `game.telemetry.*` counters, and structured logs. Without `OTEL_EXPORTER_OTLP_ENDPOINT` set, nothing is exported.
 - Errors come back as [problem details](https://www.rfc-editor.org/rfc/rfc9457) JSON with a `traceId` you can search for in the dashboard.
 

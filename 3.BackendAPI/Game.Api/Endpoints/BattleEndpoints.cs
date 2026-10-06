@@ -117,6 +117,7 @@ public static class BattleEndpoints
 
             BattleRewardResponse? reward = null;
             GameMatch? match = null;
+            MatchCompletedEvent? completed = null;
             if (battle.IsFinished)
             {
                 var player = await dbContext.Players.FindAsync(playerId);
@@ -131,6 +132,14 @@ public static class BattleEndpoints
                 dbContext.Matches.Add(match);
                 var earned = new MatchRulesEngine(timeProvider).ProcessPveMatch(match, player, won, battle.Difficulty);
                 battle.AttachMatch(match.Id);
+                completed = new MatchCompletedEvent(match.Id, match.WinnerPlayerId!.Value, won ? GameMatch.AiBossId : player.Id)
+                {
+                    OccurredAt = timeProvider.GetUtcNow().UtcDateTime,
+                    Kind = MatchKind.Boss,
+                    Difficulty = battle.Difficulty,
+                    Turns = battle.Turn,
+                    Participants = [new MatchParticipant(player.Id, player.Username, battle.Class, won, earned.Gold, earned.Experience)]
+                };
 
                 var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
                 reward = BattleRewardResponse.From(earned, player, isDuel: false,
@@ -146,12 +155,10 @@ public static class BattleEndpoints
                 return Results.Conflict(new { message = "Another move was played at the same time. Reload the battle and try again." });
             }
 
-            if (match is not null)
+            if (completed is not null)
             {
-                var winnerId = match.WinnerPlayerId!.Value;
-                var loserId = winnerId == playerId ? GameMatch.AiBossId : playerId;
-                await telemetry.PublishAsync(new MatchCompletedEvent(match.Id, winnerId, loserId));
-                GameTelemetry.BattleCompleted("pve", winnerId == playerId ? "victory" : "defeat", battle.Difficulty.ToString());
+                await telemetry.PublishAsync(completed);
+                GameTelemetry.BattleCompleted("pve", completed.WinnerId == playerId ? "victory" : "defeat", battle.Difficulty.ToString());
             }
 
             return Results.Ok(new PlayCardResponse(BattleStateResponse.From(battle), BattleTurnResponse.From(turn), reward));

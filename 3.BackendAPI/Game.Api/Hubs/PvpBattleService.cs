@@ -216,10 +216,10 @@ public class PvpBattleService(
     private async Task SaveAndBroadcastAsync(PvpBattle battle, PvpTurnResult? lastTurn)
     {
         Dictionary<Guid, BattleRewardResponse>? rewards = null;
-        GameMatch? match = null;
+        MatchCompletedEvent? completed = null;
         if (battle.IsFinished)
         {
-            (match, rewards) = await SettleAsync(battle);
+            (completed, rewards) = await SettleAsync(battle);
         }
 
         try
@@ -237,16 +237,17 @@ public class PvpBattleService(
 
         await BroadcastAsync(battle, lastTurn, rewards, (client, update) => client.BattleUpdated(update));
 
-        if (match is not null)
+        if (completed is not null)
         {
-            var winnerId = match.WinnerPlayerId!.Value;
-            await telemetry.PublishAsync(new MatchCompletedEvent(match.Id, winnerId, battle.OpponentOf(winnerId)));
+            var winnerId = completed.WinnerId;
+            await telemetry.PublishAsync(completed);
             GameTelemetry.BattleCompleted("pvp", battle.EndReason?.ToString() ?? "Unknown");
             logger.LogInformation("PvP battle {BattleId} won by {WinnerId} ({Reason})", battle.Id, winnerId, battle.EndReason);
         }
     }
 
-    private async Task<(GameMatch? Match, Dictionary<Guid, BattleRewardResponse> Rewards)> SettleAsync(PvpBattle battle)
+    // Returns the event to publish once the rewards are saved, or null for a duel that didn't count.
+    private async Task<(MatchCompletedEvent? Completed, Dictionary<Guid, BattleRewardResponse> Rewards)> SettleAsync(PvpBattle battle)
     {
         var winnerId = battle.WinnerId!.Value;
         var winner = await dbContext.Players.FindAsync(winnerId)
@@ -283,7 +284,22 @@ public class PvpBattleService(
             [winnerId] = BattleRewardResponse.From(settlement.Winner, winner, isDuel: true),
             [loserId] = BattleRewardResponse.From(settlement.Loser, loser, isDuel: true)
         };
-        return (match, rewards);
+        var completed = new MatchCompletedEvent(match.Id, winnerId, loserId)
+        {
+            OccurredAt = Now,
+            Kind = MatchKind.Duel,
+            EndReason = battle.EndReason,
+            Turns = battle.MovesPlayed,
+            Participants =
+            [
+                Participant(winner, won: true, settlement.Winner),
+                Participant(loser, won: false, settlement.Loser)
+            ]
+        };
+        return (completed, rewards);
+
+        MatchParticipant Participant(Player hero, bool won, BattleReward reward) =>
+            new(hero.Id, hero.Username, battle.ClassOf(hero.Id), won, reward.Gold, reward.Experience, reward.RatingChange, reward.WagerResult);
     }
 
     private async Task BroadcastAsync(

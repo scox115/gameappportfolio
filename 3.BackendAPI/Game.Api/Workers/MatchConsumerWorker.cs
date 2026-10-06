@@ -1,5 +1,6 @@
-using Game.Core.Entities;
+using Game.Api.Messaging;
 using Game.Core.Events;
+using Game.Infrastructure.History;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
@@ -7,9 +8,19 @@ using System.Text.Json;
 
 namespace Game.Api.Workers;
 
+// Builds match history and daily arena stats from the match events the API publishes.
 public class MatchConsumerWorker : BackgroundService
 {
+    // How long to wait before handing a message back after a database error, so a database
+    // outage doesn't spin through the queue.
+    private static readonly TimeSpan RequeueDelay = TimeSpan.FromSeconds(2);
+
+    // An event that still can't be saved after this many tries is dropped, so it can't block the queue.
+    private const int MaxAttempts = 5;
+    private readonly Dictionary<Guid, int> _failedAttempts = [];
+
     private readonly IConnectionFactory _connectionFactory;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MatchConsumerWorker> _logger;
     private IConnection? _connection;
     private IChannel? _channel;
@@ -17,9 +28,11 @@ public class MatchConsumerWorker : BackgroundService
 
     public MatchConsumerWorker(
         IConnectionFactory connectionFactory,
+        IServiceScopeFactory scopeFactory,
         ILogger<MatchConsumerWorker> logger)
     {
         _connectionFactory = connectionFactory;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -57,7 +70,7 @@ public class MatchConsumerWorker : BackgroundService
 
     private async Task StartConsumingAsync(CancellationToken stoppingToken)
     {
-        _connection = await _connectionFactory.CreateConnectionAsync("card-arena-telemetry-consumer", stoppingToken);
+        _connection = await _connectionFactory.CreateConnectionAsync("card-arena-match-history-consumer", stoppingToken);
         var channel = await _connection.CreateChannelAsync(cancellationToken: stoppingToken);
         _channel = channel;
 
@@ -73,24 +86,48 @@ public class MatchConsumerWorker : BackgroundService
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += async (model, ea) =>
         {
-            var messageJson = Encoding.UTF8.GetString(ea.Body.Span);
+            MatchCompletedEvent? matchEvent;
+            try
+            {
+                matchEvent = JsonSerializer.Deserialize<MatchCompletedEvent>(ea.Body.Span, MatchEventJson.Options);
+            }
+            catch (JsonException ex)
+            {
+                // A message we can't read will never become readable, so drop it instead of requeueing it forever
+                _logger.LogError("Dropping unreadable match event: {Error} {Message}", ex.Message, Encoding.UTF8.GetString(ea.Body.Span));
+                await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken: stoppingToken);
+                return;
+            }
 
             try
             {
-                var matchEvent = JsonSerializer.Deserialize<MatchCompletedEvent>(messageJson);
-                if (matchEvent != null)
+                if (matchEvent is not null)
                 {
-                    RecordTelemetry(matchEvent);
+                    await RecordAsync(matchEvent, stoppingToken);
                 }
 
-                // Acknowledge the message was processed so RabbitMQ can delete it
+                // Acknowledge only after the history is saved, so a crash before this redelivers the event
                 await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
+                if (matchEvent is not null) _failedAttempts.Remove(matchEvent.MatchId);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
-                _logger.LogError(ex, "Failed to read match telemetry message: {Message}", messageJson);
-                // Drop malformed telemetry instead of requeueing it forever
-                await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken: stoppingToken);
+                // Usually the database is briefly unreachable, or another instance counted the same
+                // day at the same moment. Hand the event back to try again; nothing was saved.
+                var attempts = matchEvent is null ? MaxAttempts : _failedAttempts.GetValueOrDefault(matchEvent.MatchId) + 1;
+                if (attempts >= MaxAttempts)
+                {
+                    _failedAttempts.Remove(matchEvent?.MatchId ?? Guid.Empty);
+                    _logger.LogError(ex, "Giving up on match {MatchId} after {Attempts} tries.", matchEvent?.MatchId, attempts);
+                    await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken: stoppingToken);
+                    return;
+                }
+
+                _failedAttempts[matchEvent!.MatchId] = attempts;
+                _logger.LogWarning("Couldn't record match {MatchId} yet ({Error}); retrying (try {Attempts} of {Max}).",
+                    matchEvent.MatchId, ex.Message, attempts, MaxAttempts);
+                await Task.Delay(RequeueDelay, stoppingToken);
+                await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true, cancellationToken: stoppingToken);
             }
         };
 
@@ -116,16 +153,17 @@ public class MatchConsumerWorker : BackgroundService
         }
     }
 
-    private void RecordTelemetry(MatchCompletedEvent matchEvent)
+    private async Task RecordAsync(MatchCompletedEvent matchEvent, CancellationToken cancellationToken)
     {
-        // Telemetry only. Rewards are applied and saved by the API on the request thread,
+        // A fresh scope (and DbContext) per message, so a failed save can't leak into the next one.
+        // This only writes history and stats: rewards were settled by the API when the match ended,
         // so this worker must never touch Player balances.
-        var outcome = matchEvent.LoserId == GameMatch.AiBossId ? "PvE victory"
-            : matchEvent.WinnerId == GameMatch.AiBossId ? "PvE defeat"
-            : "PvP";
+        using var scope = _scopeFactory.CreateScope();
+        var projector = scope.ServiceProvider.GetRequiredService<MatchHistoryProjector>();
+        var result = await projector.ProjectAsync(matchEvent, cancellationToken);
 
-        _logger.LogInformation("📊 Match telemetry: {MatchId} ({Outcome}) winner {WinnerId}, loser {LoserId}",
-            matchEvent.MatchId, outcome, matchEvent.WinnerId, matchEvent.LoserId);
+        _logger.LogInformation("📊 Match {MatchId} ({Kind}) winner {WinnerId}: {Result}",
+            matchEvent.MatchId, matchEvent.Kind, matchEvent.WinnerId, result);
     }
 
     public override void Dispose()
