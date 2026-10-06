@@ -1,0 +1,29 @@
+# Dependabot opens pull requests for outdated or vulnerable dependencies. CI runs on each one,
+# and merging deploys as usual. Minor and patch updates are grouped to keep the noise down.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directories:
+      - /1.Core/*
+      - /2.Infrastructure/*
+      - /3.BackendAPI/*
+      - /4.Frontend/*
+      - /5.Tests/*
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      microsoft:
+        patterns: ["Microsoft.*", "System.*"]
+        update-types: [minor, patch]
+      everything-else:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

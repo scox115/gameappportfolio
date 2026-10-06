@@ -4,6 +4,8 @@
 
 **Deploy it to Azure:** see [docs/azure-deployment.md](docs/azure-deployment.md).
 
+**Security checks:** CI fails on any NuGet package with a known vulnerability, Dependabot opens weekly update PRs for NuGet packages and GitHub Actions, and CodeQL scans the C# code once the repository is public.
+
 ========================================================================
 🤖 AI COLLABORATION RESUME CHECKLIST: CLOUD-BACKED CARD ARENA APPS
 ========================================================================
