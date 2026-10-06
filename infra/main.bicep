@@ -19,6 +19,9 @@ param location string = resourceGroup().location
 @allowed(['westus2', 'centralus', 'eastus2', 'westeurope', 'eastasia'])
 param staticWebAppLocation string = 'eastus2'
 
+@description('Region for the SQL server and database. Some regions stop accepting new SQL servers on some subscriptions (RegionDoesNotAllowProvisioning), so it can differ from the rest.')
+param sqlLocation string = 'centralus'
+
 @description('Short lowercase name used to build every resource name.')
 @minLength(3)
 @maxLength(12)
@@ -159,8 +162,9 @@ resource apiWritesBlobs 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 // --- Database ---
 
 resource sqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = {
-  name: 'sql-${appName}-${suffix}'
-  location: location
+  // The region is part of the name, so moving the database never collides with a server left behind elsewhere.
+  name: 'sql-${appName}-${uniqueString(resourceGroup().id, sqlLocation)}'
+  location: sqlLocation
   tags: tags
   properties: {
     minimalTlsVersion: '1.2'
@@ -190,7 +194,7 @@ resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-prev
 resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
   parent: sqlServer
   name: databaseName
-  location: location
+  location: sqlLocation
   tags: tags
   sku: {
     name: 'GP_S_Gen5'
