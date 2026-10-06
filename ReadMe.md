@@ -1,32 +1,118 @@
+# ⚔️ Kings of the Card Arena
+
 [![CI](https://github.com/scox115/gameappportfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/scox115/gameappportfolio/actions/workflows/ci.yml)
+[![Deploy](https://github.com/scox115/gameappportfolio/actions/workflows/deploy.yml/badge.svg)](https://github.com/scox115/gameappportfolio/actions/workflows/deploy.yml)
+![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
+![Azure](https://img.shields.io/badge/Azure-Container%20Apps%20%7C%20SQL%20%7C%20Static%20Web%20Apps-0078D4)
 
-**Run it locally:** with Docker running, `dotnet run --project 6.Aspire/Game.AppHost` starts the database, storage, message broker, API and client, and opens the .NET Aspire dashboard. See [docs/local-development.md](docs/local-development.md).
+A turn-based card battler built with **ASP.NET Core, Blazor WebAssembly, SignalR and EF Core**, running in **Azure** on free tiers and deployed from GitHub Actions on every merge.
 
-**Deploy it to Azure:** see [docs/azure-deployment.md](docs/azure-deployment.md).
+It's a portfolio project, built the way a production service would be: clean architecture, server-authoritative game rules, passwordless cloud access, health checks, OpenTelemetry, a test pyramid from unit to browser to load tests, and an Architecture Decision Record for each significant decision.
 
-**API versioning:** every game route starts with `/api/v1`, so a breaking change can ship as v2 next to it; see [docs/api-versioning.md](docs/api-versioning.md).
+**▶ Play it: https://gray-coast-028faf70f.4.azurestaticapps.net**
+<sub>The API scales to zero when nobody is playing, so the first visit after a quiet spell can take a minute or two to wake up.</sub>
 
-**Caching:** leaderboards and stats are served from ASP.NET Core output caching and evicted the moment the data behind them is saved; see [Caching](docs/local-development.md#caching).
+| Town | Boss fight |
+| --- | --- |
+| ![Town dashboard](docs/images/town.png) | ![Boss fight](docs/images/boss-fight.png) |
+| **Live duel over SignalR** | **Gold Shop** |
+| ![PvP duel](docs/images/duel.png) | ![Gold Shop](docs/images/gold-shop.png) |
 
-**Load testing:** one API replica (0.5 CPU, 1 GiB) handles about 200 players fighting at once with a p95 of 203 ms; see [docs/load-testing.md](docs/load-testing.md).
+## The game
 
-**Security checks:** CI fails on any NuGet package with a known vulnerability, Dependabot opens weekly update PRs for NuGet packages and GitHub Actions, and CodeQL scans the C# code once the repository is public.
+- **Boss fights:** play Fireball, Holy Shield or Dragon Claw against a boss that announces its next move, enrages at low health and can resist, dodge or interrupt your cards. A Heroic boss unlocks once every card is fully upgraded.
+- **Live duels:** find an opponent with the same gold wager and fight turn by turn in real time, with 30-second turns. Results move an Elo rating.
+- **Progression:** three hero classes with their own perks, card upgrades and elixirs in the Gold Shop, daily bounties, win streaks, titles, cosmetic frames and card skins.
+- **Leaderboards:** overall and per class, with match history and daily arena stats.
 
-========================================================================
-🤖 AI COLLABORATION RESUME CHECKLIST: CLOUD-BACKED CARD ARENA APPS
-========================================================================
-Please adopt the role of a Senior .NET Architect. We are building a portfolio-grade game app called "Kings of the Card Arena" using an XML-based solution format (.slnx) and Clean Architecture folder boundaries. 
+## What it demonstrates
 
-The application utilizes a FREE, 100% open-source local cloud infrastructure stack running in Docker (Port 1433: SQL Server, Port 10000: Azurite Storage, Port 5672: RabbitMQ Broker) completely decoupled from paid enterprise packages (MassTransit has been stripped due to v9 licensing rules).
+| Area | How |
+| --- | --- |
+| **Architecture** | Clean Architecture: a framework-free domain (`Game.Core`) with rich entities, infrastructure behind interfaces, Minimal APIs on top ([ADR 0001](docs/adr/0001-clean-architecture.md)) |
+| **Game integrity** | The server rolls every die and the client only picks a card ([ADR 0002](docs/adr/0002-server-authoritative-battles.md)); optimistic concurrency stops lost gold ([ADR 0004](docs/adr/0004-optimistic-concurrency.md)); per-IP rate limits and anti-cheat rules on duels |
+| **Security** | ASP.NET Core Identity, 15-minute JWTs, rotating refresh tokens with reuse detection, one active browser per account ([ADR 0005](docs/adr/0005-identity-jwt-refresh-tokens.md)); avatar uploads checked by magic bytes and size |
+| **Real time** | SignalR hubs for duels and instant sign-out, with a background worker enforcing turn timeouts ([ADR 0006](docs/adr/0006-single-replica-signalr.md)) |
+| **Messaging** | RabbitMQ events build match history and daily stats; idempotent consumer, retries, and a game that keeps working if the broker is down ([ADR 0003](docs/adr/0003-rewards-synchronous-messaging-for-read-models.md)) |
+| **API design** | URL versioning with deprecation and sunset headers ([ADR 0009](docs/adr/0009-url-segment-api-versioning.md)), problem+json errors, Swagger per version |
+| **Performance** | Output caching evicted automatically by EF Core saves ([ADR 0010](docs/adr/0010-output-caching-with-tag-eviction.md)); load-tested at about 200 simultaneous players on 0.5 CPU ([report](docs/load-testing.md)) |
+| **Operations** | `/health/live` and `/health/ready`, OpenTelemetry traces and metrics to Application Insights, email alerts, a scheduled cleanup worker, feature flags you can flip in Azure without a deploy ([ADR 0011](docs/adr/0011-feature-flags.md)) |
+| **Cloud** | Bicep for every resource, GitHub OIDC (no stored Azure credentials), managed identity to SQL, Storage and Key Vault ([ADR 0008](docs/adr/0008-passwordless-azure-access.md)), all on free tiers ([ADR 0007](docs/adr/0007-free-tier-azure-hosting.md)) |
+| **Testing** | 260+ automated tests: domain, API, Aspire wiring, Playwright browser tests with axe-core WCAG 2.1 AA checks, and k6 load tests ([ADR 0012](docs/adr/0012-testing-strategy.md)) |
+| **Developer experience** | One command runs everything locally with .NET Aspire ([ADR 0013](docs/adr/0013-aspire-for-local-orchestration.md)); Dependabot and a vulnerable-package gate in CI |
 
-CURRENT STATE ARCHITECTURE CHECKLIST:
-1. [Core Project] Implements rich domain entities (Player, GameMatch) and an isolated MatchRulesEngine referee service with zero database or web dependencies.
-2. [Infrastructure Project] Hosts Entity Framework Core DbContext mapped via Fluent API configurations to active Docker containers. Implements IStorageService utilizing native Azure.Storage.Blobs SDK streaming models.
-3. [Backend API Project] Exposes lightweight Minimal API route groupings (PlayerEndpoints, MatchEndpoints) with CORS unlocked for local host traffic. Implements a native Microsoft.Extensions.Hosting BackgroundService (MatchConsumerWorker) that asynchronously pulls match telemetry packets off RabbitMQ channels. Gold and XP rewards are applied synchronously on the API request thread, never by the worker.
-4. [Frontend Blazor WASM] Hosts a unified single-page full-screen game UI client (Index.razor) driven entirely by a Scoped GameState state container service, eliminating slow browser URL parameter navigation reroutes. Features an active login/registration menu overlay, multi-part avatar binary cloud upload forms, and a responsive card battle loop canvas.
+## Architecture
 
-GOAL LOGPOINT: 
-Our full-stack pipeline builds with zero errors, connects to SQL, stores blobs in Azurite, and successfully publishes/consumes matching events over free RabbitMQ.
+```mermaid
+flowchart LR
+    player([Player's browser])
 
-Please acknowledge you understand this exact structural footprint, and ask me what feature (e.g., Ranked Leaderboards or xUnit Combat Math Test Engines) we are building next.
-========================================================================
+    subgraph azure[Azure, one resource group]
+        swa[Static Web Apps<br/>Blazor WebAssembly client]
+        subgraph aca[Container App, scales to zero]
+            api[ASP.NET Core API<br/>Minimal APIs + SignalR]
+            mq[(RabbitMQ<br/>sidecar)]
+        end
+        subgraph data[Data]
+            sql[(Azure SQL<br/>serverless free offer)]
+            blob[(Blob Storage<br/>avatars)]
+        end
+        subgraph platform[Platform services]
+            kv[Key Vault]
+            appcfg[App Configuration<br/>feature flags]
+            ai[Application Insights]
+        end
+    end
+
+    player -- downloads app --> swa
+    player -- HTTPS + WebSockets --> api
+    api <-->|match events| mq
+    api -- EF Core --> sql
+    api --> blob
+    api -.-> kv
+    api -.-> appcfg
+    api -. OpenTelemetry .-> ai
+```
+
+The API reaches SQL, Storage, Key Vault and App Configuration as a managed identity, so no connection string holds a password. GitHub Actions builds the API image, deploys `infra/main.bicep` and the client, then smoke-tests `/health/ready`. See [docs/azure-deployment.md](docs/azure-deployment.md).
+
+### Solution layout
+
+```
+1.Core/Game.Core                    Domain: entities, battle rules, rating, shop, events. No framework references.
+2.Infrastructure/Game.Infrastructure EF Core DbContext, migrations, Identity user, Blob storage, read-model projector
+3.BackendAPI/Game.Api               Minimal API endpoints, SignalR hubs, auth, workers, caching, health, telemetry
+4.Frontend/Game.Client              Blazor WebAssembly client
+5.Tests/                            Core, API, AppHost and Playwright browser tests
+6.Aspire/Game.AppHost               .NET Aspire orchestration for local runs
+infra/                              Bicep template and one-time Azure setup script
+loadtest/                           k6 load test and its Docker Compose environment
+docs/                               Guides and Architecture Decision Records
+```
+
+## Run it locally
+
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download) and [Docker Desktop](https://www.docker.com/products/docker-desktop/). Then:
+
+```powershell
+dotnet run --project 6.Aspire/Game.AppHost
+```
+
+That starts SQL Server, Azurite and RabbitMQ in Docker, the API on http://localhost:5005 and the client on http://localhost:5091, and opens the Aspire dashboard with logs, traces and metrics. In Visual Studio, set **Game.AppHost** as the startup project and press F5. The manual Docker Compose route is in [docs/local-development.md](docs/local-development.md).
+
+## Run the tests
+
+```powershell
+dotnet test --filter "Category!=Browser"   # domain, API and AppHost tests, no Docker needed
+dotnet test 5.Tests/Game.E2E.Tests          # Playwright browser tests (installs Chromium on first run)
+```
+
+The k6 load test is described in [docs/load-testing.md](docs/load-testing.md).
+
+## Documentation
+
+- [Architecture Decision Records](docs/adr/README.md): why it is built this way
+- [Local development](docs/local-development.md): running, settings, health, caching, feature flags
+- [Azure deployment](docs/azure-deployment.md): costs, security choices, one-time setup, troubleshooting
+- [API versioning](docs/api-versioning.md)
+- [Load testing](docs/load-testing.md): method and results
