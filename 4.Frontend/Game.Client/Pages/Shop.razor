@@ -7,9 +7,14 @@
 @* The Gold Shop: spend battle winnings on card upgrades, elixirs, titles and prestige cosmetics.
    The server sets every price and checks the player's gold; this page only shows the offers. *@
 <div style="max-width: 1000px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    @* The header stays pinned while the shelves scroll, so the way back to town is always in reach. *@
+    <div style="position: sticky; top: 0; z-index: 10; background: #1e293b; margin: -30px -30px 10px; padding: 20px 30px 15px; border-radius: 16px 16px 0 0; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
         <h2 style="margin: 0; color: #fbbf24;">🪙 Gold Shop</h2>
-        <span style="color: #fbbf24; font-weight: bold; font-size: 1.2rem;">You have @State.Gold gold</span>
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <span style="color: #fbbf24; font-weight: bold; font-size: 1.2rem;">You have @State.Gold gold</span>
+            <button @onclick="BackToTown"
+                    style="background: #334155; color: white; padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🏰 Back to Town</button>
+        </div>
     </div>
     <p style="color: #94a3b8; margin: 0 0 20px;">
         Upgrades make your cards stronger in boss fights and PvP duels. Titles show off your duel wins (you have @pvpWins).
@@ -105,11 +110,13 @@
         }
     }
 
-    <button @onclick="() => State.ChangeScreen(GameScreen.CharacterDashboard)"
+    <button @onclick="BackToTown"
             style="margin-top: 25px; background: #334155; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🏰 Back to Town</button>
 </div>
 
 @code {
+    private void BackToTown() => State.ChangeScreen(GameScreen.CharacterDashboard);
+
     private List<ShopOfferDto>? offers;
     private int pvpWins;
     private string? equippedTitle;
