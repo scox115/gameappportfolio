@@ -98,7 +98,7 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
     private sealed class NoStorage : IStorageService
     {
         public Task<string> UploadFileAsync(Stream fileStream, string fileName, string containerName, string contentType) =>
-            Task.FromResult($"https://storage.test/{containerName}/{fileName}");
+            Task.FromResult($"{ClientHost.AvatarOrigin}/{containerName}/{fileName}");
 
         public Task DeleteFileAsync(string fileUrl, string containerName) => Task.CompletedTask;
     }

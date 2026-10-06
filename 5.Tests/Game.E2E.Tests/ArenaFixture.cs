@@ -13,6 +13,10 @@ public sealed class ArenaFixture : IAsyncLifetime
 
     public string ClientUrl => _client!.BaseUrl;
 
+    public IReadOnlyDictionary<string, string> ClientHeaders => _client!.Headers;
+
+    public string ApiUrl => _api!.BaseUrl;
+
     public ApiHost.FeatureSwitches Features => _api!.Features;
 
     public async Task InitializeAsync()

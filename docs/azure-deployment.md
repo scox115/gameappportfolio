@@ -35,6 +35,7 @@ These are estimates. Set a [budget alert](https://learn.microsoft.com/azure/cost
 - **No Azure credentials in GitHub.** The workflow signs in with OpenID Connect. Only the `production` environment of this repository can sign in as the deploy app, and that app can only change the `rg-card-arena` resource group.
 - **Secrets live in Key Vault.** The JWT signing key and RabbitMQ password are passed from GitHub secrets to Key Vault, and the Container App reads them from there.
 - The API image is built by the .NET SDK on a chiseled Ubuntu base: no shell, no package manager, running as a non-root user.
+- **Security headers.** The game is served with a strict Content Security Policy: scripts only from the site itself, network calls only to the site and the API, and images only from the site and the avatar storage account. The deploy fills in those addresses and the hash of the one inline script that `dotnet publish` writes (`infra/set-client-csp.py`), then checks the live site sends the policy. Both the game and the API send HSTS, `nosniff` and anti-framing headers. See [ADR 0015](adr/0015-security-headers.md).
 
 ## One-time setup
 

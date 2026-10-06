@@ -24,6 +24,12 @@ public abstract class BrowserTest(ArenaFixture arena) : IAsyncLifetime
     {
         var context = await Arena.Browser.NewContextAsync(new() { ViewportSize = new() { Width = 1280, Height = 900 } });
         context.SetDefaultTimeout(30_000);
+        // Anything the Content Security Policy blocks is recorded for ContentSecurityPolicyTests.
+        await context.AddInitScriptAsync("""
+            window.__cspViolations = [];
+            document.addEventListener('securitypolicyviolation',
+                e => window.__cspViolations.push(`${e.effectiveDirective} blocked ${e.blockedURI}`));
+            """);
         _contexts.Add(context);
         return await context.NewPageAsync();
     }

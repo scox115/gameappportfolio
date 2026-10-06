@@ -31,7 +31,7 @@ It's a portfolio project, built the way a production service would be: clean arc
 | --- | --- |
 | **Architecture** | Clean Architecture: a framework-free domain (`Game.Core`) with rich entities, infrastructure behind interfaces, Minimal APIs on top ([ADR 0001](docs/adr/0001-clean-architecture.md)) |
 | **Game integrity** | The server rolls every die and the client only picks a card ([ADR 0002](docs/adr/0002-server-authoritative-battles.md)); optimistic concurrency stops lost gold ([ADR 0004](docs/adr/0004-optimistic-concurrency.md)); per-IP rate limits and anti-cheat rules on duels |
-| **Security** | ASP.NET Core Identity, 15-minute JWTs, rotating refresh tokens with reuse detection, one active browser per account ([ADR 0005](docs/adr/0005-identity-jwt-refresh-tokens.md)); avatar uploads checked by magic bytes and size |
+| **Security** | ASP.NET Core Identity, 15-minute JWTs, rotating refresh tokens with reuse detection, one active browser per account ([ADR 0005](docs/adr/0005-identity-jwt-refresh-tokens.md)); a strict Content Security Policy and HSTS, tested in the browser ([ADR 0015](docs/adr/0015-security-headers.md)); avatar uploads checked by magic bytes and size |
 | **Real time** | SignalR hubs for duels and instant sign-out, with a background worker enforcing turn timeouts ([ADR 0006](docs/adr/0006-single-replica-signalr.md)) |
 | **Messaging** | RabbitMQ events build match history and daily stats; idempotent consumer, retries, and a game that keeps working if the broker is down ([ADR 0003](docs/adr/0003-rewards-synchronous-messaging-for-read-models.md)) |
 | **API design** | URL versioning with deprecation and sunset headers ([ADR 0009](docs/adr/0009-url-segment-api-versioning.md)), problem+json errors, Swagger per version |
