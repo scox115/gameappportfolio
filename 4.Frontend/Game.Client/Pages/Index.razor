@@ -75,13 +75,13 @@
                     {
                         <!-- ONLY NEW HEROES PICK A CLASS; RETURNING HEROES KEEP THEIRS -->
                         <ClassPicker @bind-Selected="chosenClass" Heading="Choose your class:" />
-                        <button type="submit"
-                                style="width: 100%; background: #059669; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Create Hero</button>
+                        <button type="submit" disabled="@(!CredentialsEntered)"
+                                style="width: 100%; background: #059669; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: @(CredentialsEntered ? "pointer" : "not-allowed"); opacity: @(CredentialsEntered ? "1" : "0.5");">Create Hero</button>
                     }
                     else
                     {
-                        <button type="submit"
-                                style="width: 100%; background: #4f46e5; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Play Game</button>
+                        <button type="submit" disabled="@(!CredentialsEntered)"
+                                style="width: 100%; background: #4f46e5; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: @(CredentialsEntered ? "pointer" : "not-allowed"); opacity: @(CredentialsEntered ? "1" : "0.5");">Play Game</button>
                     }
                     </form>
                     <p style="text-align: center; color: #94a3b8; font-size: 0.9rem; margin: 18px 0 0;">
@@ -412,6 +412,9 @@
     {
         if (firstRender) await Sounds.LoadAsync();
     }
+
+    // Play Game / Create Hero stay disabled until both fields have something in them.
+    private bool CredentialsEntered => !string.IsNullOrWhiteSpace(inputUsername) && !string.IsNullOrEmpty(inputPassword);
 
     private Task SubmitCredentials() => creatingHero ? HandleRegister() : HandleLogin();
 
