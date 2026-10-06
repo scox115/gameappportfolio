@@ -149,6 +149,30 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
     }
 
     [Fact]
+    public async Task Winning_MovesRatingPointsFromTheLoserToTheWinner()
+    {
+        var (alice, bob, battleId) = await StartBattleAsync();
+        await using (alice)
+        await using (bob)
+        {
+            await alice.ForfeitAsync(battleId);
+
+            var bobUpdate = await bob.Updates.ReadAsync();
+            var aliceUpdate = await alice.Updates.ReadAsync();
+            var points = EloRating.PointsForWin(EloRating.StartingRating, EloRating.StartingRating);
+            Assert.Equal(points, bobUpdate.Reward!.RatingChange);
+            Assert.Equal(-points, aliceUpdate.Reward!.RatingChange);
+            Assert.Equal(EloRating.StartingRating + points, bobUpdate.Battle.You.Rating);
+            Assert.Equal(EloRating.StartingRating - points, bobUpdate.Battle.Opponent.Rating);
+
+            var aliceProfile = await alice.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+            Assert.Equal(EloRating.StartingRating - points, aliceProfile!.Rating);
+            Assert.Equal(1, aliceProfile.PvpLosses);
+            Assert.Equal(0, aliceProfile.PvpWins);
+        }
+    }
+
+    [Fact]
     public async Task RunningOutOfTime_LosesTheBattle()
     {
         var (alice, bob, battleId) = await StartBattleAsync();

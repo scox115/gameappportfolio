@@ -1,4 +1,5 @@
 using Game.Core.Battles;
+using Game.Core.Services;
 
 namespace Game.Core.Entities;
 
@@ -29,6 +30,12 @@ public class Player
 
     /// <summary>PvP duels won; titles in the Gold Shop unlock as this grows.</summary>
     public int PvpWins { get; private set; }
+
+    /// <summary>PvP duels lost.</summary>
+    public int PvpLosses { get; private set; }
+
+    /// <summary>Elo-style PvP rating; everyone starts at <see cref="EloRating.StartingRating"/>.</summary>
+    public int Rating { get; private set; } = EloRating.StartingRating;
 
     /// <summary>Titles bought in the Gold Shop.</summary>
     public IReadOnlyCollection<OwnedTitle> Titles => _titles;
@@ -84,7 +91,21 @@ public class Player
         Version = Guid.NewGuid();
     }
 
-    public void RecordPvpWin() => PvpWins++;
+    public void RecordPvpWin(int ratingGained)
+    {
+        if (ratingGained < 0) throw new ArgumentException("Rating gained cannot be negative.");
+        PvpWins++;
+        Rating += ratingGained;
+        Version = Guid.NewGuid();
+    }
+
+    public void RecordPvpLoss(int ratingLost)
+    {
+        if (ratingLost < 0) throw new ArgumentException("Rating lost cannot be negative.");
+        PvpLosses++;
+        Rating = Math.Max(EloRating.MinimumRating, Rating - ratingLost);
+        Version = Guid.NewGuid();
+    }
 
     public bool OwnsTitle(PlayerTitle title) => _titles.Any(t => t.Title == title);
 

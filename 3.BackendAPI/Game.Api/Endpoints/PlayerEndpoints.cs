@@ -95,12 +95,13 @@ public static class PlayerEndpoints
         // GET: /api/players/leaderboard
         group.MapGet("/leaderboard", async (AppDbContext dbContext) =>
         {
-            // Fetch the top 10 players ranked primarily by level, then by experience points
+            // Top 10 by PvP rating; level and experience break ties (such as players who haven't dueled yet)
             var topPlayers = await dbContext.Players
-                .OrderByDescending(p => p.Level)
+                .OrderByDescending(p => p.Rating)
+                .ThenByDescending(p => p.Level)
                 .ThenByDescending(p => p.ExperiencePoints)
                 .Take(10)
-                .Select(p => new { p.Id, p.Username, p.Level, p.Gold, p.AvatarUrl, p.EquippedTitle, p.PvpWins })
+                .Select(p => new { p.Id, p.Username, p.Level, p.Gold, p.AvatarUrl, p.EquippedTitle, p.PvpWins, p.PvpLosses, p.Rating })
                 .ToListAsync();
 
             return Results.Ok(topPlayers.Select(p => new
@@ -110,7 +111,9 @@ public static class PlayerEndpoints
                 title = p.EquippedTitle is { } title ? PlayerTitles.Get(title).Name : null,
                 level = p.Level,
                 gold = p.Gold,
+                rating = p.Rating,
                 pvpWins = p.PvpWins,
+                pvpLosses = p.PvpLosses,
                 avatarUrl = p.AvatarUrl
             }));
         });

@@ -218,6 +218,8 @@ public class PvpBattleService(
 
         var winnerGold = winner.Gold;
         var loserGold = loser.Gold;
+        var winnerRating = winner.Rating;
+        var loserRating = loser.Rating;
 
         var match = new GameMatch(battle.PlayerOneId, battle.PlayerTwoId);
         dbContext.Matches.Add(match);
@@ -226,8 +228,8 @@ public class PvpBattleService(
 
         var rewards = new Dictionary<Guid, BattleRewardResponse>
         {
-            [winnerId] = new(winner.Gold - winnerGold, MatchRulesEngine.WinExperience, PlayerProfileResponse.From(winner)),
-            [loserId] = new(loser.Gold - loserGold, MatchRulesEngine.LossExperience, PlayerProfileResponse.From(loser))
+            [winnerId] = new(winner.Gold - winnerGold, MatchRulesEngine.WinExperience, PlayerProfileResponse.From(winner), winner.Rating - winnerRating),
+            [loserId] = new(loser.Gold - loserGold, MatchRulesEngine.LossExperience, PlayerProfileResponse.From(loser), loser.Rating - loserRating)
         };
         return (match, rewards);
     }

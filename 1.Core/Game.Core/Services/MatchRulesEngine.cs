@@ -13,7 +13,8 @@ public class MatchRulesEngine
     /// Settles a PvP match between two registered players: finalizes the match and pays
     /// each player exactly once.
     /// </summary>
-    public void ProcessMatchWin(GameMatch match, Player winner, Player loser)
+    /// <returns>The rating points the winner gained and the loser lost.</returns>
+    public int ProcessMatchWin(GameMatch match, Player winner, Player loser)
     {
         ArgumentNullException.ThrowIfNull(match);
         ArgumentNullException.ThrowIfNull(winner);
@@ -26,12 +27,17 @@ public class MatchRulesEngine
 
         match.CompleteMatch(winner.Id);
 
+        var ratingChange = EloRating.PointsForWin(winner.Rating, loser.Rating);
+
         winner.AddGold(WinGold);
         winner.AddExperience(WinExperience);
-        winner.RecordPvpWin();
+        winner.RecordPvpWin(ratingChange);
 
         loser.AddGold(LossGold);
         loser.AddExperience(LossExperience);
+        loser.RecordPvpLoss(ratingChange);
+
+        return ratingChange;
     }
 
     /// <summary>
