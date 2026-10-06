@@ -103,6 +103,7 @@ jobs:
             ${{ vars.AZURE_SQL_ADMIN_GROUP }}
             ${{ vars.AZURE_SQL_ADMIN_GROUP_ID }}
             ${{ vars.AZURE_SQL_LOCATION }}
+            ${{ vars.CUSTOM_DOMAIN }}
             ${{ secrets.JWT_SIGNING_KEY }}
             ${{ secrets.RABBITMQ_PASSWORD }}
             ${{ secrets.GHCR_READ_TOKEN }}
@@ -122,6 +123,7 @@ jobs:
               sqlAdminGroupName="${{ vars.AZURE_SQL_ADMIN_GROUP }}" \
               sqlAdminGroupObjectId="${{ vars.AZURE_SQL_ADMIN_GROUP_ID }}" \
               sqlLocation="${{ vars.AZURE_SQL_LOCATION || 'centralus' }}" \
+              customDomain="${{ vars.CUSTOM_DOMAIN }}" \
               jwtSigningKey="$JWT_SIGNING_KEY" \
               rabbitMqPassword="$RABBITMQ_PASSWORD" \
               registryUsername="$registry_user" \
@@ -148,6 +150,7 @@ jobs:
         run: |
           echo "api=$(jq -r .apiUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
           echo "client=$(jq -r .clientUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "game=$(jq -r '(.gameUrl // .clientUrl).value' outputs.json)" >> "$GITHUB_OUTPUT"
           echo "swa=$(jq -r .staticWebAppName.value outputs.json)" >> "$GITHUB_OUTPUT"
 
       - name: Build the client against the deployed API
@@ -191,11 +194,11 @@ jobs:
           done
           curl --fail --silent --show-error "$api/health/ready" > /dev/null
           curl --fail --silent --show-error --output /dev/null "$client"
-          echo "client=$client" >> "$GITHUB_OUTPUT"
+          echo "client=${{ steps.infra.outputs.game }}" >> "$GITHUB_OUTPUT"
           {
             echo "### 🃏 Kings of the Card Arena is live"
             echo ""
-            echo "- Game: $client"
+            echo "- Game: ${{ steps.infra.outputs.game }}"
             echo "- API health: $api/health/ready"
           } >> "$GITHUB_STEP_SUMMARY"
 

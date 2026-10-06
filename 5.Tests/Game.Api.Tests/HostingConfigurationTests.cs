@@ -43,4 +43,37 @@ public class HostingConfigurationTests : IClassFixture<GameApiFactory>
         Assert.Equal("stcardarena", blobs.AccountName);
         Assert.False(blobs.CanGenerateAccountSasUri); // no shared key: it signs in with a token credential
     }
+
+    [Theory]
+    [InlineData("https://swa-cardarena.azurestaticapps.net")]
+    [InlineData("https://play.example.com")]
+    public async Task WithACustomDomain_BothClientAddressesMayCallTheApi(string origin)
+    {
+        using var hosted = _factory.WithWebHostBuilder(builder => builder
+            .UseSetting("Cors:AllowedOrigins:0", "https://swa-cardarena.azurestaticapps.net")
+            .UseSetting("Cors:AllowedOrigins:1", "https://play.example.com"));
+        using var client = hosted.CreateClient();
+
+        using var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/players/me");
+        preflight.Headers.Add("Origin", origin);
+        preflight.Headers.Add("Access-Control-Request-Method", "GET");
+        using var response = await client.SendAsync(preflight);
+
+        Assert.Equal(origin, Assert.Single(response.Headers.GetValues("Access-Control-Allow-Origin")));
+    }
+
+    [Fact]
+    public async Task AnUnlistedOrigin_IsNotAllowed()
+    {
+        using var hosted = _factory.WithWebHostBuilder(builder => builder
+            .UseSetting("Cors:AllowedOrigins:0", "https://swa-cardarena.azurestaticapps.net"));
+        using var client = hosted.CreateClient();
+
+        using var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/players/me");
+        preflight.Headers.Add("Origin", "https://evil.example.com");
+        preflight.Headers.Add("Access-Control-Request-Method", "GET");
+        using var response = await client.SendAsync(preflight);
+
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+    }
 }
