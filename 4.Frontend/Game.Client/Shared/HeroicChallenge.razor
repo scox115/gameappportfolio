@@ -1,0 +1,52 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+@* The Heroic boss: a much tougher fight for players who have upgraded every card as far as it
+   goes. The server checks the unlock and pays the reward; this only shows where the player stands. *@
+@if (status is null)
+{
+    return;
+}
+@if (status.heroicUnlocked)
+{
+    <button @onclick="OnFight"
+            title="A much tougher Shadow Overlord: more health, harder hits, and it enrages at half health."
+            style="width: 100%; background: linear-gradient(135deg, #b45309, #7c2d12); color: #fef3c7; padding: 15px; border: 2px solid #f59e0b; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(245,158,11,0.3);">
+        👑 FACE THE HEROIC BOSS
+    </button>
+    <p style="color: #fbbf24; font-size: 0.85rem; margin: 8px 0 0;">
+        @(status.heroicRewardAvailable
+            ? "Today's first Heroic win pays 300 gold and 150 XP."
+            : "Today's Heroic reward is claimed. Wins pay 25 gold until tomorrow.")
+    </p>
+}
+else
+{
+    <p style="color: #94a3b8; font-size: 0.85rem; margin: 15px 0 0;">
+        🔒 Upgrade all three cards to level 3 in the Gold Shop to unlock the Heroic boss.
+    </p>
+}
+
+@code {
+    [Parameter] public EventCallback OnFight { get; set; }
+
+    private HeroicStatusDto? status;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            status = await Http.GetFromJsonAsync<HeroicStatusDto>("/api/bounties");
+        }
+        catch (Exception)
+        {
+            // Without the status the button stays hidden; the normal boss still works.
+        }
+    }
+
+    private class HeroicStatusDto
+    {
+        public bool heroicUnlocked { get; set; }
+        public bool heroicRewardAvailable { get; set; }
+    }
+}

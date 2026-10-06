@@ -75,6 +75,9 @@ public class Player
     public int BossWinsToday { get; private set; }
     public DateOnly? BossWinsDay { get; private set; }
 
+    /// <summary>The last day the player won a full-reward Heroic boss fight.</summary>
+    public DateOnly? HeroicWinDay { get; private set; }
+
     /// <summary>Progress on today's daily bounties.</summary>
     public IReadOnlyCollection<BountyProgress> Bounties => _bounties;
 
@@ -268,6 +271,20 @@ public class Player
         }
         BossWinsToday++;
         return withinLimit;
+    }
+
+    /// <summary>The Heroic boss is for players who have upgraded every card as far as it goes.</summary>
+    public bool CanFightHeroicBoss => BattleCards.All.All(c => CardLevel(c.Card) == BattleCards.MaxLevel);
+
+    /// <summary>Only the first Heroic win each day pays the Heroic reward.</summary>
+    public bool HeroicRewardAvailable(DateOnly today) => HeroicWinDay != today;
+
+    /// <summary>Counts a Heroic boss win. Returns true when it's the first today and pays in full.</summary>
+    public bool RecordHeroicWin(DateOnly today)
+    {
+        if (!HeroicRewardAvailable(today)) return false;
+        HeroicWinDay = today;
+        return true;
     }
 
     public int CardLevel(BattleCard card) =>

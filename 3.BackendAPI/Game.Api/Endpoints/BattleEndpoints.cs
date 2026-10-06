@@ -22,8 +22,10 @@ public static class BattleEndpoints
                        .RequireAuthorization();
 
         // Enter the arena. Returns the player's unfinished battle if there is one, so leaving
-        // and coming back can't be used to re-roll a bad fight.
-        group.MapPost("/", async (ClaimsPrincipal user, AppDbContext dbContext, TimeProvider timeProvider) =>
+        // and coming back can't be used to re-roll a bad fight. ?difficulty=Heroic picks the
+        // Heroic boss, which needs every card fully upgraded.
+        group.MapPost("/", async (ClaimsPrincipal user, AppDbContext dbContext, TimeProvider timeProvider,
+            BossDifficulty difficulty = BossDifficulty.Normal) =>
         {
             var playerId = user.GetPlayerId();
 
@@ -40,8 +42,24 @@ public static class BattleEndpoints
                 return Results.NotFound("Player profile not found.");
             }
 
+            if (!Enum.IsDefined(difficulty))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(difficulty)] = ["Unknown difficulty."]
+                });
+            }
+
+            if (difficulty == BossDifficulty.Heroic && !player.CanFightHeroicBoss)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(difficulty)] = [$"Upgrade all three cards to level {BattleCards.MaxLevel} in the Gold Shop to face the Heroic boss."]
+                });
+            }
+
             // Upgrades bought in the Gold Shop come along, and a Battle Elixir is drunk now.
-            var battle = PveBattle.Start(playerId, timeProvider.GetUtcNow().UtcDateTime, player.TakeLoadoutForBossFight());
+            var battle = PveBattle.Start(playerId, timeProvider.GetUtcNow().UtcDateTime, player.TakeLoadoutForBossFight(), difficulty);
             dbContext.PveBattles.Add(battle);
             try
             {
@@ -110,11 +128,12 @@ public static class BattleEndpoints
                 var won = battle.Status == BattleStatus.Won;
                 match = GameMatch.CreatePve(player.Id);
                 dbContext.Matches.Add(match);
-                var earned = new MatchRulesEngine(timeProvider).ProcessPveMatch(match, player, won);
+                var earned = new MatchRulesEngine(timeProvider).ProcessPveMatch(match, player, won, battle.Difficulty);
                 battle.AttachMatch(match.Id);
 
                 var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-                reward = BattleRewardResponse.From(earned, player, isDuel: false, player.FullRewardBossWinsLeft(today));
+                reward = BattleRewardResponse.From(earned, player, isDuel: false,
+                    battle.Difficulty == BossDifficulty.Normal ? player.FullRewardBossWinsLeft(today) : null);
             }
 
             try

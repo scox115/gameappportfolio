@@ -167,6 +167,69 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task HeroicBoss_IsLockedUntilEveryCardIsMaxedOut()
+    {
+        var client = await SignedInClientAsync();
+
+        var response = await client.PostAsync("/api/battles/pve?difficulty=Heroic", null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var status = await client.GetFromJsonAsync<BountiesResponse>("/api/bounties", Json);
+        Assert.False(status!.HeroicUnlocked);
+    }
+
+    [Fact]
+    public async Task HeroicBoss_FirstWinTodayPaysTheHeroicReward_LaterWinsPayLess()
+    {
+        var client = await MaxedOutClientAsync();
+        var status = await client.GetFromJsonAsync<BountiesResponse>("/api/bounties", Json);
+        Assert.True(status!.HeroicUnlocked);
+        Assert.True(status.HeroicRewardAvailable);
+
+        var battle = await StartBattleAsync(client, "?difficulty=Heroic");
+        Assert.Equal(BossDifficulty.Heroic, battle.Difficulty);
+        Assert.Equal(BossProfile.Heroic.MaxHp, battle.BossHp);
+        Assert.Equal(BossProfile.Heroic.MaxHp, battle.BossMaxHp);
+        Assert.Equal(BossProfile.Heroic.Name, battle.BossName);
+
+        // Even with every roll going the hero's way, the Heroic boss needs a well-timed shield.
+        var first = await PlayUntilFinishedAsync(client, battle.Id, shieldWhenInDanger: true);
+        Assert.Equal(BattleStatus.Won, first.Battle.Status);
+        var bonuses = first.Reward!.StreakBonus + first.Reward.BountiesCompleted!.Sum(b => b.Reward);
+        Assert.Equal(MatchRulesEngine.HeroicWinGold + bonuses, first.Reward.GoldEarned);
+        Assert.Equal(MatchRulesEngine.HeroicWinExperience, first.Reward.ExperienceEarned);
+        Assert.False(first.Reward.ReducedBossReward);
+        Assert.Null(first.Reward.FullRewardBossWinsLeft);
+
+        var again = await StartBattleAsync(client, "?difficulty=Heroic");
+        var second = await PlayUntilFinishedAsync(client, again.Id, shieldWhenInDanger: true);
+        Assert.Equal(BattleStatus.Won, second.Battle.Status);
+        Assert.True(second.Reward!.ReducedBossReward);
+
+        // The normal boss's full-reward wins are untouched.
+        status = await client.GetFromJsonAsync<BountiesResponse>("/api/bounties", Json);
+        Assert.False(status!.HeroicRewardAvailable);
+        Assert.Equal(Player.FullRewardBossWinsPerDay, status.FullRewardBossWinsLeft);
+    }
+
+    // A hero who has bought every card upgrade in the Gold Shop.
+    private async Task<HttpClient> MaxedOutClientAsync()
+    {
+        var client = await SignedInClientAsync();
+        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+        await _factory.GiveGoldAsync(me!.Id, 2000);
+        foreach (var item in new[] { "FireballUpgrade", "HolyShieldUpgrade", "DragonClawUpgrade" })
+        {
+            for (var level = 1; level < BattleCards.MaxLevel; level++)
+            {
+                var bought = await client.PostAsJsonAsync("/api/shop/purchases", new { Item = item });
+                bought.EnsureSuccessStatusCode();
+            }
+        }
+        return client;
+    }
+
     private Task<HttpClient> SignedInClientAsync() => SignedInClientAsync(_factory);
 
     private static async Task<HttpClient> SignedInClientAsync(WebApplicationFactory<Program> factory)
@@ -180,9 +243,9 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         return client;
     }
 
-    private static async Task<BattleStateResponse> StartBattleAsync(HttpClient client)
+    private static async Task<BattleStateResponse> StartBattleAsync(HttpClient client, string query = "")
     {
-        var response = await client.PostAsync("/api/battles/pve", null);
+        var response = await client.PostAsync("/api/battles/pve" + query, null);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<BattleStateResponse>(Json))!;
     }
@@ -194,19 +257,23 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         return (await response.Content.ReadFromJsonAsync<PlayCardResponse>(Json))!;
     }
 
-    // Plays Dragon Claw whenever it is ready and Fireball while it recharges.
-    private static async Task<PlayCardResponse> PlayUntilFinishedAsync(HttpClient client, Guid battleId)
+    // Plays Dragon Claw whenever it is ready and Fireball while it recharges. With shieldWhenInDanger
+    // it raises Holy Shield when the boss's next move would finish the hero.
+    private static async Task<PlayCardResponse> PlayUntilFinishedAsync(HttpClient client, Guid battleId, bool shieldWhenInDanger = false)
     {
         BattleCard? recharging = null;
+        var inDanger = false;
         for (var turn = 0; turn < 50; turn++)
         {
-            var card = recharging == BattleCard.DragonClaw ? "Fireball" : "DragonClaw";
+            var card = shieldWhenInDanger && inDanger && recharging != BattleCard.HolyShield ? "HolyShield"
+                : recharging == BattleCard.DragonClaw ? "Fireball" : "DragonClaw";
             var result = await PlayAsync(client, battleId, card);
             if (result.Battle.Status != BattleStatus.InProgress)
             {
                 return result;
             }
             recharging = result.Battle.RechargingCard;
+            inDanger = result.Battle.BossNextAttack >= result.Battle.PlayerHp;
         }
 
         throw new InvalidOperationException("Battle did not finish within 50 turns.");

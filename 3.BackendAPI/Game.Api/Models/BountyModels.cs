@@ -8,8 +8,10 @@ public record BountyResponse(Bounty Bounty, string Name, int Goal, int Progress,
 /// <param name="ResetsAt">When today's bounties are replaced (midnight UTC).</param>
 /// <param name="StreakBonus">The extra gold the player's next win would pay.</param>
 /// <param name="FullRewardBossWinsLeft">Boss wins left today that pay the full reward, out of <paramref name="FullRewardBossWinsPerDay"/>.</param>
+/// <param name="HeroicUnlocked">Every card is fully upgraded, so the player can fight the Heroic boss.</param>
+/// <param name="HeroicRewardAvailable">The player hasn't yet claimed today's Heroic reward.</param>
 public record BountiesResponse(DateTime ResetsAt, int WinStreak, int StreakBonus, IReadOnlyList<BountyResponse> Bounties,
-    int FullRewardBossWinsLeft, int FullRewardBossWinsPerDay)
+    int FullRewardBossWinsLeft, int FullRewardBossWinsPerDay, bool HeroicUnlocked, bool HeroicRewardAvailable)
 {
     public static BountiesResponse For(Player player, DateTime now)
     {
@@ -23,6 +25,8 @@ public record BountiesResponse(DateTime ResetsAt, int WinStreak, int StreakBonus
                     Math.Min(b.Progress, b.Definition.Goal), b.Definition.Reward, b.Completed))
                 .ToList(),
             player.FullRewardBossWinsLeft(today),
-            Player.FullRewardBossWinsPerDay);
+            Player.FullRewardBossWinsPerDay,
+            player.CanFightHeroicBoss,
+            player.HeroicRewardAvailable(today));
     }
 }
