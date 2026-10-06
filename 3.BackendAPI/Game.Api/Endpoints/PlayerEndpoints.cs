@@ -4,6 +4,7 @@ using Game.Api.Models;
 using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Core.Interfaces;
+using Game.Core.Media;
 using Game.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +15,11 @@ public static class PlayerEndpoints
 {
     // TODO: move this
     // 1. Declare a typed form container at the bottom of the file or in your Models folder
+    private const string AvatarContainer = "player-avatars";
+
+    private static IResult AvatarProblem(string message) =>
+        Results.ValidationProblem(new Dictionary<string, string[]> { ["File"] = [message] });
+
     private class AvatarUploadModel
     {
         [FromForm]
@@ -61,7 +67,8 @@ public static class PlayerEndpoints
             ClaimsPrincipal user,
             [FromForm] AvatarUploadModel model, 
             AppDbContext dbContext,
-            IStorageService storageService) =>
+            IStorageService storageService,
+            ILoggerFactory loggerFactory) =>
         {
             // Check if the player exists in the SQL database first
             var player = await dbContext.Players.FindAsync(user.GetPlayerId());
@@ -70,27 +77,53 @@ public static class PlayerEndpoints
                 return Results.NotFound("Player profile not found.");
             }
 
-            // Double check that a physical file was attached
             if (model?.File is null || model.File.Length == 0)
             {
-                return Results.BadRequest("Invalid upload request. File content is missing.");
+                return AvatarProblem("Choose a PNG or JPG image to upload.");
             }
 
-            // --- 🚀 THE CRITICAL PIECE: OPEN THE ACTUAL FILE FILE STREAM ---
-            // This reads the raw binary image bytes from the browser upload request
-            using var stream = model.File.OpenReadStream();
+            if (model.File.Length > AvatarImage.MaxBytes)
+            {
+                return AvatarProblem("Portraits must be 5 MB or smaller.");
+            }
 
-            // Pass the raw byte stream and file name to the Azurite SDK client
-            // This physically saves the image inside your active Azurite Docker container
-            var uploadedBlobUrl = await storageService.UploadFileAsync(stream, model.File.FileName, "player-avatars");
+            // Read the upload (at most 5 MB) and decide its type from the bytes themselves. The file
+            // name and the browser's Content-Type are both up to the client, so neither is trusted.
+            using var content = new MemoryStream((int)model.File.Length);
+            await model.File.CopyToAsync(content);
+            var format = AvatarImage.Detect(content.GetBuffer().AsSpan(0, (int)content.Length));
+            if (format is null)
+            {
+                return AvatarProblem("Portraits must be PNG or JPG images.");
+            }
 
-            // Save the resulting cloud address string back to our SQL database row
+            content.Position = 0;
+            var uploadedBlobUrl = await storageService.UploadFileAsync(content, "avatar" + format.Extension, AvatarContainer, format.ContentType);
+
+            var previousUrl = player.AvatarUrl;
             player.UpdateAvatar(uploadedBlobUrl);
             await dbContext.SaveChangesAsync();
+
+            // The old portrait is no longer shown anywhere, so don't keep paying to store it.
+            if (previousUrl is not null)
+            {
+                try
+                {
+                    await storageService.DeleteFileAsync(previousUrl, AvatarContainer);
+                }
+                catch (Exception ex)
+                {
+                    loggerFactory.CreateLogger("Game.Api.Avatars")
+                        .LogWarning("Couldn't delete the old portrait for player {PlayerId}: {Error}", player.Id, ex.Message);
+                }
+            }
 
             return Results.Ok(new { PlayerId = player.Id, AvatarUrl = uploadedBlobUrl });
         })
         .RequireAuthorization()
+        .RequireRateLimiting(RateLimits.AvatarUpload)
+        // Turn away oversized bodies before they're read, leaving room for the multipart framing.
+        .WithMetadata(new RequestSizeLimitAttribute(AvatarImage.MaxBytes + 64 * 1024))
         .DisableAntiforgery();
 
         // GET: /api/players/stats

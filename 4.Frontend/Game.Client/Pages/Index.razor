@@ -531,9 +531,12 @@
                 selectedFile = null;
                 showPortraitPopup = false;
             }
-            else uploadError = res.StatusCode == HttpStatusCode.BadRequest
-                ? "That file couldn't be used. Pick a PNG or JPG under 5 MB."
-                : "Upload failed. Please try again.";
+            else uploadError = res.StatusCode switch
+            {
+                HttpStatusCode.BadRequest or HttpStatusCode.RequestEntityTooLarge => "That file couldn't be used. Pick a PNG or JPG under 5 MB.",
+                HttpStatusCode.TooManyRequests => "You've changed your portrait a lot recently. Please try again later.",
+                _ => "Upload failed. Please try again."
+            };
         }
         catch { uploadError = "Upload failed. Make sure the file is a PNG or JPG under 5 MB and try again."; }
         finally { uploading = false; }

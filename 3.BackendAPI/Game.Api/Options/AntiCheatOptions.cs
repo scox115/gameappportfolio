@@ -20,4 +20,8 @@ public class AntiCheatOptions
     /// <summary>Sign-in attempts allowed per IP address per minute.</summary>
     [Range(1, int.MaxValue)]
     public int SignInsPerMinute { get; set; } = 10;
+
+    /// <summary>Portrait uploads allowed per player per hour, so nobody can fill up blob storage.</summary>
+    [Range(1, int.MaxValue)]
+    public int AvatarUploadsPerHour { get; set; } = 10;
 }

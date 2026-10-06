@@ -24,6 +24,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -204,6 +206,14 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy(RateLimits.Registration, context => PerAddress(context, limits => limits.RegistrationsPerHour, TimeSpan.FromHours(1)));
     options.AddPolicy(RateLimits.SignIn, context => PerAddress(context, limits => limits.SignInsPerMinute, TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimits.AvatarUpload, context => RateLimitPartition.GetFixedWindowLimiter(
+        context.User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "anonymous",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = context.RequestServices.GetRequiredService<IOptions<AntiCheatOptions>>().Value.AvatarUploadsPerHour,
+            Window = TimeSpan.FromHours(1),
+            QueueLimit = 0
+        }));
     options.OnRejected = async (context, cancellationToken) =>
         await context.HttpContext.Response.WriteAsJsonAsync(
             new { message = "Too many attempts from your network. Please wait a little and try again." }, cancellationToken);
