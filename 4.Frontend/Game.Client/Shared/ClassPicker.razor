@@ -10,22 +10,22 @@
         {
             <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">@Heading</label>
         }
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
             @foreach (var option in classes.Where(c => c.id != Exclude))
             {
                 var selected = option.id == Selected;
-                <button type="button" @onclick="() => Pick(option.id)" title="@option.description"
+                var (ability, effect) = SplitAbility(option.description);
+                <button type="button" @onclick="() => Pick(option.id)"
                         aria-pressed="@(selected ? "true" : "false")"
-                        style="flex: 1; background: @(selected ? "#312e81" : "#0f172a"); color: white; padding: 10px 6px; border: 2px solid @(selected ? "#818cf8" : "#334155"); border-radius: 10px; cursor: pointer; font-weight: bold;">
-                    <div style="font-size: 1.4rem;">@HeroClassIcons.For(option.id)</div>
-                    @option.name
+                        style="display: flex; align-items: center; gap: 12px; text-align: left; background: @(selected ? "#312e81" : "#0f172a"); color: white; padding: 10px 12px; border: 2px solid @(selected ? "#818cf8" : "#334155"); border-radius: 10px; cursor: pointer;">
+                    <span style="font-size: 1.6rem;">@HeroClassIcons.For(option.id)</span>
+                    <span>
+                        <span style="display: block; font-weight: bold;">@option.name@(string.IsNullOrEmpty(ability) ? "" : $" · {ability}")</span>
+                        <span style="display: block; color: #94a3b8; font-size: 0.85rem;">@effect</span>
+                    </span>
                 </button>
             }
         </div>
-        @if (classes.FirstOrDefault(c => c.id == Selected) is { } picked)
-        {
-            <p style="color: #94a3b8; font-size: 0.85rem; margin: 8px 0 0;">@picked.description</p>
-        }
     </div>
 }
 
@@ -52,6 +52,15 @@
     }
 
     private Task Pick(string heroClass) => SelectedChanged.InvokeAsync(heroClass);
+
+    // Descriptions read "Ability Name: what it does".
+    private static (string ability, string effect) SplitAbility(string description)
+    {
+        var colon = description.IndexOf(':');
+        return colon > 0
+            ? (description[..colon], description[(colon + 1)..].Trim())
+            : ("", description);
+    }
 
     public class HeroClassDto
     {

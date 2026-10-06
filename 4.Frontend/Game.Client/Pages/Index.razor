@@ -23,6 +23,7 @@
                 <img src="@(string.IsNullOrEmpty(State.AvatarUrl) ? "https://dicebear.com" + State.Username : State.AvatarUrl)"
                      style="width: 35px; height: 35px; border-radius: 50%; @CosmeticStyles.Frame(State.Frame, 2, "2px solid #818cf8") object-fit: cover;" />
                 <span style="font-weight: bold; color: #f1f5f9;">@State.Username</span>
+                <span style="color: #c7d2fe; font-size: 0.9rem; white-space: nowrap;" title="Your class">@HeroClassIcons.For(State.HeroClass) @State.HeroClass</span>
                 <span style="color: #fbbf24; font-weight: bold;">🪙 @State.Gold</span>
 
 
@@ -245,7 +246,7 @@
                                                     <span title="Below @enrageBelowPercent% health the boss's attacks hit 50% harder." style="background: #7f1d1d; color: #fecaca; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem; margin-right: 12px;">😡 ENRAGED</span>
                                                 }
                                                 <span style="color: #ef4444; margin-right: 20px;">Boss HP: @enemyHp / @enemyMaxHp</span>
-                                                <span style="color: #3b82f6;">Your HP: @playerHp / @playerMaxHp</span>
+                                                <span style="color: #3b82f6;">@HeroClassIcons.For(State.HeroClass) Your HP: @playerHp / @playerMaxHp</span>
                                             </div>
                                         </div>
 
@@ -278,9 +279,14 @@
                                             {
                                                 var recharging = rechargingCard == card.Id;
                                                 var held = heldCards.FirstOrDefault(c => c.card == card.Id);
+                                                var signature = HeroClassIcons.SignatureCard(State.HeroClass) == card.Id;
                                                 <button @onclick="() => PlayTurn(card.Id)" disabled="@recharging"
-                                                        title="@card.Hint"
-                                                        style="background: @(recharging ? "#475569" : CosmeticStyles.CardBackground(State.CardSkin, card.Color)); width: 150px; height: 110px; border-radius: 12px; border: none; color: white; font-weight: bold; cursor: @(recharging ? "not-allowed" : "pointer"); opacity: @(recharging ? "0.6" : "1");">
+                                                        title="@(signature ? $"{State.HeroClass} signature card. {card.Hint}" : card.Hint)"
+                                                        style="background: @(recharging ? "#475569" : CosmeticStyles.CardBackground(State.CardSkin, card.Color)); width: 150px; height: 110px; border-radius: 12px; position: relative; border: @(signature ? "2px solid #c7d2fe" : "none"); color: white; font-weight: bold; cursor: @(recharging ? "not-allowed" : "pointer"); opacity: @(recharging ? "0.6" : "1");">
+                                                    @if (signature)
+                                                    {
+                                                        <span style="position: absolute; top: 4px; right: 6px; font-size: 0.85rem;">@HeroClassIcons.For(State.HeroClass)</span>
+                                                    }
                                                     @card.Icon @card.Label@(held is { level: > 1 } ? $" ★{held.level}" : "")<br /><small>@(held is null ? card.Effect : ArenaCards.EffectOf(held.damage, held.heal))</small><br />
                                                     <small style="font-weight: normal;">@(recharging ? "⏳ Recharging" : held is null ? card.Risk : ArenaCards.RiskOf(card.Id, held.failChance))</small>
                                                 </button>
