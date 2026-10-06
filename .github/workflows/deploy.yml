@@ -65,6 +65,8 @@ jobs:
             -p:ContainerImageTags="\"$tag;latest\"" \
             -p:ContainerFamily=noble-chiseled-extra \
             -p:Version="1.0.${GITHUB_RUN_NUMBER}" -p:SourceRevisionId="$HEAD_SHA"
+          # Fill in the Content Security Policy: the API, the avatar storage and this build's import map hash.
+          python3 infra/set-client-csp.py out/client/wwwroot "${{ steps.infra.outputs.api }}" "${{ steps.infra.outputs.avatars }}"
           echo "name=ghcr.io/$repository:$tag" >> "$GITHUB_OUTPUT"
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -156,12 +158,15 @@ jobs:
           echo "client=$(jq -r .clientUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
           echo "game=$(jq -r '(.gameUrl // .clientUrl).value' outputs.json)" >> "$GITHUB_OUTPUT"
           echo "swa=$(jq -r .staticWebAppName.value outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "avatars=https://$(jq -r .storageAccount.value outputs.json).blob.core.windows.net" >> "$GITHUB_OUTPUT"
 
       - name: Build the client against the deployed API
         run: |
           echo "{ \"ApiBaseUrl\": \"${{ steps.infra.outputs.api }}\" }" > 4.Frontend/Game.Client/wwwroot/appsettings.Production.json
           dotnet publish 4.Frontend/Game.Client/Game.Client.csproj -c Release -o out/client \
             -p:Version="1.0.${GITHUB_RUN_NUMBER}" -p:SourceRevisionId="$HEAD_SHA"
+          # Fill in the Content Security Policy: the API, the avatar storage and this build's import map hash.
+          python3 infra/set-client-csp.py out/client/wwwroot "${{ steps.infra.outputs.api }}" "${{ steps.infra.outputs.avatars }}"
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
@@ -198,6 +203,8 @@ jobs:
           done
           curl --fail --silent --show-error "$api/health/ready" > /dev/null
           curl --fail --silent --show-error --output /dev/null "$client"
+          curl --fail --silent --show-error --dump-header - --output /dev/null "$client" | grep -i "^content-security-policy: default-src 'self'" \
+            || { echo "::error::The client is served without its Content Security Policy."; exit 1; }
           echo "client=${{ steps.infra.outputs.game }}" >> "$GITHUB_OUTPUT"
           {
             echo "### 🃏 Kings of the Card Arena is live"

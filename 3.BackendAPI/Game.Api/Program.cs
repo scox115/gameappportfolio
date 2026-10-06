@@ -17,6 +17,7 @@ using Game.Api.Hubs;
 using Game.Api.Versioning;
 using Game.Api.Caching;
 using Game.Api.Features;
+using Game.Api.Security;
 using Microsoft.AspNetCore.SignalR;
 using Game.Api.Messaging;
 using Game.Core.Battles;
@@ -293,7 +294,13 @@ builder.Services.AddOptions<CleanupOptions>()
 builder.Services.AddScoped<DataCleanupService>();
 builder.Services.AddHostedService<DataCleanupWorker>();
 
+// Security headers on every response, and HSTS outside Development.
+builder.Services.AddGameSecurityHeaders();
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false); // don't advertise the server
+
 var app = builder.Build();
+
+app.UseGameSecurityHeaders();
 
 // Unhandled exceptions become a 500 problem-details response instead of an empty body or stack trace,
 // and bare error status codes (404, 405...) get a problem-details body too.
@@ -308,6 +315,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseForwardedHeaders();
+if (!app.Environment.IsDevelopment())
+{
+    // After UseForwardedHeaders, so a request that reached Azure over HTTPS counts as HTTPS.
+    // Browsers then refuse plain HTTP to the API for a year.
+    app.UseHsts();
+}
 app.UseHttpsRedirection();
 
 // --- 🚀 ACTIVATE CORS MIDDLEWARE ---

@@ -1,12 +1,22 @@
 {
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/_framework/*", "/css/*", "/js/*", "/lib/*", "*.{png,ico,svg,json,wasm,dll,dat,blat,js,css}"]
+    "exclude": [
+      "/_framework/*",
+      "/css/*",
+      "/js/*",
+      "/lib/*",
+      "*.{png,ico,svg,json,wasm,dll,dat,blat,js,css}"
+    ]
   },
   "globalHeaders": {
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' __IMPORTMAP_HASH__; style-src 'self' 'unsafe-inline'; img-src 'self' data: __AVATAR_ORIGIN__; connect-src 'self' __API_ORIGIN__ __API_WS_ORIGIN__; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    "Strict-Transport-Security": "max-age=31536000",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    "X-Frame-Options": "DENY"
+    "X-Frame-Options": "DENY",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "Cross-Origin-Opener-Policy": "same-origin"
   },
   "mimeTypes": {
     ".wasm": "application/wasm",

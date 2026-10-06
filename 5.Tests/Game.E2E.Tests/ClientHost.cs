@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -12,7 +15,9 @@ using Microsoft.Extensions.Logging;
 namespace Game.E2E.Tests;
 
 // Serves the published Blazor client the way Azure Static Web Apps does: static files, with
-// index.html for any other path. Its appsettings.json points the game at the test API.
+// index.html for any other path, and every response carrying the globalHeaders from
+// staticwebapp.config.json, Content Security Policy included. Its appsettings.json points the
+// game at the test API.
 public sealed class ClientHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
@@ -24,6 +29,12 @@ public sealed class ClientHost : IAsyncDisposable
     }
 
     public string BaseUrl { get; }
+
+    /// <summary>Where the test API says uploaded portraits live (see ApiHost's storage stand-in).</summary>
+    public const string AvatarOrigin = "https://storage.test";
+
+    /// <summary>The headers every response carries, as Static Web Apps would send them.</summary>
+    public IReadOnlyDictionary<string, string> Headers { get; private init; } = new Dictionary<string, string>();
 
     public static async Task<ClientHost> StartAsync(string wwwroot, int port, string apiBaseUrl)
     {
@@ -37,6 +48,16 @@ public sealed class ClientHost : IAsyncDisposable
         settings["ApiBaseUrl"] = apiBaseUrl;
         var settingsJson = settings.ToJsonString();
 
+        var headers = await GlobalHeadersAsync(wwwroot, apiBaseUrl);
+        app.Use((context, next) =>
+        {
+            foreach (var (name, value) in headers)
+            {
+                context.Response.Headers[name] = value;
+            }
+            return next(context);
+        });
+
         app.MapGet("/appsettings.json", () => Results.Text(settingsJson, "application/json"));
         var files = new PhysicalFileProvider(wwwroot);
         app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
@@ -49,7 +70,25 @@ public sealed class ClientHost : IAsyncDisposable
         app.MapFallbackToFile("index.html", new StaticFileOptions { FileProvider = files });
 
         await app.StartAsync();
-        return new ClientHost(app, baseUrl);
+        return new ClientHost(app, baseUrl) { Headers = headers };
+    }
+
+    // Fills in the policy's deploy-time placeholders the same way infra/set-client-csp.py does.
+    private static async Task<Dictionary<string, string>> GlobalHeadersAsync(string wwwroot, string apiBaseUrl)
+    {
+        var config = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(wwwroot, "staticwebapp.config.json")))!;
+        var headers = config["globalHeaders"]!.AsObject().ToDictionary(h => h.Key, h => h.Value!.GetValue<string>());
+
+        var index = await File.ReadAllTextAsync(Path.Combine(wwwroot, "index.html"));
+        var importMap = Regex.Match(index, "<script type=\"importmap\">(.*?)</script>", RegexOptions.Singleline).Groups[1].Value;
+        var api = new Uri(apiBaseUrl).GetLeftPart(UriPartial.Authority);
+
+        headers["Content-Security-Policy"] = headers["Content-Security-Policy"]
+            .Replace("__API_ORIGIN__", api)
+            .Replace("__API_WS_ORIGIN__", "ws" + api["http".Length..])
+            .Replace("__AVATAR_ORIGIN__", AvatarOrigin)
+            .Replace("__IMPORTMAP_HASH__", $"'sha256-{Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(importMap)))}'");
+        return headers;
     }
 
     /// <summary>
