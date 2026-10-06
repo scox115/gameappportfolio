@@ -51,7 +51,7 @@
                 <!-- RENDERS LOGIN / ACCOUNT CREATION SIMULTANEOUSLY -->
                 <div
                     style="max-width: 450px; margin: 60px auto; background: #1e293b; padding: 35px; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
-                    <h3 style="text-align: center; margin-top: 0; color: #f1f5f9;">Enter the Realm</h3>
+                    <h3 style="text-align: center; margin-top: 0; color: #f1f5f9;">@(creatingHero ? "Create a New Hero" : "Enter the Realm")</h3>
                 
                     <div style="margin-bottom: 20px; margin-top: 25px;">
                         <label
@@ -64,20 +64,28 @@
                     <div style="margin-bottom: 20px;">
                         <label
                             style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Password:</label>
-                            <input type="password" @bind="inputPassword" placeholder="At least 8 characters..." autocomplete="current-password"
+                            <input type="password" @bind="inputPassword" placeholder="At least 8 characters..." autocomplete="@(creatingHero ? "new-password" : "current-password")"
                                    style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
                         </div>
 
-                    <!-- NEW HEROES PICK A CLASS; SIGNING IN KEEPS THE CLASS ALREADY CHOSEN -->
-                    <ClassPicker @bind-Selected="chosenClass" Heading="Class (for new heroes):" />
-
-                        <div style="display: flex; gap: 15px;">
-                            <button @onclick="HandleLogin"
-                                    style="flex: 1; background: #4f46e5; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Play
-                                Game</button>
-                                <button @onclick="HandleRegister"
-                                        style="flex: 1; background: #059669; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Register</button>
-                            </div>
+                    @if (creatingHero)
+                    {
+                        <!-- ONLY NEW HEROES PICK A CLASS; RETURNING HEROES KEEP THEIRS -->
+                        <ClassPicker @bind-Selected="chosenClass" Heading="Choose your class:" />
+                        <button @onclick="HandleRegister"
+                                style="width: 100%; background: #059669; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Create Hero</button>
+                    }
+                    else
+                    {
+                        <button @onclick="HandleLogin"
+                                style="width: 100%; background: #4f46e5; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Play Game</button>
+                    }
+                    <p style="text-align: center; color: #94a3b8; font-size: 0.9rem; margin: 18px 0 0;">
+                        @(creatingHero ? "Already have a hero?" : "New to the arena?")
+                        <button @onclick="ToggleCreatingHero" style="background: transparent; border: none; color: #818cf8; cursor: pointer; font-weight: bold; text-decoration: underline; font-size: 0.9rem;">
+                            @(creatingHero ? "Sign in" : "Create a new hero")
+                        </button>
+                    </p>
 
                             @if (!string.IsNullOrEmpty(statusMsg) || !string.IsNullOrEmpty(State.SignOutReason))
                             {
@@ -333,6 +341,13 @@
     private string inputUsername = string.Empty;
     private string inputPassword = string.Empty;
     private string chosenClass = "Sorcerer";
+    private bool creatingHero; // The sign-in screen is creating a new hero rather than signing in
+
+    private void ToggleCreatingHero()
+    {
+        creatingHero = !creatingHero;
+        statusMsg = string.Empty;
+    }
     private string statusMsg = string.Empty;
     private bool uploading = false;
     private IBrowserFile? selectedFile;
@@ -419,6 +434,7 @@
 
         statusMsg = string.Empty;
         inputPassword = string.Empty;
+        creatingHero = false;
         State.UpdateClass(auth.player.@class);
         State.SetPlayerSession(new SessionTokens(auth.accessToken, auth.expiresAt, auth.refreshToken), auth.player.id, auth.player.username, auth.player.gold, auth.player.level, auth.player.avatarUrl);
         State.UpdateCosmetics(auth.player.frame, auth.player.cardSkin);
