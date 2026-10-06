@@ -5,4 +5,5 @@ public static class RateLimits
 {
     public const string Registration = "registration";
     public const string SignIn = "sign-in";
+    public const string AvatarUpload = "avatar-upload";
 }

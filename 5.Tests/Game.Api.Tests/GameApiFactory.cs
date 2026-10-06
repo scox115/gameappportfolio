@@ -1,6 +1,7 @@
 using Game.Api.Messaging;
 using Game.Api.Workers;
 using Game.Core.Battles;
+using Game.Core.Interfaces;
 using Game.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -18,6 +19,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
 
     /// <summary>The API's clock; tests move it forward to run out a turn timer.</summary>
     public TestClock Clock { get; } = new();
+
+    /// <summary>Stands in for blob storage and records what was uploaded and deleted.</summary>
+    public FakeStorageService Storage { get; } = new();
 
     /// <summary>Tops up a player's gold, for tests that need more than a new hero starts with.</summary>
     public async Task GiveGoldAsync(Guid playerId, int amount)
@@ -38,6 +42,7 @@ public class GameApiFactory : WebApplicationFactory<Program>
         // Every test client shares one address, so lift the per-address limits (RateLimitTests sets its own).
         builder.UseSetting("AntiCheat:RegistrationsPerHour", "100000");
         builder.UseSetting("AntiCheat:SignInsPerMinute", "100000");
+        builder.UseSetting("AntiCheat:AvatarUploadsPerHour", "100000");
         builder.UseSetting("RabbitMq:UserName", "test");
         builder.UseSetting("RabbitMq:Password", "test");
         builder.UseSetting("Jwt:SigningKey", "integration-tests-signing-key-that-is-long-enough");
@@ -60,6 +65,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
+
+            services.RemoveAll<IStorageService>();
+            services.AddSingleton<IStorageService>(Storage);
         });
     }
 }
@@ -68,6 +76,29 @@ public class GameApiFactory : WebApplicationFactory<Program>
 public class FixedBattleRandom(bool lucky = true) : IBattleRandom
 {
     public int Next(int minInclusive, int maxExclusive) => lucky ? minInclusive : maxExclusive - 1;
+}
+
+public class FakeStorageService : IStorageService
+{
+    public record StoredFile(string Url, string ContentType, byte[] Content);
+
+    public List<StoredFile> Uploaded { get; } = [];
+    public List<string> Deleted { get; } = [];
+
+    public Task<string> UploadFileAsync(Stream fileStream, string fileName, string containerName, string contentType)
+    {
+        using var copy = new MemoryStream();
+        fileStream.CopyTo(copy);
+        var url = $"https://storage.test/{containerName}/{Guid.NewGuid()}_{fileName}";
+        lock (Uploaded) Uploaded.Add(new StoredFile(url, contentType, copy.ToArray()));
+        return Task.FromResult(url);
+    }
+
+    public Task DeleteFileAsync(string fileUrl, string containerName)
+    {
+        lock (Deleted) Deleted.Add(fileUrl);
+        return Task.CompletedTask;
+    }
 }
 
 public class TestClock : TimeProvider
