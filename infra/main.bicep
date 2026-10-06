@@ -56,6 +56,9 @@ param registryUsername string = ''
 @description('Token with read:packages for that user. Leave empty if the package is public.')
 param registryPassword string = ''
 
+@description('Optional address for the game, such as play.example.com. Add a CNAME record pointing it at the Static Web App\'s default host name first; leave empty to use only the default address.')
+param customDomain string = ''
+
 var suffix = uniqueString(resourceGroup().id)
 var tags = { app: 'kings-of-the-card-arena' }
 var databaseName = 'GameDb'
@@ -225,6 +228,15 @@ resource client 'Microsoft.Web/staticSites@2023-12-01' = {
   properties: {}
 }
 
+// Azure checks the CNAME record and then issues and renews a free certificate for the domain.
+resource clientDomain 'Microsoft.Web/staticSites/customDomains@2023-12-01' = if (!empty(customDomain)) {
+  parent: client
+  name: customDomain
+  properties: {
+    validationMethod: 'cname-delegation'
+  }
+}
+
 // --- API ---
 
 resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
@@ -294,19 +306,21 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'api'
           image: apiImage
           resources: { cpu: json('0.5'), memory: '1Gi' }
-          env: [
+          env: concat([
             { name: 'ASPNETCORE_ENVIRONMENT', value: 'Production' }
             { name: 'AZURE_CLIENT_ID', value: apiIdentity.properties.clientId }
             { name: 'ConnectionStrings__DefaultConnection', value: sqlConnectionString }
             { name: 'ConnectionStrings__AzureBlobStorage', value: storage.properties.primaryEndpoints.blob }
-            { name: 'Cors__AllowedOrigins__0', value: 'https://${client.properties.defaultHostname}' }
             { name: 'Jwt__SigningKey', secretRef: 'jwt-signing-key' }
             { name: 'RabbitMq__HostName', value: '127.0.0.1' }
             { name: 'RabbitMq__UserName', value: 'cardarena' }
             { name: 'RabbitMq__Password', secretRef: 'rabbitmq-password' }
             { name: 'ForwardedHeaders__TrustAllProxies', value: 'true' }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
-          ]
+            { name: 'Cors__AllowedOrigins__0', value: 'https://${client.properties.defaultHostname}' }
+          ], empty(customDomain) ? [] : [
+            { name: 'Cors__AllowedOrigins__1', value: 'https://${customDomain}' }
+          ])
           probes: [
             {
               // Database migrations run before the API starts listening, and a paused database can
@@ -362,6 +376,7 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
 
 output apiUrl string = 'https://${api.properties.configuration.ingress.fqdn}'
 output clientUrl string = 'https://${client.properties.defaultHostname}'
+output gameUrl string = empty(customDomain) ? 'https://${client.properties.defaultHostname}' : 'https://${customDomain}'
 output staticWebAppName string = client.name
 output apiContainerAppName string = api.name
 output sqlServer string = sqlServer.properties.fullyQualifiedDomainName

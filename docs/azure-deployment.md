@@ -77,6 +77,22 @@ You need an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/
   2. Connect to `<sql-server-name>.database.windows.net` with **Microsoft Entra MFA** authentication as yourself. You are in the admin group.
 - **Tear it all down:** `az group delete --name rg-card-arena`. The Entra group and deploy app stay; delete them in Entra ID if you're done for good.
 
+## Custom domain (optional)
+
+The game always answers on its `*.azurestaticapps.net` address. To give it your own address as well:
+
+1. Buy a domain from any registrar if you don't have one. Cloudflare and Porkbun sell `.com` domains for about $10 a year.
+2. At your DNS provider, add a **CNAME** record. Use a subdomain such as `play` or `www` as the name, and the
+   Static Web App's default host name (the "Game" address in a deploy's summary, without `https://`) as the value.
+   On Cloudflare, set the record to **DNS only** (grey cloud).
+3. Check that it resolves: `Resolve-DnsName play.example.com` in PowerShell should show the CNAME.
+4. In GitHub, add a repository variable `CUSTOM_DOMAIN` with the full name, for example `play.example.com`,
+   then run **Deploy to Azure** from the Actions tab. Changing the variable makes the deploy re-apply the infrastructure.
+5. Azure validates the record and issues a free certificate that renews itself. HTTPS on the new address can take
+   10 to 20 minutes to start working. The API accepts requests from both addresses.
+
+Use a subdomain: a bare domain like `example.com` needs a different kind of validation that this setup doesn't do.
+
 ## Troubleshooting
 
 - **`AADSTS700213: No matching federated identity record found`** when the workflow signs in to Azure:
@@ -87,3 +103,6 @@ You need an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/
   region for your subscription. The database defaults to `centralus`; to use another region, add a
   repository variable `AZURE_SQL_LOCATION` (for example `westus2` or `northcentralus`) and run the
   workflow again. The rest of the app stays where it is.
+- **The deploy fails on the custom domain** (`CNAME Record is invalid` or similar): the CNAME record doesn't
+  resolve to the Static Web App yet. Check it with `Resolve-DnsName`, wait for DNS to update, and run the workflow
+  again. Clear the `CUSTOM_DOMAIN` variable to deploy without it.
