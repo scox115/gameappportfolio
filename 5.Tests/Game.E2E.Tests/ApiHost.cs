@@ -1,3 +1,4 @@
+using Game.Api.Caching;
 using Game.Api.Messaging;
 using Game.Api.Workers;
 using Game.Core.Battles;
@@ -47,7 +48,9 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
         {
             RemoveAll<DbContextOptions<AppDbContext>>(services);
             RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>(services);
-            services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_databaseName));
+            services.AddDbContext<AppDbContext>((sp, options) => options
+                .UseInMemoryDatabase(_databaseName)
+                .AddOutputCacheEviction(sp));
 
             services.Remove(services.Single(d => d.ImplementationType == typeof(MatchConsumerWorker)));
             services.Remove(services.Single(d => d.ImplementationType == typeof(MatchTelemetrySender)));

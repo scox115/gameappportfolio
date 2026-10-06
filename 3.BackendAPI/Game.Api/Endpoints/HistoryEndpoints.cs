@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Game.Api.Auth;
+using Game.Api.Caching;
 using Game.Api.Models;
 using Game.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +48,7 @@ public static class HistoryEndpoints
                 .Select(offset => today.AddDays(-offset))
                 .Select(day => stored.TryGetValue(day, out var s) ? DailyArenaStatsResponse.From(s) : DailyArenaStatsResponse.Empty(day)));
         })
-        .WithTags("Arena");
+        .WithTags("Arena")
+        .CacheOutput(OutputCaching.Policies.ArenaStats);
     }
 }

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Game.Api.Auth;
+using Game.Api.Caching;
 using Game.Api.Models;
 using Game.Core.Battles;
 using Game.Infrastructure.Data;
@@ -14,7 +15,8 @@ public static class ClassEndpoints
         // The playable classes, for the sign-up screen and the class switcher.
         app.MapGet("/classes", () => Results.Ok(HeroClasses.All.Select(HeroClassResponse.From).ToList()))
            .WithTags("Classes")
-           .AllowAnonymous();
+           .AllowAnonymous()
+           .CacheOutput(OutputCaching.Policies.Classes);
 
         // Switches the signed-in hero to another class for gold.
         app.MapPut("/players/me/class", async (ChangeClassRequest request, ClaimsPrincipal user, AppDbContext dbContext) =>

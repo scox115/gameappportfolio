@@ -6,6 +6,8 @@
 
 **API versioning:** every game route starts with `/api/v1`, so a breaking change can ship as v2 next to it; see [docs/api-versioning.md](docs/api-versioning.md).
 
+**Caching:** leaderboards and stats are served from ASP.NET Core output caching and evicted the moment the data behind them is saved; see [Caching](docs/local-development.md#caching).
+
 **Load testing:** one API replica (0.5 CPU, 1 GiB) handles about 200 players fighting at once with a p95 of 203 ms; see [docs/load-testing.md](docs/load-testing.md).
 
 **Security checks:** CI fails on any NuGet package with a known vulnerability, Dependabot opens weekly update PRs for NuGet packages and GitHub Actions, and CodeQL scans the C# code once the repository is public.

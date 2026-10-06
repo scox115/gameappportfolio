@@ -103,6 +103,14 @@ Both are written in one `SaveChanges`, and the message is acknowledged only afte
 - Traces, metrics and logs go out over OpenTelemetry. Open the dashboard at http://localhost:18888 to see each request's trace, the `game.battles.completed` and `game.telemetry.*` counters, and structured logs. Without `OTEL_EXPORTER_OTLP_ENDPOINT` set, nothing is exported.
 - Errors come back as [problem details](https://www.rfc-editor.org/rfc/rfc9457) JSON with a `traceId` you can search for in the dashboard.
 
+### Caching
+
+The leaderboards, the player count, the arena stats and the class list are the same for every player, so the API caches them with [output caching](https://learn.microsoft.com/aspnet/core/performance/caching/output) instead of querying SQL on every visit (`3.BackendAPI/Game.Api/Caching/OutputCaching.cs`). They are cached even for signed-in players, which the built-in policy would refuse, because none of them depends on who is asking. Personal endpoints such as `/players/me` are never cached.
+
+A cached response stays fresh because saving a change evicts it: an EF Core interceptor notices when a save touches `Players` or `DailyArenaStats` and evicts the responses tagged with them, so a new rating shows on the leaderboard straight away. Each entry also expires after a minute (an hour for the class list), which covers changes made outside the API, such as an edit in SSMS. When lots of players miss at once, one request queries SQL and the rest wait for its answer. A response served from the cache carries an `Age` header.
+
+The cache lives in the API's memory, which is enough for one instance. To share it between several instances, run Redis (`docker run -d -p 6379:6379 redis:8-alpine`) and set `ConnectionStrings:Redis` (for example `localhost:6379`). Azure doesn't use Redis yet, because it has no free tier and the API runs as one instance.
+
 ## 4. Test
 
 ```bash
@@ -123,6 +131,7 @@ CI runs them on every pull request in the `browser-tests` job, and uploads the s
 | `Jwt:SigningKey` | none | user-secrets | yes |
 | `Jwt:Issuer` / `Audience` | set | inherited | no |
 | `Jwt:AccessTokenMinutes` / `RefreshTokenDays` | `15` / `7` (the client renews access tokens with a one-time refresh token) | inherited | no |
+| `ConnectionStrings:Redis` | none (cache in API memory) | none | yes, if set |
 | `RabbitMq:HostName` / `Port` / `VirtualHost` | `localhost` / `5672` / `/` | inherited | no |
 | `RabbitMq:UserName` / `Password` | none | `guest` / `guest` (RabbitMQ's local default) | in cloud |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none (no export) | `http://localhost:4317` (the dashboard container) | no |
