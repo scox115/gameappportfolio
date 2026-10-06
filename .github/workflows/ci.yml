@@ -41,9 +41,11 @@ jobs:
       - name: Build
         run: dotnet build GamePortfolioSolution.slnx --no-restore --configuration Release
 
+      # The browser tests run in their own job below.
       - name: Test
         run: >
           dotnet test GamePortfolioSolution.slnx --no-build --configuration Release
+          --filter "Category!=Browser"
           --logger "trx;LogFileName=test-results.trx"
           --results-directory TestResults
 
@@ -53,3 +55,42 @@ jobs:
         with:
           name: test-results
           path: TestResults/*.trx
+
+  # Plays the game in Chromium: the published Blazor client against the real API
+  # (in-memory database, no RabbitMQ), started by the tests themselves.
+  browser-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build 5.Tests/Game.E2E.Tests --configuration Release
+
+      - name: Publish the client
+        run: dotnet publish 4.Frontend/Game.Client --configuration Release --output client-publish
+
+      # The browser version matches the Microsoft.Playwright package the tests were built with.
+      - name: Install Chromium
+        run: pwsh 5.Tests/Game.E2E.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Browser tests
+        env:
+          E2E_CLIENT_DIR: ${{ github.workspace }}/client-publish
+          E2E_SCREENSHOTS_DIR: ${{ github.workspace }}/BrowserTestResults/screenshots
+        run: >
+          dotnet test 5.Tests/Game.E2E.Tests --no-build --configuration Release
+          --logger "trx;LogFileName=browser-test-results.trx"
+          --results-directory BrowserTestResults
+
+      - name: Upload browser test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-test-results
+          path: |
+            BrowserTestResults/*.trx
+            BrowserTestResults/screenshots/

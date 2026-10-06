@@ -67,6 +67,17 @@ Both are written in one `SaveChanges`, and the message is acknowledged only afte
 - Traces, metrics and logs go out over OpenTelemetry. Open the dashboard at http://localhost:18888 to see each request's trace, the `game.battles.completed` and `game.telemetry.*` counters, and structured logs. Without `OTEL_EXPORTER_OTLP_ENDPOINT` set, nothing is exported.
 - Errors come back as [problem details](https://www.rfc-editor.org/rfc/rfc9457) JSON with a `traceId` you can search for in the dashboard.
 
+## 4. Test
+
+```bash
+dotnet test GamePortfolioSolution.slnx --filter "Category!=Browser"   # unit and API tests, a few seconds
+dotnet test 5.Tests/Game.E2E.Tests                                      # browser tests, about a minute
+```
+
+The browser tests (`5.Tests/Game.E2E.Tests`) play the game in Chromium with [Playwright](https://playwright.dev/dotnet/): they create heroes, sign in again, beat the boss, fight a friendly duel between two browsers, and check that signing in on a second browser signs the first one out. They need no Docker services: the tests publish the Blazor client, serve it on a free port, and start the real API on another with an in-memory database, fake blob storage, no RabbitMQ and dice that always favour the player. The first run downloads Chromium (about 150 MB). To watch it play, set `HEADED=1` first (`$env:HEADED = "1"` in PowerShell). When a test fails, a screenshot of each browser is saved to `bin/<configuration>/net10.0/screenshots`. In Visual Studio they show in Test Explorer under the `Browser` trait.
+
+CI runs them on every pull request in the `browser-tests` job, and uploads the screenshots with the results when something fails.
+
 ## Where settings live
 
 | Setting | Base (`appsettings.json`) | Development | Secret? |
