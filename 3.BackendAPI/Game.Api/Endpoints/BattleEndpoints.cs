@@ -113,7 +113,8 @@ public static class BattleEndpoints
                 var earned = new MatchRulesEngine(timeProvider).ProcessPveMatch(match, player, won);
                 battle.AttachMatch(match.Id);
 
-                reward = BattleRewardResponse.From(earned, player, isDuel: false);
+                var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+                reward = BattleRewardResponse.From(earned, player, isDuel: false, player.FullRewardBossWinsLeft(today));
             }
 
             try

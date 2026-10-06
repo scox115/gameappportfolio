@@ -11,7 +11,6 @@ namespace Game.Api.Endpoints;
 
 public static class AuthEndpoints
 {
-    private const int StartingGold = 500;
 
     public static void MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
@@ -43,7 +42,7 @@ public static class AuthEndpoints
             }
 
             var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = username };
-            var player = new Player(user.Id, username, StartingGold);
+            var player = new Player(user.Id, username, Player.StartingGold);
 
             // The player is tracked on the same DbContext the Identity store saves with,
             // so the account and the profile are written in one SaveChanges call.

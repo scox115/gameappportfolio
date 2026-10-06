@@ -280,6 +280,15 @@
 
                                                 <RewardBonuses StreakBonus="battleResult.streakBonus" Bounties="battleResult.bounties" />
 
+                                                @if (battleResult.reducedBossReward)
+                                                {
+                                                    <div style="color: #94a3b8; margin-bottom: 15px;">You've used today's 5 full-reward boss wins, so this one paid 25 gold. Full rewards come back tomorrow.</div>
+                                                }
+                                                else if (battleResult.won && battleResult.fullRewardWinsLeft is { } left)
+                                                {
+                                                    <div style="color: #94a3b8; margin-bottom: 15px;">@(left == 0 ? "That was your last full-reward boss win today." : $"{left} full-reward boss win{(left == 1 ? "" : "s")} left today.")</div>
+                                                }
+
                                                 @if (battleResult.leveledUp)
                                                 {
                                                     <div style="color: #fbbf24; font-weight: bold; margin-bottom: 20px;">⬆️ LEVEL UP! You are now level @battleResult.newLevel.</div>
@@ -588,7 +597,9 @@
             State.Level > levelBefore,
             State.Level,
             result.reward?.streakBonus ?? 0,
-            result.reward?.bountiesCompleted.Select(b => new RewardBonuses.BountyLine(b.name, b.reward)).ToList() ?? []);
+            result.reward?.bountiesCompleted.Select(b => new RewardBonuses.BountyLine(b.name, b.reward)).ToList() ?? [],
+            result.reward?.reducedBossReward ?? false,
+            result.reward?.fullRewardBossWinsLeft);
         StateHasChanged();
     }
 
@@ -599,7 +610,7 @@
     }
 
     private record BattleResultView(bool won, int goldEarned, int experienceEarned, bool leveledUp, int newLevel,
-        int streakBonus, IReadOnlyList<RewardBonuses.BountyLine> bounties);
+        int streakBonus, IReadOnlyList<RewardBonuses.BountyLine> bounties, bool reducedBossReward, int? fullRewardWinsLeft);
 
     private async Task LaunchLeaderboardView()
     {
@@ -729,6 +740,8 @@
         public PlayerProfileDto player { get; set; } = new();
         public int streakBonus { get; set; }
         public List<BountyRewardDto> bountiesCompleted { get; set; } = new();
+        public bool reducedBossReward { get; set; }
+        public int? fullRewardBossWinsLeft { get; set; }
     }
 
     public class BountyRewardDto

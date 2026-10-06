@@ -59,6 +59,8 @@ public record BattleTurnResponse(
 /// <param name="StreakBonus">Extra gold for winning several battles in a row.</param>
 /// <param name="BountiesCompleted">Daily bounties this battle completed; their gold is in <paramref name="GoldEarned"/>.</param>
 /// <param name="WagerResult">PvP only: the wager payout won, or the stake lost as a negative number; null for a friendly duel or a boss fight.</param>
+/// <param name="ReducedBossReward">The boss win came after today's full-reward wins were used, so it paid less.</param>
+/// <param name="FullRewardBossWinsLeft">Boss fights only: full-reward boss wins left today.</param>
 public record BattleRewardResponse(
     int GoldEarned,
     int ExperienceEarned,
@@ -66,16 +68,20 @@ public record BattleRewardResponse(
     int? RatingChange = null,
     int StreakBonus = 0,
     IReadOnlyList<BountyRewardResponse>? BountiesCompleted = null,
-    int? WagerResult = null)
+    int? WagerResult = null,
+    bool ReducedBossReward = false,
+    int? FullRewardBossWinsLeft = null)
 {
-    public static BattleRewardResponse From(BattleReward reward, Player player, bool isDuel) =>
+    public static BattleRewardResponse From(BattleReward reward, Player player, bool isDuel, int? fullRewardBossWinsLeft = null) =>
         new(reward.Gold,
             reward.Experience,
             PlayerProfileResponse.From(player),
             isDuel ? reward.RatingChange : null,
             reward.Bonuses.StreakBonus,
             reward.Bonuses.CompletedBounties.Select(b => new BountyRewardResponse(b.Name, b.Reward)).ToList(),
-            reward.WagerResult == 0 ? null : reward.WagerResult);
+            reward.WagerResult == 0 ? null : reward.WagerResult,
+            reward.ReducedBossReward,
+            fullRewardBossWinsLeft);
 }
 
 public record BountyRewardResponse(string Name, int Reward);

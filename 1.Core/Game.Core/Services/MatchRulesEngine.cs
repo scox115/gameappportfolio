@@ -9,7 +9,8 @@ namespace Game.Core.Services;
 /// <param name="Bonuses">The streak bonus and bounties included in <paramref name="Gold"/>.</param>
 /// <param name="WagerResult">PvP only: the wager won (the payout) as a positive number, or the stake lost as a negative one.</param>
 /// <param name="RatingChange">PvP only: rating points gained or lost.</param>
-public record BattleReward(int Gold, int Experience, BattleBonuses Bonuses, int WagerResult = 0, int RatingChange = 0);
+/// <param name="ReducedBossReward">A boss win past the daily full-reward limit, which pays <see cref="MatchRulesEngine.ReducedBossWinGold"/> and no streak bonus.</param>
+public record BattleReward(int Gold, int Experience, BattleBonuses Bonuses, int WagerResult = 0, int RatingChange = 0, bool ReducedBossReward = false);
 
 public record PvpSettlement(BattleReward Winner, BattleReward Loser);
 
@@ -19,6 +20,9 @@ public class MatchRulesEngine(TimeProvider timeProvider)
     public const int WinExperience = 50;
     public const int LossGold = 20;
     public const int LossExperience = 10;
+
+    /// <summary>What a boss win pays once the player has used today's full-reward wins.</summary>
+    public const int ReducedBossWinGold = 25;
 
     public MatchRulesEngine() : this(TimeProvider.System) { }
 
@@ -80,13 +84,15 @@ public class MatchRulesEngine(TimeProvider timeProvider)
 
         match.CompleteMatch(isVictory ? player.Id : GameMatch.AiBossId);
 
-        var gold = isVictory ? WinGold : LossGold;
+        // Boss fights can be replayed endlessly, so only the first few wins each day pay in full.
+        var fullReward = !isVictory || player.RecordBossWin(Today);
+        var gold = !isVictory ? LossGold : fullReward ? WinGold : ReducedBossWinGold;
         var experience = isVictory ? WinExperience : LossExperience;
         player.AddGold(gold);
         player.AddExperience(experience);
-        var bonuses = player.RecordBattle(Today, BattleKind.BossFight, isVictory);
+        var bonuses = player.RecordBattle(Today, BattleKind.BossFight, isVictory, payStreakBonus: fullReward);
 
-        return new BattleReward(gold + bonuses.Gold, experience, bonuses);
+        return new BattleReward(gold + bonuses.Gold, experience, bonuses, ReducedBossReward: !fullReward);
     }
 
     private static bool IsParticipant(GameMatch match, Guid playerId) =>
