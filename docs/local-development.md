@@ -72,15 +72,17 @@ Both are written in one `SaveChanges`, and the message is acknowledged only afte
 | Setting | Base (`appsettings.json`) | Development | Secret? |
 |---|---|---|---|
 | `ConnectionStrings:DefaultConnection` | none | user-secrets | yes |
-| `ConnectionStrings:AzureBlobStorage` | none | `UseDevelopmentStorage=true` (Azurite) | in cloud |
+| `ConnectionStrings:AzureBlobStorage` | none | `UseDevelopmentStorage=true` (Azurite) | in cloud: the blob endpoint URL, reached with managed identity |
 | `Jwt:SigningKey` | none | user-secrets | yes |
 | `Jwt:Issuer` / `Audience` | set | inherited | no |
 | `Jwt:AccessTokenMinutes` / `RefreshTokenDays` | `15` / `7` (the client renews access tokens with a one-time refresh token) | inherited | no |
 | `RabbitMq:HostName` / `Port` / `VirtualHost` | `localhost` / `5672` / `/` | inherited | no |
 | `RabbitMq:UserName` / `Password` | none | `guest` / `guest` (RabbitMQ's local default) | in cloud |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none (no export) | `http://localhost:4317` (the dashboard container) | no |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | none (no export) | none | set by the Azure deployment |
+| `ForwardedHeaders:TrustAllProxies` | `false` | `false` | `true` only behind Container Apps' ingress |
 | `Cors:AllowedOrigins` | empty (no cross-origin calls) | the client's local URLs | no |
 | Client `ApiBaseUrl` | empty (same origin) | `http://localhost:5005` | no |
 | Client `IdleTimeoutMinutes` | `15` (sign out after this long without activity) | inherited | no |
 
-Hosted environments supply the same keys as environment variables (for example `RabbitMq__Password`, `ConnectionStrings__DefaultConnection`) or from Azure Key Vault. The API refuses to start if a required value is missing.
+Hosted environments supply the same keys as environment variables (for example `RabbitMq__Password`, `ConnectionStrings__DefaultConnection`) or from Azure Key Vault. The API refuses to start if a required value is missing. See [azure-deployment.md](azure-deployment.md) for how the Azure deployment sets them.

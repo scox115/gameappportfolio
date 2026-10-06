@@ -1,0 +1,153 @@
+name: Deploy to Azure
+
+# Runs after CI passes on main, or by hand from the Actions tab. It does nothing until the
+# one-time setup in docs/azure-deployment.md has set the AZURE_* repository variables.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # sign in to Azure with OIDC, so no Azure password is stored in GitHub
+  packages: write   # push the API image to GitHub Container Registry
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+
+jobs:
+  deploy:
+    if: >-
+      vars.AZURE_CLIENT_ID != '' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.urls.outputs.client }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Sign in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The .NET SDK builds the image itself (no Dockerfile): a chiseled Ubuntu base with no shell
+      # or package manager, running as a non-root user. "-extra" adds ICU, which SqlClient needs.
+      - name: Build and push the API image
+        id: image
+        run: |
+          repository="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')/card-arena-api"
+          tag="${HEAD_SHA::12}"
+          dotnet publish 3.BackendAPI/Game.Api/Game.Api.csproj -c Release \
+            -t:PublishContainer \
+            -p:ContainerRegistry=ghcr.io \
+            -p:ContainerRepository="$repository" \
+            -p:ContainerImageTags="\"$tag;latest\"" \
+            -p:ContainerFamily=noble-chiseled-extra
+          echo "name=ghcr.io/$repository:$tag" >> "$GITHUB_OUTPUT"
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy infrastructure and the API
+        id: infra
+        run: |
+          registry_user=""
+          if [ -n "$REGISTRY_PASSWORD" ]; then registry_user="$GITHUB_REPOSITORY_OWNER"; fi
+          az deployment group create \
+            --name "card-arena-${GITHUB_RUN_NUMBER}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --template-file infra/main.bicep \
+            --parameters \
+              apiImage="${{ steps.image.outputs.name }}" \
+              apiIdentityName="${{ vars.AZURE_API_IDENTITY }}" \
+              sqlAdminGroupName="${{ vars.AZURE_SQL_ADMIN_GROUP }}" \
+              sqlAdminGroupObjectId="${{ vars.AZURE_SQL_ADMIN_GROUP_ID }}" \
+              jwtSigningKey="$JWT_SIGNING_KEY" \
+              rabbitMqPassword="$RABBITMQ_PASSWORD" \
+              registryUsername="$registry_user" \
+              registryPassword="$REGISTRY_PASSWORD" \
+            --query properties.outputs --output json > outputs.json
+          echo "api=$(jq -r .apiUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "client=$(jq -r .clientUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "swa=$(jq -r .staticWebAppName.value outputs.json)" >> "$GITHUB_OUTPUT"
+        env:
+          JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
+          RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+          REGISTRY_PASSWORD: ${{ secrets.GHCR_READ_TOKEN }}
+
+      - name: Build the client against the deployed API
+        run: |
+          echo "{ \"ApiBaseUrl\": \"${{ steps.infra.outputs.api }}\" }" > 4.Frontend/Game.Client/wwwroot/appsettings.Production.json
+          dotnet publish 4.Frontend/Game.Client/Game.Client.csproj -c Release -o out/client
+
+      - name: Get the Static Web App deployment token
+        id: swa
+        run: |
+          token=$(az staticwebapp secrets list --name "${{ steps.infra.outputs.swa }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" --query properties.apiKey --output tsv)
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy the client
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa.outputs.token }}
+          action: upload
+          app_location: out/client/wwwroot
+          skip_app_build: true
+          skip_api_build: true
+
+      # The API scales to zero and the database pauses, so the first request can take a couple of minutes.
+      - name: Smoke test
+        id: urls
+        run: |
+          api="${{ steps.infra.outputs.api }}"
+          client="${{ steps.infra.outputs.client }}"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --max-time 20 "$api/health/ready" > ready.json; then
+              cat ready.json; echo
+              curl --fail --silent --output /dev/null "$client" && break
+            fi
+            echo "Waiting for the API to start (attempt $attempt)..."
+            sleep 10
+          done
+          curl --fail --silent --show-error "$api/health/ready" > /dev/null
+          curl --fail --silent --show-error --output /dev/null "$client"
+          echo "client=$client" >> "$GITHUB_OUTPUT"
+          {
+            echo "### 🃏 Kings of the Card Arena is live"
+            echo ""
+            echo "- Game: $client"
+            echo "- API health: $api/health/ready"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Keep GitHub Container Registry tidy (and inside the free storage allowance).
+      - name: Delete old API images
+        uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: card-arena-api
+          package-type: container
+          min-versions-to-keep: 5

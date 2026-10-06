@@ -3,6 +3,7 @@ using Game.Api.Observability;
 using Game.Api.Endpoints; // Add this using statement at the top!
 using Game.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using Game.Core.Interfaces;
 using Game.Infrastructure.Storage;
@@ -99,8 +100,12 @@ builder.Services.AddSingleton<IConnectionFactory>(sp =>
 var sqlConnectionString = GetRequiredConnectionString(builder.Configuration, "DefaultConnection");
 var blobConnectionString = GetRequiredConnectionString(builder.Configuration, "AzureBlobStorage");
 
-// Register Azure SDK client library using connection configurations
-builder.Services.AddSingleton(sp => new BlobServiceClient(blobConnectionString));
+// Locally this is an Azurite connection string. In Azure it's just the account's blob endpoint
+// (https://<account>.blob.core.windows.net) and the API signs in with its managed identity, so no
+// storage key exists anywhere in configuration.
+builder.Services.AddSingleton(sp => Uri.TryCreate(blobConnectionString, UriKind.Absolute, out var blobEndpoint)
+    ? new BlobServiceClient(blobEndpoint, new DefaultAzureCredential())
+    : new BlobServiceClient(blobConnectionString));
 
 // Bind your Clean Architecture application interfaces to your infrastructure
 builder.Services.AddScoped<IStorageService, AzureBlobStorageService>();
@@ -109,7 +114,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseSqlServer(
         sqlConnectionString,
-        sqlOptions => sqlOptions.MigrationsAssembly("Game.Infrastructure")
+        sqlOptions => sqlOptions
+            .MigrationsAssembly("Game.Infrastructure")
+            // Azure SQL drops connections now and then, and a serverless database that has paused
+            // takes a moment to wake up, so retry transient failures instead of failing the request.
+            .EnableRetryOnFailure(maxRetryCount: 6, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null)
     );
 
     //options.UseInMemoryDatabase("GamePortfolioDb");
@@ -198,9 +207,20 @@ builder.Services.AddOptions<AntiCheatOptions>()
 
 // Behind a reverse proxy (such as Azure Container Apps' ingress) the client's address arrives in
 // X-Forwarded-For. Only loopback proxies are trusted by default; add the hosting proxy's
-// network to KnownNetworks when deploying so the header can't be spoofed.
+// network when deploying (or set ForwardedHeaders:TrustAllProxies, below) so the header can't be spoofed.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    // Container Apps' ingress is the only way into the API there, but its address isn't fixed, so the
+    // Azure deployment sets ForwardedHeaders:TrustAllProxies. Never set it where clients can reach
+    // the API directly, or they could fake their IP address.
+    if (builder.Configuration.GetValue<bool>("ForwardedHeaders:TrustAllProxies"))
+    {
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    }
+});
 
 builder.Services.AddRateLimiter(options =>
 {
