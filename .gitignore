@@ -16,3 +16,4 @@ rabbit_data/
 *.user
 *.suo
 TestResults/
+loadtest/results/
