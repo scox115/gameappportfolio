@@ -37,7 +37,8 @@ public class MatchRulesEngine(TimeProvider timeProvider)
     /// Settles a PvP match between two registered players: finalizes the match and pays
     /// each player exactly once. <paramref name="wager"/> is what each player staked when the duel started.
     /// </summary>
-    public PvpSettlement ProcessMatchWin(GameMatch match, Player winner, Player loser, int wager = 0)
+    public PvpSettlement ProcessMatchWin(GameMatch match, Player winner, Player loser, int wager = 0,
+        HeroClass? winnerClass = null, HeroClass? loserClass = null)
     {
         ArgumentNullException.ThrowIfNull(match);
         ArgumentNullException.ThrowIfNull(winner);
@@ -57,14 +58,14 @@ public class MatchRulesEngine(TimeProvider timeProvider)
 
         winner.AddGold(WinGold + payout);
         winner.AddExperience(WinExperience);
-        winner.RecordPvpWin(ratingChange);
+        winner.RecordPvpWin(ratingChange, winnerClass);
         var winnerBonuses = winner.RecordBattle(Today, BattleKind.Duel, won: true);
 
         // The rating floor can make the loser drop less than the winner gains.
         var loserRatingBefore = loser.Rating;
         loser.AddGold(LossGold);
         loser.AddExperience(LossExperience);
-        loser.RecordPvpLoss(ratingChange);
+        loser.RecordPvpLoss(ratingChange, loserClass);
         var loserBonuses = loser.RecordBattle(Today, BattleKind.Duel, won: false);
 
         return new PvpSettlement(

@@ -99,6 +99,17 @@ public class PlayerConfiguration : IEntityTypeConfiguration<Player>
             bounties.HasKey("PlayerId", nameof(BountyProgress.Day), nameof(BountyProgress.Bounty));
         });
 
+        // PvP wins and losses for each class the hero has dueled as, one row per class.
+        builder.OwnsMany(p => p.ClassRecords, records =>
+        {
+            records.ToTable("PlayerClassRecords");
+            records.WithOwner().HasForeignKey("PlayerId");
+            records.Property(r => r.Class)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+            records.HasKey("PlayerId", nameof(ClassRecord.Class));
+        });
+
         // Optimizes lookups by indexing the username field uniquely
         builder.HasIndex(p => p.Username)
             .IsUnique();
