@@ -1,0 +1,24 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.0">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>card-arena-apphost</UserSecretsId>
+    <!-- "dotnet run" and Visual Studio use the dashboard and orchestrator from NuGet, so the separate Aspire CLI isn't needed. -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.6.0" />
+    <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="13.6.0" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\3.BackendAPI\Game.Api\Game.Api.csproj" />
+    <ProjectReference Include="..\..\4.Frontend\Game.Client\Game.Client.csproj" />
+  </ItemGroup>
+
+</Project>

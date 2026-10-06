@@ -9,6 +9,7 @@ updates:
       - /3.BackendAPI/*
       - /4.Frontend/*
       - /5.Tests/*
+      - /6.Aspire/*
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -16,6 +17,10 @@ updates:
       # Test tooling only touches the test projects, so even major versions come as one PR.
       test-tools:
         patterns: ["xunit*", "Microsoft.NET.Test.Sdk", "coverlet*"]
+      # Aspire packages are released together. The AppHost's Sdk="Aspire.AppHost.Sdk/x.y.z" line
+      # isn't a package reference, so bump it by hand to match when this PR arrives.
+      aspire:
+        patterns: ["Aspire.*"]
       microsoft:
         patterns: ["Microsoft.*", "System.*"]
         update-types: [minor, patch]

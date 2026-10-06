@@ -1,6 +1,6 @@
 [![CI](https://github.com/scox115/gameappportfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/scox115/gameappportfolio/actions/workflows/ci.yml)
 
-**Run it locally:** see [docs/local-development.md](docs/local-development.md).
+**Run it locally:** with Docker running, `dotnet run --project 6.Aspire/Game.AppHost` starts the database, storage, message broker, API and client, and opens the .NET Aspire dashboard. See [docs/local-development.md](docs/local-development.md).
 
 **Deploy it to Azure:** see [docs/azure-deployment.md](docs/azure-deployment.md).
 
