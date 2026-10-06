@@ -2,6 +2,42 @@
 
 Everything runs on free tooling: the .NET 10 SDK and Docker.
 
+There are two ways to run the game. Both use the same API and client code and settings:
+
+- **The quick way:** one command, using .NET Aspire. This is described just below.
+- **The manual way:** Docker Compose plus two `dotnet run` commands, in steps 1 to 3.
+
+## Quick start with .NET Aspire
+
+With Docker Desktop running, use either of these:
+
+```powershell
+dotnet run --project 6.Aspire/Game.AppHost
+```
+
+- **In Visual Studio:** right-click **Game.AppHost** (in the `6.Aspire` folder), choose **Set as Startup Project**, then press F5.
+
+This one command does all of the following:
+
+- starts SQL Server, Azurite and RabbitMQ in Docker;
+- waits until they are ready;
+- starts the API on http://localhost:5005 once `/health/ready` passes;
+- starts the client on http://localhost:5091;
+- opens the [Aspire dashboard](https://aspire.dev/dashboard/overview/). Every service is listed there with its logs, traces (one request can be followed from the browser through the API into SQL and RabbitMQ) and metrics, and you can stop or restart each one.
+
+Nothing needs setting up first:
+
+- **Passwords:** the SQL Server and RabbitMQ passwords and the JWT signing key are generated on the first run, and kept in the AppHost's user-secrets.
+- **Data:** heroes, avatars and queued messages live in the Docker volumes `card-arena-sql`, `card-arena-azurite` and `card-arena-rabbitmq`. These are separate from the Docker Compose volumes.
+- **Containers:** they keep running after you stop the AppHost, so the next start is quick. Stop them in Docker Desktop, or with `docker ps` and `docker stop`.
+
+**Things to check:**
+
+- Stop anything else that is using ports 5005 or 5091 first, such as the API started from Visual Studio.
+- If the dashboard warns "No trusted development certificate", run `dotnet dev-certs https --trust` once.
+
+`6.Aspire/Game.AppHost/AppHost.cs` describes the whole setup in about 50 lines. The API keeps reading the settings names it already uses (`ConnectionStrings:DefaultConnection`, `RabbitMq:*`, `Jwt:SigningKey`), so Docker Compose and Azure work unchanged. `5.Tests/Game.AppHost.Tests` checks this wiring without starting anything.
+
 ## 1. Start the local services
 
 ```bash

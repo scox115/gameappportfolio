@@ -13,7 +13,11 @@
   </Folder>
   <Folder Name="/5.Tests/">
     <Project Path="5.Tests/Game.Api.Tests/Game.Api.Tests.csproj" />
+    <Project Path="5.Tests/Game.AppHost.Tests/Game.AppHost.Tests.csproj" />
     <Project Path="5.Tests/Game.Core.Tests/Game.Core.Tests.csproj" />
     <Project Path="5.Tests/Game.E2E.Tests/Game.E2E.Tests.csproj" />
+  </Folder>
+  <Folder Name="/6.Aspire/">
+    <Project Path="6.Aspire/Game.AppHost/Game.AppHost.csproj" />
   </Folder>
 </Solution>
