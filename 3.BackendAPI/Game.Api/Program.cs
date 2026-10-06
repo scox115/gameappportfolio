@@ -20,6 +20,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -170,6 +172,39 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton(TimeProvider.System);
+
+// --- 🛡️ ANTI-CHEAT ---
+// Same-network duels pay nothing, and sign-up and sign-in are rate-limited per IP address.
+builder.Services.AddOptions<AntiCheatOptions>()
+    .Bind(builder.Configuration.GetSection(AntiCheatOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+// Behind a reverse proxy (such as Azure Container Apps' ingress) the client's address arrives in
+// X-Forwarded-For. Only loopback proxies are trusted by default; add the hosting proxy's
+// network to KnownNetworks when deploying so the header can't be spoofed.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(RateLimits.Registration, context => PerAddress(context, limits => limits.RegistrationsPerHour, TimeSpan.FromHours(1)));
+    options.AddPolicy(RateLimits.SignIn, context => PerAddress(context, limits => limits.SignInsPerMinute, TimeSpan.FromMinutes(1)));
+    options.OnRejected = async (context, cancellationToken) =>
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new { message = "Too many attempts from your network. Please wait a little and try again." }, cancellationToken);
+
+    static RateLimitPartition<string> PerAddress(HttpContext context, Func<AntiCheatOptions, int> limit, TimeSpan window) =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = limit(context.RequestServices.GetRequiredService<IOptions<AntiCheatOptions>>().Value),
+                Window = window,
+                QueueLimit = 0
+            });
+});
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<RefreshTokenService>();
 builder.Services.AddScoped<ActiveSessionValidator>();
@@ -202,6 +237,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 
 // --- 🚀 ACTIVATE CORS MIDDLEWARE ---
@@ -210,6 +246,7 @@ app.UseCors("BlazorFrontendPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 // --- MAP MINIMAL ENDPOINTS HERE ---
 app.MapAuthEndpoints();

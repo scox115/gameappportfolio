@@ -20,6 +20,7 @@ public record PvpBattleView(
     PvpBattleStatus Status,
     bool? YouWon,
     int Wager,
+    bool Practice,
     PvpEndReason? EndReason,
     IReadOnlyList<BattleCardResponse> YourCards)
 {
@@ -36,6 +37,7 @@ public record PvpBattleView(
             battle.Status,
             battle.WinnerId is { } winner ? winner == viewerId : null,
             battle.Wager,
+            battle.Practice,
             battle.EndReason,
             BattleCards.All.Select(c => BattleCardResponse.From(battle.CardFor(viewerId, c.Card), battle.LevelOf(viewerId, c.Card))).ToList());
 

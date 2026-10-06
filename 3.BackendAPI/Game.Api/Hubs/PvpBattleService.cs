@@ -7,6 +7,8 @@ using Game.Core.Services;
 using Game.Infrastructure.Data;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Game.Api.Options;
 
 namespace Game.Api.Hubs;
 
@@ -21,6 +23,7 @@ public class PvpBattleService(
     TimeProvider timeProvider,
     MatchTelemetryPublisher telemetry,
     IHubContext<ArenaHub, IArenaClient> hub,
+    IOptions<AntiCheatOptions> antiCheat,
     ILogger<PvpBattleService> logger)
 {
     private DateTime Now => timeProvider.GetUtcNow().UtcDateTime;
@@ -57,7 +60,8 @@ public class PvpBattleService(
     }
 
     /// <summary>Returns true when the player is waiting in the lobby, false when a battle started or resumed.</summary>
-    public async Task<bool> FindOpponentAsync(Guid playerId, int wager = 0)
+    /// <param name="network">The player's IP address, used to keep a player's own accounts from farming each other.</param>
+    public async Task<bool> FindOpponentAsync(Guid playerId, int wager = 0, string? network = null)
     {
         if (!DuelWagers.IsAllowed(wager))
         {
@@ -84,8 +88,10 @@ public class PvpBattleService(
 
         // The waiting player may have spent their gold since joining; if so they leave the lobby
         // and this player takes the next opponent, or waits.
-        while (matchmaker.JoinOrPair(playerId, wager) is { } opponentId)
+        var practiceOnSameNetwork = antiCheat.Value.SameNetworkDuelsArePractice;
+        while (matchmaker.JoinOrPair(playerId, wager, network, avoidSameNetwork: wager > 0 && practiceOnSameNetwork) is { } pairing)
         {
+            var opponentId = pairing.OpponentId;
             var opponent = await LoadPlayerAsync(opponentId);
             if (opponent.Gold < wager)
             {
@@ -96,7 +102,7 @@ public class PvpBattleService(
 
             // A coin flip decides who goes first.
             var (first, second) = random.Next(0, 2) == 0 ? (playerId, opponentId) : (opponentId, playerId);
-            var battle = await StartDuelAsync(first, second, wager);
+            var battle = await StartDuelAsync(first, second, wager, practice: pairing.SameNetwork && practiceOnSameNetwork);
 
             await BroadcastAsync(battle, lastTurn: null, rewards: null, (client, update) => client.MatchFound(update));
             return false;
@@ -107,7 +113,7 @@ public class PvpBattleService(
 
     // Each player brings their upgraded cards, drinks a Duel Elixir if they have one and pays their
     // stake. A shop purchase saved at the same moment changes the player row, so reload and try again.
-    private async Task<PvpBattle> StartDuelAsync(Guid first, Guid second, int wager)
+    private async Task<PvpBattle> StartDuelAsync(Guid first, Guid second, int wager, bool practice)
     {
         for (var attempt = 1; ; attempt++)
         {
@@ -126,7 +132,7 @@ public class PvpBattleService(
                 throw new HubException(ex.Message);
             }
 
-            var battle = PvpBattle.Start(first, second, Now, firstPlayer.TakeLoadoutForDuel(), secondPlayer.TakeLoadoutForDuel(), wager);
+            var battle = PvpBattle.Start(first, second, Now, firstPlayer.TakeLoadoutForDuel(), secondPlayer.TakeLoadoutForDuel(), wager, practice);
             dbContext.PvpBattles.Add(battle);
             try
             {
@@ -238,7 +244,7 @@ public class PvpBattleService(
         }
     }
 
-    private async Task<(GameMatch Match, Dictionary<Guid, BattleRewardResponse> Rewards)> SettleAsync(PvpBattle battle)
+    private async Task<(GameMatch? Match, Dictionary<Guid, BattleRewardResponse> Rewards)> SettleAsync(PvpBattle battle)
     {
         var winnerId = battle.WinnerId!.Value;
         var winner = await dbContext.Players.FindAsync(winnerId)
@@ -246,6 +252,23 @@ public class PvpBattleService(
         var loserId = battle.OpponentOf(winnerId);
         var loser = await dbContext.Players.FindAsync(loserId)
             ?? throw new InvalidOperationException($"Player {loserId} not found.");
+
+        // Practice duels, very early forfeits and too many duels against the same opponent don't
+        // count: nobody is paid, ratings stay put and both stakes go back.
+        var startOfToday = Now.Date;
+        var rewardedToday = await dbContext.PvpBattles.CountAsync(b =>
+            b.MatchId != null && b.CompletedAt >= startOfToday &&
+            ((b.PlayerOneId == winnerId && b.PlayerTwoId == loserId) || (b.PlayerOneId == loserId && b.PlayerTwoId == winnerId)));
+        if (DuelRewardRules.NoRewardReason(battle, rewardedToday) is { } reason)
+        {
+            winner.RefundWager(battle.Wager);
+            loser.RefundWager(battle.Wager);
+            return (null, new Dictionary<Guid, BattleRewardResponse>
+            {
+                [winnerId] = BattleRewardResponse.NotCounted(winner, reason),
+                [loserId] = BattleRewardResponse.NotCounted(loser, reason)
+            });
+        }
 
         var match = new GameMatch(battle.PlayerOneId, battle.PlayerTwoId);
         dbContext.Matches.Add(match);

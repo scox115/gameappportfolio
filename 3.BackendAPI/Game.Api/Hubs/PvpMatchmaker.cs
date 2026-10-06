@@ -1,5 +1,8 @@
 namespace Game.Api.Hubs;
 
+/// <param name="SameNetwork">The two players connected from the same IP address.</param>
+public record PvpPairing(Guid OpponentId, bool SameNetwork);
+
 /// <summary>
 /// Pairs players who are looking for a battle, first come first served. Players only meet
 /// someone who chose the same wager.
@@ -12,24 +15,31 @@ public class PvpMatchmaker
 {
     private readonly Lock _gate = new();
 
-    // Players are paired as soon as a second one arrives, so at most one is waiting per wager.
-    private readonly Dictionary<int, Guid> _waitingByWager = new();
+    private sealed record Waiting(Guid PlayerId, string? Network);
+
+    private readonly Dictionary<int, List<Waiting>> _waitingByWager = new();
 
     /// <summary>
-    /// Returns the waiting opponent with the same wager to battle, or null after putting this
-    /// player in the queue. Joining again with a different wager moves the player.
+    /// Returns the longest-waiting opponent with the same wager, or null after putting this player
+    /// in the queue. Joining again with a different wager moves the player.
     /// </summary>
-    public Guid? JoinOrPair(Guid playerId, int wager = 0)
+    /// <param name="network">The player's IP address, or null when it isn't known.</param>
+    /// <param name="avoidSameNetwork">Skip opponents on the same network, so wagers can't move gold between one person's accounts.</param>
+    public PvpPairing? JoinOrPair(Guid playerId, int wager = 0, string? network = null, bool avoidSameNetwork = false)
     {
         lock (_gate)
         {
             RemoveLocked(playerId);
-            if (_waitingByWager.Remove(wager, out var opponentId))
+            var queue = _waitingByWager.TryGetValue(wager, out var existing) ? existing : _waitingByWager[wager] = new();
+
+            var opponent = queue.FirstOrDefault(w => !(avoidSameNetwork && SameNetwork(w.Network, network)));
+            if (opponent is not null)
             {
-                return opponentId;
+                queue.Remove(opponent);
+                return new PvpPairing(opponent.PlayerId, SameNetwork(opponent.Network, network));
             }
 
-            _waitingByWager[wager] = playerId;
+            queue.Add(new Waiting(playerId, network));
             return null;
         }
     }
@@ -46,15 +56,18 @@ public class PvpMatchmaker
     {
         lock (_gate)
         {
-            return _waitingByWager.ContainsValue(playerId);
+            return _waitingByWager.Values.Any(queue => queue.Any(w => w.PlayerId == playerId));
         }
     }
 
     private void RemoveLocked(Guid playerId)
     {
-        foreach (var (wager, waiting) in _waitingByWager.ToList())
+        foreach (var queue in _waitingByWager.Values)
         {
-            if (waiting == playerId) _waitingByWager.Remove(wager);
+            queue.RemoveAll(w => w.PlayerId == playerId);
         }
     }
+
+    // An unknown address never matches, so players are only treated as one network when we can tell.
+    private static bool SameNetwork(string? a, string? b) => a is not null && b is not null && a == b;
 }

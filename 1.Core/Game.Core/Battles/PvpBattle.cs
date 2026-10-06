@@ -83,6 +83,9 @@ public class PvpBattle
     /// <summary>Gold each player staked on this duel (0 for a friendly duel). Taken when the battle starts.</summary>
     public int Wager { get; private set; }
 
+    /// <summary>A duel between players on the same network: it never pays rewards or moves ratings.</summary>
+    public bool Practice { get; private set; }
+
     /// <summary>The settled match record, set when the battle ends.</summary>
     public Guid? MatchId { get; private set; }
 
@@ -97,8 +100,10 @@ public class PvpBattle
     /// <paramref name="wager"/> is the gold each player has staked, which the caller takes from them.
     /// </summary>
     public static PvpBattle Start(Guid firstPlayerId, Guid secondPlayerId, DateTime startedAt,
-        BattleLoadout? firstLoadout = null, BattleLoadout? secondLoadout = null, int wager = 0)
+        BattleLoadout? firstLoadout = null, BattleLoadout? secondLoadout = null, int wager = 0, bool practice = false)
     {
+        if (practice && wager > 0)
+            throw new ArgumentException("A practice duel can't have a wager.", nameof(wager));
         if (!DuelWagers.IsAllowed(wager))
             throw new ArgumentOutOfRangeException(nameof(wager), wager, "That isn't one of the wager amounts.");
         firstLoadout ??= BattleLoadout.Basic;
@@ -132,6 +137,7 @@ public class PvpBattle
             Status = PvpBattleStatus.InProgress,
             StartedAt = startedAt,
             Wager = wager,
+            Practice = practice,
             Version = Guid.NewGuid()
         };
 
@@ -145,6 +151,13 @@ public class PvpBattle
     }
 
     public bool IsFinished => Status == PvpBattleStatus.Finished;
+
+    /// <summary>Cards played so far. The turn counter only moves on when a card doesn't end the battle.</summary>
+    public int MovesPlayed => EndReason == PvpEndReason.Knockout ? Turn : Turn - 1;
+
+    /// <summary>The duel was forfeited or timed out before each player made <see cref="DuelRewardRules.MinMovesEach"/> moves.</summary>
+    public bool EndedTooEarly =>
+        EndReason is PvpEndReason.Forfeit or PvpEndReason.Timeout && MovesPlayed < 2 * DuelRewardRules.MinMovesEach;
 
     public bool IsParticipant(Guid playerId) => playerId == PlayerOneId || playerId == PlayerTwoId;
 

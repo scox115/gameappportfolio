@@ -15,10 +15,10 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker) : Hub<
     public const string Path = "/hubs/arena";
 
     /// <summary>Joins the lobby. Returns true when waiting, false when a battle started or resumed.</summary>
-    public Task<bool> FindOpponent() => battles.FindOpponentAsync(PlayerId);
+    public Task<bool> FindOpponent() => battles.FindOpponentAsync(PlayerId, network: Network);
 
     /// <summary>Joins the lobby staking gold on the duel; only players with the same wager are paired.</summary>
-    public Task<bool> FindWageredOpponent(int wager) => battles.FindOpponentAsync(PlayerId, wager);
+    public Task<bool> FindWageredOpponent(int wager) => battles.FindOpponentAsync(PlayerId, wager, Network);
 
     public void CancelSearch() => matchmaker.Leave(PlayerId);
 
@@ -35,4 +35,7 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker) : Hub<
     }
 
     private Guid PlayerId => Context.User!.GetPlayerId();
+
+    // The player's IP address (behind a proxy, from X-Forwarded-For; see UseForwardedHeaders).
+    private string? Network => Context.GetHttpContext()?.Connection.RemoteIpAddress?.ToString();
 }
