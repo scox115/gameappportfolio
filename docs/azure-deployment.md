@@ -69,7 +69,7 @@ You need an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/
 
 ## Day to day
 
-- **Deploys:** merge to `main`. CI runs first, and the deploy only starts if CI passes.
+- **Deploys:** merge to `main`. CI runs first, and the deploy only starts if CI passes. When nothing in `infra/main.bicep`, the repository variables or the secrets changed since the last successful deployment, the workflow skips the Bicep deployment and only swaps the API's image, which saves about 3 minutes. To force the full deployment anyway, run **Deploy to Azure** from the Actions tab with **Redeploy the infrastructure** ticked.
 - **Logs and traces:** in the Azure portal, open the Application Insights resource and use Transaction search or Logs. Container logs are under the Container App's **Log stream**.
 - **Health:** open `https://<api>/health/ready`.
 - **Query the production database from SSMS:**

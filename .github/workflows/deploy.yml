@@ -8,6 +8,11 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      full:
+        description: Redeploy the infrastructure even if nothing in it changed
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -70,13 +75,44 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      # Re-applying the Bicep template takes about 3 minutes even when nothing changed. Its inputs
+      # (the template, the settings and the secrets) are fingerprinted, and the fingerprint is part of
+      # the deployment's name, so a run whose fingerprint matches the last successful deployment only
+      # swaps the API image. Rotating a secret or changing a variable changes the fingerprint too.
+      - name: Check whether the infrastructure changed
+        id: plan
+        run: |
+          fingerprint=$( { cat infra/main.bicep; printf '%s\n' "$INFRA_INPUTS"; } | sha256sum | cut -c1-12)
+          last=$(az deployment group list --resource-group "$RESOURCE_GROUP" \
+            --query "sort_by([?starts_with(name, 'card-arena-') && properties.provisioningState == 'Succeeded'], &properties.timestamp)[-1].name" \
+            --output tsv)
+          full=true
+          if [ "$FORCE_FULL" != "true" ] && [[ "$last" == *"-$fingerprint" ]]; then full=false; fi
+          echo "Infrastructure fingerprint $fingerprint, last deployment '${last:-none}', full deploy: $full"
+          {
+            echo "fingerprint=$fingerprint"
+            echo "last=$last"
+            echo "full=$full"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          FORCE_FULL: ${{ inputs.full }}
+          INFRA_INPUTS: |
+            ${{ vars.AZURE_API_IDENTITY }}
+            ${{ vars.AZURE_SQL_ADMIN_GROUP }}
+            ${{ vars.AZURE_SQL_ADMIN_GROUP_ID }}
+            ${{ vars.AZURE_SQL_LOCATION }}
+            ${{ secrets.JWT_SIGNING_KEY }}
+            ${{ secrets.RABBITMQ_PASSWORD }}
+            ${{ secrets.GHCR_READ_TOKEN }}
+
       - name: Deploy infrastructure and the API
-        id: infra
+        if: steps.plan.outputs.full == 'true'
         run: |
           registry_user=""
           if [ -n "$REGISTRY_PASSWORD" ]; then registry_user="$GITHUB_REPOSITORY_OWNER"; fi
           az deployment group create \
-            --name "card-arena-${GITHUB_RUN_NUMBER}" \
+            --name "card-arena-${GITHUB_RUN_NUMBER}-${{ steps.plan.outputs.fingerprint }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --template-file infra/main.bicep \
             --parameters \
@@ -90,13 +126,28 @@ jobs:
               registryUsername="$registry_user" \
               registryPassword="$REGISTRY_PASSWORD" \
             --query properties.outputs --output json > outputs.json
-          echo "api=$(jq -r .apiUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
-          echo "client=$(jq -r .clientUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
-          echo "swa=$(jq -r .staticWebAppName.value outputs.json)" >> "$GITHUB_OUTPUT"
         env:
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
           RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
           REGISTRY_PASSWORD: ${{ secrets.GHCR_READ_TOKEN }}
+
+      - name: Update the API image only
+        if: steps.plan.outputs.full == 'false'
+        run: |
+          az deployment group show --resource-group "$RESOURCE_GROUP" --name "${{ steps.plan.outputs.last }}" \
+            --query properties.outputs --output json > outputs.json
+          az containerapp update --resource-group "$RESOURCE_GROUP" \
+            --name "$(jq -r .apiContainerAppName.value outputs.json)" \
+            --container-name api --image "${{ steps.image.outputs.name }}" --output none
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+      - name: Read the deployed addresses
+        id: infra
+        run: |
+          echo "api=$(jq -r .apiUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "client=$(jq -r .clientUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "swa=$(jq -r .staticWebAppName.value outputs.json)" >> "$GITHUB_OUTPUT"
 
       - name: Build the client against the deployed API
         run: |
