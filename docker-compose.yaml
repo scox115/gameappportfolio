@@ -34,6 +34,17 @@ services:
     volumes:
       - rabbit_data:/var/lib/rabbitmq
 
+  # Free OpenTelemetry dashboard (traces, metrics, structured logs) at http://localhost:18888.
+  # The API sends to it over OTLP on port 4317 (see OTEL_EXPORTER_OTLP_ENDPOINT in appsettings.Development.json).
+  game-telemetry-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    container_name: game-aspire-dashboard
+    environment:
+      - DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true
+    ports:
+      - "18888:18888"
+      - "4317:18889"
+
 volumes:
   sql_data:
   azurite_data:

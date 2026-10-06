@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Game.Api.Observability;
 using Game.Core.Events;
 
 namespace Game.Api.Messaging;
@@ -19,7 +20,11 @@ public class MatchTelemetryPublisher(ILogger<MatchTelemetryPublisher> logger)
             FullMode = BoundedChannelFullMode.DropOldest,
             SingleReader = true
         },
-        dropped => logger.LogWarning("Telemetry backlog is full; dropped match {MatchId}.", dropped.MatchId));
+        dropped =>
+        {
+            GameTelemetry.TelemetryMessageDropped();
+            logger.LogWarning("Telemetry backlog is full; dropped match {MatchId}.", dropped.MatchId);
+        });
 
     public ChannelReader<MatchCompletedEvent> Pending => _pending.Reader;
 

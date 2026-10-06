@@ -1,3 +1,4 @@
+using Game.Api.Observability;
 using System.Security.Claims;
 using Game.Api.Auth;
 using Game.Api.Messaging;
@@ -150,6 +151,7 @@ public static class BattleEndpoints
                 var winnerId = match.WinnerPlayerId!.Value;
                 var loserId = winnerId == playerId ? GameMatch.AiBossId : playerId;
                 await telemetry.PublishAsync(new MatchCompletedEvent(match.Id, winnerId, loserId));
+                GameTelemetry.BattleCompleted("pve", winnerId == playerId ? "victory" : "defeat", battle.Difficulty.ToString());
             }
 
             return Results.Ok(new PlayCardResponse(BattleStateResponse.From(battle), BattleTurnResponse.From(turn), reward));

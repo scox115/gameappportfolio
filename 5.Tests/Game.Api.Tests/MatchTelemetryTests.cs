@@ -41,14 +41,14 @@ public class MatchTelemetryTests
     {
         var publisher = new MatchTelemetryPublisher(NullLogger<MatchTelemetryPublisher>.Instance);
         var factory = UnreachableBroker.Create();
-        using var sender = new MatchTelemetrySender(publisher, factory, NullLogger<MatchTelemetrySender>.Instance);
+        using var sender = new MatchTelemetrySender(publisher, factory, new TelemetryBrokerStatus(), NullLogger<MatchTelemetrySender>.Instance);
 
         await sender.StartAsync(CancellationToken.None);
         await publisher.PublishAsync(NewEvent());
         await WaitUntilAsync(() => UnreachableBroker.Attempts(factory) >= 1);
 
-        // The event was taken off the backlog and is held for the next attempt; the sender is still running.
-        Assert.Equal(0, publisher.Pending.Count);
+        // The sender connects before taking an event, so the event waits in the backlog; the sender keeps running.
+        Assert.Equal(1, publisher.Pending.Count);
         Assert.False(sender.ExecuteTask!.IsCompleted);
 
         await sender.StopAsync(CancellationToken.None);

@@ -1,3 +1,5 @@
+using Game.Api.Health;
+using Game.Api.Observability;
 using Game.Api.Endpoints; // Add this using statement at the top!
 using Game.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +28,12 @@ using Microsoft.AspNetCore.HttpOverrides;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.AddObservability();
+builder.Services.AddGameHealthChecks();
+
+// Errors come back as RFC 7807 problem details (with a traceId to find them in the logs and traces).
+builder.Services.AddProblemDetails();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -218,6 +226,7 @@ builder.Services.AddScoped<SessionNotifier>();
 // --- ⚔️ SERVER-AUTHORITATIVE BATTLES ---
 builder.Services.AddSingleton<IBattleRandom, SystemBattleRandom>();
 builder.Services.AddSingleton<MatchTelemetryPublisher>();
+builder.Services.AddSingleton<TelemetryBrokerStatus>();
 
 // --- 🆚 REAL-TIME PVP ARENA (SignalR) ---
 builder.Services.AddSignalR(options => options.AddFilter<ActiveSessionHubFilter>())
@@ -236,6 +245,11 @@ builder.Services.AddHostedService<MatchTelemetrySender>();
 builder.Services.AddHostedService<MatchConsumerWorker>();
 
 var app = builder.Build();
+
+// Unhandled exceptions become a 500 problem-details response instead of an empty body or stack trace,
+// and bare error status codes (404, 405...) get a problem-details body too.
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {
@@ -262,6 +276,7 @@ app.MapPvpEndpoints();
 app.MapShopEndpoints();
 app.MapClassEndpoints();
 app.MapBountyEndpoints();
+app.MapGameHealthChecks();
 app.MapHub<ArenaHub>(ArenaHub.Path);
 app.MapHub<SessionHub>(SessionHub.Path);
 
