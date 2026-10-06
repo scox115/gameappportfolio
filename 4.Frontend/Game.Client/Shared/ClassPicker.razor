@@ -43,7 +43,7 @@
     {
         try
         {
-            classes = await Http.GetFromJsonAsync<List<HeroClassDto>>("/api/classes");
+            classes = await Http.GetFromJsonAsync<List<HeroClassDto>>("/api/v1/classes");
         }
         catch (Exception)
         {

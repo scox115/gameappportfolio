@@ -23,7 +23,7 @@ public class ClassEndpointsTests : IClassFixture<GameApiFactory>
     [Fact]
     public async Task ListsTheThreeClasses()
     {
-        var classes = await _factory.CreateClient().GetFromJsonAsync<List<HeroClassResponse>>("/api/classes", Json);
+        var classes = await _factory.CreateClient().GetFromJsonAsync<List<HeroClassResponse>>("/api/v1/classes", Json);
 
         Assert.Equal([HeroClass.Sorcerer, HeroClass.Paladin, HeroClass.Ranger], classes!.Select(c => c.Class));
         Assert.All(classes, c => Assert.Equal(HeroClasses.ChangePrice, c.ChangePrice));
@@ -35,7 +35,7 @@ public class ClassEndpointsTests : IClassFixture<GameApiFactory>
         var (client, auth) = await RegisterAsync(HeroClass.Ranger);
         Assert.Equal(HeroClass.Ranger, auth.Player.Class);
 
-        var response = await client.PostAsync("/api/battles/pve", null);
+        var response = await client.PostAsync("/api/v1/battles/pve", null);
         var battle = (await response.Content.ReadFromJsonAsync<BattleStateResponse>(Json))!;
 
         Assert.Equal(20, battle.Cards.Single(c => c.Card == BattleCard.DragonClaw).FailChance);
@@ -55,7 +55,7 @@ public class ClassEndpointsTests : IClassFixture<GameApiFactory>
         var (client, auth) = await RegisterAsync(null);
         await _factory.GiveGoldAsync(auth.Player.Id, HeroClasses.ChangePrice);
 
-        var response = await client.PutAsJsonAsync("/api/players/me/class", new { Class = "Paladin" });
+        var response = await client.PutAsJsonAsync("/api/v1/players/me/class", new { Class = "Paladin" });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var me = await response.Content.ReadFromJsonAsync<PlayerProfileResponse>(Json);
@@ -68,10 +68,10 @@ public class ClassEndpointsTests : IClassFixture<GameApiFactory>
     {
         var (client, auth) = await RegisterAsync(null);
 
-        var response = await client.PutAsJsonAsync("/api/players/me/class", new { Class = "Paladin" });
+        var response = await client.PutAsJsonAsync("/api/v1/players/me/class", new { Class = "Paladin" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
         Assert.Equal(HeroClass.Sorcerer, me!.Class);
         Assert.Equal(auth.Player.Gold, me.Gold);
     }
@@ -79,7 +79,7 @@ public class ClassEndpointsTests : IClassFixture<GameApiFactory>
     [Fact]
     public async Task ChangingClass_NeedsSigningIn()
     {
-        var response = await _factory.CreateClient().PutAsJsonAsync("/api/players/me/class", new { Class = "Paladin" });
+        var response = await _factory.CreateClient().PutAsJsonAsync("/api/v1/players/me/class", new { Class = "Paladin" });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -88,7 +88,7 @@ public class ClassEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = _factory.CreateClient();
         var username = $"hero{Guid.NewGuid():N}"[..20];
-        var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = username, Password, Class = heroClass?.ToString() });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register", new { Username = username, Password, Class = heroClass?.ToString() });
         response.EnsureSuccessStatusCode();
         var auth = (await response.Content.ReadFromJsonAsync<AuthResponse>(Json))!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);

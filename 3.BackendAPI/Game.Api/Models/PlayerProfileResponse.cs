@@ -16,7 +16,7 @@ public record PlayerProfileResponse(
 
 /// <summary>
 /// A signed-in session. Use the access token on API calls until ExpiresAt, then trade the refresh
-/// token at /api/auth/refresh for a new pair; each refresh token works once.
+/// token at /api/v1/auth/refresh for a new pair; each refresh token works once.
 /// </summary>
 public record AuthResponse(
     string AccessToken,

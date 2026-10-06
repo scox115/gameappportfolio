@@ -11,7 +11,7 @@ public static class ShopEndpoints
 {
     public static void MapShopEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/shop")
+        var group = app.MapGroup("/shop")
                        .WithTags("Shop")
                        .RequireAuthorization();
 

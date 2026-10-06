@@ -14,7 +14,7 @@ public static class AuthEndpoints
 
     public static void MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/auth")
+        var group = app.MapGroup("/auth")
                        .WithTags("Auth")
                        .AllowAnonymous();
 
@@ -66,7 +66,7 @@ public static class AuthEndpoints
             }
 
             var session = await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier);
-            return Results.Created("/api/players/me", session);
+            return Results.Created("/players/me", session);
         }).RequireRateLimiting(RateLimits.Registration);
 
         group.MapPost("/login", async (

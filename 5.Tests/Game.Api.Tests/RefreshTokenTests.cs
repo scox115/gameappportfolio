@@ -28,7 +28,7 @@ public class RefreshTokenTests : IClassFixture<GameApiFactory>
         var auth = await RegisterAsync();
         var client = _factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/refresh", new { auth.RefreshToken });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/refresh", new { auth.RefreshToken });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var refreshed = (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
@@ -36,14 +36,14 @@ public class RefreshTokenTests : IClassFixture<GameApiFactory>
         Assert.Equal(auth.Player.Id, refreshed.Player.Id);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", refreshed.AccessToken);
-        var me = await client.GetAsync("/api/players/me");
+        var me = await client.GetAsync("/api/v1/players/me");
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
     }
 
     [Fact]
     public async Task Refresh_RejectsUnknownTokens()
     {
-        var response = await _factory.CreateClient().PostAsJsonAsync("/api/auth/refresh", new { RefreshToken = "not-a-real-token" });
+        var response = await _factory.CreateClient().PostAsJsonAsync("/api/v1/auth/refresh", new { RefreshToken = "not-a-real-token" });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -56,11 +56,11 @@ public class RefreshTokenTests : IClassFixture<GameApiFactory>
         var first = await RefreshAsync(client, auth.RefreshToken);
 
         // The original token was already used, so presenting it again looks like theft.
-        var reused = await client.PostAsJsonAsync("/api/auth/refresh", new { auth.RefreshToken });
+        var reused = await client.PostAsJsonAsync("/api/v1/auth/refresh", new { auth.RefreshToken });
         Assert.Equal(HttpStatusCode.Unauthorized, reused.StatusCode);
 
         // That also kills the token issued by the legitimate refresh.
-        var afterReuse = await client.PostAsJsonAsync("/api/auth/refresh", new { first.RefreshToken });
+        var afterReuse = await client.PostAsJsonAsync("/api/v1/auth/refresh", new { first.RefreshToken });
         Assert.Equal(HttpStatusCode.Unauthorized, afterReuse.StatusCode);
     }
 
@@ -70,10 +70,10 @@ public class RefreshTokenTests : IClassFixture<GameApiFactory>
         var auth = await RegisterAsync();
         var client = _factory.CreateClient();
 
-        var logout = await client.PostAsJsonAsync("/api/auth/logout", new { auth.RefreshToken });
+        var logout = await client.PostAsJsonAsync("/api/v1/auth/logout", new { auth.RefreshToken });
         Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
 
-        var refresh = await client.PostAsJsonAsync("/api/auth/refresh", new { auth.RefreshToken });
+        var refresh = await client.PostAsJsonAsync("/api/v1/auth/refresh", new { auth.RefreshToken });
         Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
     }
 
@@ -93,14 +93,14 @@ public class RefreshTokenTests : IClassFixture<GameApiFactory>
     private async Task<AuthResponse> RegisterAsync()
     {
         var username = $"hero{Guid.NewGuid():N}"[..20];
-        var response = await _factory.CreateClient().PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
+        var response = await _factory.CreateClient().PostAsJsonAsync("/api/v1/auth/register", new { Username = username, Password });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
     }
 
     private static async Task<AuthResponse> RefreshAsync(HttpClient client, string refreshToken)
     {
-        var response = await client.PostAsJsonAsync("/api/auth/refresh", new { RefreshToken = refreshToken });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/refresh", new { RefreshToken = refreshToken });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
     }

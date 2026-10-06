@@ -32,7 +32,7 @@ public class AvatarUploadTests : IClassFixture<GameApiFactory>
         Assert.EndsWith("_avatar.png", url);
         Assert.Equal(PngBytes, stored.Content);
 
-        var profile = await client.GetFromJsonAsync<JsonElement>($"/api/players/{playerId}", Json);
+        var profile = await client.GetFromJsonAsync<JsonElement>($"/api/v1/players/{playerId}", Json);
         Assert.Equal(url, profile.GetProperty("avatarUrl").GetString());
     }
 
@@ -116,14 +116,14 @@ public class AvatarUploadTests : IClassFixture<GameApiFactory>
         var file = new ByteArrayContent(bytes);
         file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         form.Add(file, "File", fileName);
-        return await client.PostAsync("/api/players/me/avatar", form);
+        return await client.PostAsync("/api/v1/players/me/avatar", form);
     }
 
     private static async Task<(HttpClient Client, Guid PlayerId)> SignedInPlayerAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory)
     {
         var client = factory.CreateClient();
         var username = $"pic{Guid.NewGuid():N}"[..20];
-        var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register", new { Username = username, Password });
         response.EnsureSuccessStatusCode();
         var auth = (await response.Content.ReadFromJsonAsync<AuthResponse>(Json))!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);

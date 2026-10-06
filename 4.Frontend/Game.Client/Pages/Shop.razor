@@ -141,7 +141,7 @@
     {
         try
         {
-            var shop = await Http.GetFromJsonAsync<ShopDto>("/api/shop");
+            var shop = await Http.GetFromJsonAsync<ShopDto>("/api/v1/shop");
             if (shop is not null) Show(shop);
         }
         catch (Exception)
@@ -156,7 +156,7 @@
         message = null;
         try
         {
-            var response = await Http.PostAsJsonAsync("/api/shop/purchases", new { Item = offer.item });
+            var response = await Http.PostAsJsonAsync("/api/v1/shop/purchases", new { Item = offer.item });
             if (response.IsSuccessStatusCode && await response.Content.ReadFromJsonAsync<ShopDto>() is { } shop)
             {
                 Show(shop);
@@ -195,7 +195,7 @@
         message = null;
         try
         {
-            var response = await Http.PutAsJsonAsync("/api/shop/title", new { Title = title });
+            var response = await Http.PutAsJsonAsync("/api/v1/shop/title", new { Title = title });
             if (response.IsSuccessStatusCode && await response.Content.ReadFromJsonAsync<ShopDto>() is { } shop)
             {
                 Show(shop);
@@ -226,7 +226,7 @@
         try
         {
             var kind = item.StartsWith("Frame") ? "AvatarFrame" : "CardSkin";
-            var response = await Http.PutAsJsonAsync("/api/shop/cosmetic", new { Kind = kind, Cosmetic = cosmetic });
+            var response = await Http.PutAsJsonAsync("/api/v1/shop/cosmetic", new { Kind = kind, Cosmetic = cosmetic });
             if (response.IsSuccessStatusCode && await response.Content.ReadFromJsonAsync<ShopDto>() is { } shop)
             {
                 Show(shop);

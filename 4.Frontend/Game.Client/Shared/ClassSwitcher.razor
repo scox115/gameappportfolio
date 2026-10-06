@@ -58,7 +58,7 @@
         message = null;
         try
         {
-            var res = await Http.PutAsJsonAsync("/api/players/me/class", new { Class = newClass });
+            var res = await Http.PutAsJsonAsync("/api/v1/players/me/class", new { Class = newClass });
             if (res.IsSuccessStatusCode && await res.Content.ReadFromJsonAsync<ProfileDto>() is { } me)
             {
                 State.UpdateGold(me.gold);

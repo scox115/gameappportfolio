@@ -46,7 +46,7 @@
     {
         try
         {
-            matches = await Http.GetFromJsonAsync<List<MatchDto>>("/api/players/me/matches?limit=5");
+            matches = await Http.GetFromJsonAsync<List<MatchDto>>("/api/v1/players/me/matches?limit=5");
         }
         catch (Exception)
         {

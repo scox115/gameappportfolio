@@ -16,7 +16,7 @@ public static class HistoryEndpoints
     public static void MapHistoryEndpoints(this IEndpointRouteBuilder app)
     {
         // GET: /api/players/me/matches?limit=10, newest first
-        app.MapGet("/api/players/me/matches", async (ClaimsPrincipal user, AppDbContext dbContext, int? limit) =>
+        app.MapGet("/players/me/matches", async (ClaimsPrincipal user, AppDbContext dbContext, int? limit) =>
         {
             var playerId = user.GetPlayerId();
             var take = Math.Clamp(limit ?? 10, 1, MaxMatches);
@@ -33,7 +33,7 @@ public static class HistoryEndpoints
         .RequireAuthorization();
 
         // GET: /api/arena/stats?days=7, one row per UTC day, newest first (days with no matches are zeros)
-        app.MapGet("/api/arena/stats", async (AppDbContext dbContext, TimeProvider timeProvider, int? days) =>
+        app.MapGet("/arena/stats", async (AppDbContext dbContext, TimeProvider timeProvider, int? days) =>
         {
             var count = Math.Clamp(days ?? 7, 1, MaxDays);
             var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);

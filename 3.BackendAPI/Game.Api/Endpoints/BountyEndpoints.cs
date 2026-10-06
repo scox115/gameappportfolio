@@ -9,7 +9,7 @@ public static class BountyEndpoints
 {
     public static void MapBountyEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/bounties")
+        var group = app.MapGroup("/bounties")
                        .WithTags("Bounties")
                        .RequireAuthorization();
 

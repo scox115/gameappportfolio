@@ -19,7 +19,7 @@ public class AuthEndpointsTests : IClassFixture<GameApiFactory>
         var client = _factory.CreateClient();
         var username = NewUsername();
 
-        var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register", new { Username = username, Password });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
@@ -35,7 +35,7 @@ public class AuthEndpointsTests : IClassFixture<GameApiFactory>
         var username = NewUsername();
         await RegisterAsync(client, username);
 
-        var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register", new { Username = username, Password });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -45,7 +45,7 @@ public class AuthEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = NewUsername(), Password = "short" });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register", new { Username = NewUsername(), Password = "short" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -57,8 +57,8 @@ public class AuthEndpointsTests : IClassFixture<GameApiFactory>
         var username = NewUsername();
         await RegisterAsync(client, username);
 
-        var wrong = await client.PostAsJsonAsync("/api/auth/login", new { Username = username, Password = "Wrong-Pass1" });
-        var right = await client.PostAsJsonAsync("/api/auth/login", new { Username = username, Password });
+        var wrong = await client.PostAsJsonAsync("/api/v1/auth/login", new { Username = username, Password = "Wrong-Pass1" });
+        var right = await client.PostAsJsonAsync("/api/v1/auth/login", new { Username = username, Password });
 
         Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
         Assert.Equal(HttpStatusCode.OK, right.StatusCode);
@@ -69,7 +69,7 @@ public class AuthEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { Username = NewUsername(), Password });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { Username = NewUsername(), Password });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -83,17 +83,17 @@ public class AuthEndpointsTests : IClassFixture<GameApiFactory>
 
         for (var i = 0; i < 5; i++)
         {
-            await client.PostAsJsonAsync("/api/auth/login", new { Username = username, Password = "Wrong-Pass1" });
+            await client.PostAsJsonAsync("/api/v1/auth/login", new { Username = username, Password = "Wrong-Pass1" });
         }
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { Username = username, Password });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { Username = username, Password });
 
         Assert.Equal(HttpStatusCode.Locked, response.StatusCode);
     }
 
     [Theory]
-    [InlineData("GET", "/api/players/me")]
-    [InlineData("POST", "/api/battles/pve")]
-    [InlineData("POST", "/api/battles/pve/00000000-0000-0000-0000-000000000001/turns")]
+    [InlineData("GET", "/api/v1/players/me")]
+    [InlineData("POST", "/api/v1/battles/pve")]
+    [InlineData("POST", "/api/v1/battles/pve/00000000-0000-0000-0000-000000000001/turns")]
     public async Task GameEndpoints_RequireASignedInPlayer(string method, string url)
     {
         var client = _factory.CreateClient();
@@ -112,7 +112,7 @@ public class AuthEndpointsTests : IClassFixture<GameApiFactory>
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "not-a-real-token");
 
-        var response = await client.GetAsync("/api/players/me");
+        var response = await client.GetAsync("/api/v1/players/me");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -121,17 +121,17 @@ public class AuthEndpointsTests : IClassFixture<GameApiFactory>
     public async Task PlayerStats_CountsEveryRegisteredHero()
     {
         var client = _factory.CreateClient();
-        var before = await client.GetFromJsonAsync<PlayerStatsResponse>("/api/players/stats");
+        var before = await client.GetFromJsonAsync<PlayerStatsResponse>("/api/v1/players/stats");
 
         await RegisterAsync(client, NewUsername());
-        var after = await client.GetFromJsonAsync<PlayerStatsResponse>("/api/players/stats");
+        var after = await client.GetFromJsonAsync<PlayerStatsResponse>("/api/v1/players/stats");
 
         Assert.Equal(before!.RegisteredPlayers + 1, after!.RegisteredPlayers);
     }
 
     private static async Task<AuthResponse> RegisterAsync(HttpClient client, string username)
     {
-        var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register", new { Username = username, Password });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
     }

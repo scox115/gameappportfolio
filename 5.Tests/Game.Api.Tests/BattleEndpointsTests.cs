@@ -33,7 +33,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = await SignedInClientAsync();
 
-        var response = await client.PostAsync("/api/battles/pve", null);
+        var response = await client.PostAsync("/api/v1/battles/pve", null);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var battle = await response.Content.ReadFromJsonAsync<BattleStateResponse>(Json);
@@ -49,7 +49,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         var first = await StartBattleAsync(client);
         await PlayAsync(client, first.Id, "Fireball");
 
-        var response = await client.PostAsync("/api/battles/pve", null);
+        var response = await client.PostAsync("/api/v1/battles/pve", null);
         var resumed = await response.Content.ReadFromJsonAsync<BattleStateResponse>(Json);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -87,7 +87,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(0, result.TurnResult.BossDamage);
         Assert.Equal(BattleCard.HolyShield, result.Battle.RechargingCard);
 
-        var again = await client.PostAsJsonAsync($"/api/battles/pve/{battle.Id}/turns", new { Card = "HolyShield" });
+        var again = await client.PostAsJsonAsync($"/api/v1/battles/pve/{battle.Id}/turns", new { Card = "HolyShield" });
         Assert.Equal(HttpStatusCode.BadRequest, again.StatusCode);
     }
 
@@ -104,16 +104,16 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         var bountyGold = final.Reward!.BountiesCompleted!.Sum(b => b.Reward);
         Assert.Equal(0, final.Reward.StreakBonus);
         Assert.Equal(MatchRulesEngine.WinGold + bountyGold, final.Reward.GoldEarned);
-        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
         Assert.Equal(Player.StartingGold + MatchRulesEngine.WinGold + bountyGold, me!.Gold);
         Assert.Equal(1, me.WinStreak);
         Assert.False(final.Reward.ReducedBossReward);
         Assert.Equal(Player.FullRewardBossWinsPerDay - 1, final.Reward.FullRewardBossWinsLeft);
 
-        var extraMove = await client.PostAsJsonAsync($"/api/battles/pve/{battle.Id}/turns", new { Card = "Fireball" });
+        var extraMove = await client.PostAsJsonAsync($"/api/v1/battles/pve/{battle.Id}/turns", new { Card = "Fireball" });
         Assert.Equal(HttpStatusCode.Conflict, extraMove.StatusCode);
 
-        var next = await client.PostAsync("/api/battles/pve", null);
+        var next = await client.PostAsync("/api/v1/battles/pve", null);
         Assert.Equal(HttpStatusCode.Created, next.StatusCode);
     }
 
@@ -144,7 +144,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         var battle = await StartBattleAsync(owner);
         var intruder = await SignedInClientAsync();
 
-        var response = await intruder.PostAsJsonAsync($"/api/battles/pve/{battle.Id}/turns", new { Card = "DragonClaw" });
+        var response = await intruder.PostAsJsonAsync($"/api/v1/battles/pve/{battle.Id}/turns", new { Card = "DragonClaw" });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -155,7 +155,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         var client = await SignedInClientAsync();
         var battle = await StartBattleAsync(client);
 
-        var response = await client.PostAsJsonAsync($"/api/battles/pve/{battle.Id}/turns", new { Card = "InstantWin" });
+        var response = await client.PostAsJsonAsync($"/api/v1/battles/pve/{battle.Id}/turns", new { Card = "InstantWin" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -165,7 +165,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = await SignedInClientAsync();
 
-        var response = await client.PostAsJsonAsync("/api/matches/pve/complete", new { IsVictory = true });
+        var response = await client.PostAsJsonAsync("/api/v1/matches/pve/complete", new { IsVictory = true });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -175,10 +175,10 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = await SignedInClientAsync();
 
-        var response = await client.PostAsync("/api/battles/pve?difficulty=Heroic", null);
+        var response = await client.PostAsync("/api/v1/battles/pve?difficulty=Heroic", null);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var status = await client.GetFromJsonAsync<BountiesResponse>("/api/bounties", Json);
+        var status = await client.GetFromJsonAsync<BountiesResponse>("/api/v1/bounties", Json);
         Assert.False(status!.HeroicUnlocked);
     }
 
@@ -186,7 +186,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
     public async Task HeroicBoss_FirstWinTodayPaysTheHeroicReward_LaterWinsPayLess()
     {
         var client = await MaxedOutClientAsync();
-        var status = await client.GetFromJsonAsync<BountiesResponse>("/api/bounties", Json);
+        var status = await client.GetFromJsonAsync<BountiesResponse>("/api/v1/bounties", Json);
         Assert.True(status!.HeroicUnlocked);
         Assert.True(status.HeroicRewardAvailable);
 
@@ -211,7 +211,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         Assert.True(second.Reward!.ReducedBossReward);
 
         // The normal boss's full-reward wins are untouched.
-        status = await client.GetFromJsonAsync<BountiesResponse>("/api/bounties", Json);
+        status = await client.GetFromJsonAsync<BountiesResponse>("/api/v1/bounties", Json);
         Assert.False(status!.HeroicRewardAvailable);
         Assert.Equal(Player.FullRewardBossWinsPerDay, status.FullRewardBossWinsLeft);
     }
@@ -220,13 +220,13 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
     private async Task<HttpClient> MaxedOutClientAsync()
     {
         var client = await SignedInClientAsync();
-        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+        var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
         await _factory.GiveGoldAsync(me!.Id, 2000);
         foreach (var item in new[] { "FireballUpgrade", "HolyShieldUpgrade", "DragonClawUpgrade" })
         {
             for (var level = 1; level < BattleCards.MaxLevel; level++)
             {
-                var bought = await client.PostAsJsonAsync("/api/shop/purchases", new { Item = item });
+                var bought = await client.PostAsJsonAsync("/api/v1/shop/purchases", new { Item = item });
                 bought.EnsureSuccessStatusCode();
             }
         }
@@ -239,7 +239,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = factory.CreateClient();
         var username = $"hero{Guid.NewGuid():N}"[..20];
-        var response = await client.PostAsJsonAsync("/api/auth/register", new { Username = username, Password });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/register", new { Username = username, Password });
         response.EnsureSuccessStatusCode();
         var auth = await response.Content.ReadFromJsonAsync<AuthResponse>(Json);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
@@ -248,14 +248,14 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
 
     private static async Task<BattleStateResponse> StartBattleAsync(HttpClient client, string query = "")
     {
-        var response = await client.PostAsync("/api/battles/pve" + query, null);
+        var response = await client.PostAsync("/api/v1/battles/pve" + query, null);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<BattleStateResponse>(Json))!;
     }
 
     private static async Task<PlayCardResponse> PlayAsync(HttpClient client, Guid battleId, string card)
     {
-        var response = await client.PostAsJsonAsync($"/api/battles/pve/{battleId}/turns", new { Card = card });
+        var response = await client.PostAsJsonAsync($"/api/v1/battles/pve/{battleId}/turns", new { Card = card });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<PlayCardResponse>(Json))!;
     }
