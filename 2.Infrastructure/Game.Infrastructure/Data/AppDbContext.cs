@@ -1,5 +1,6 @@
 using Game.Core.Battles;
 using Game.Core.Entities;
+using Game.Core.History;
 using Game.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -20,6 +21,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<PveBattle> PveBattles => Set<PveBattle>();
     public DbSet<PvpBattle> PvpBattles => Set<PvpBattle>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<MatchHistoryEntry> MatchHistory => Set<MatchHistoryEntry>();
+    public DbSet<DailyArenaStats> DailyArenaStats => Set<DailyArenaStats>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

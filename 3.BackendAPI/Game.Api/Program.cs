@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Azure.Storage.Blobs;
 using Game.Core.Interfaces;
 using Game.Infrastructure.Storage;
+using Game.Infrastructure.History;
 using RabbitMQ.Client;
 using Game.Api.Workers; // Add this using statement to register background workers
 using Game.Api.Options;
@@ -244,6 +245,7 @@ builder.Services.AddSignalR(options => options.AddFilter<ActiveSessionHubFilter>
 builder.Services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
 builder.Services.AddSingleton<PvpMatchmaker>();
 builder.Services.AddScoped<PvpBattleService>();
+builder.Services.AddScoped<MatchHistoryProjector>();
 builder.Services.AddHostedService<PvpTurnTimeoutWorker>();
 
 // Enums such as battle cards and status travel as readable strings ("DragonClaw", "Won").
@@ -286,6 +288,7 @@ app.MapPvpEndpoints();
 app.MapShopEndpoints();
 app.MapClassEndpoints();
 app.MapBountyEndpoints();
+app.MapHistoryEndpoints();
 app.MapGameHealthChecks();
 app.MapHub<ArenaHub>(ArenaHub.Path);
 app.MapHub<SessionHub>(SessionHub.Path);

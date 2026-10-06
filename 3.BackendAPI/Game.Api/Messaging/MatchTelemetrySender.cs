@@ -113,7 +113,7 @@ public class MatchTelemetrySender(
             routingKey: MatchTelemetryPublisher.MatchCompletedQueue,
             mandatory: false,
             basicProperties: properties,
-            body: JsonSerializer.SerializeToUtf8Bytes(matchEvent),
+            body: JsonSerializer.SerializeToUtf8Bytes(matchEvent, MatchEventJson.Options),
             cancellationToken: cancellationToken);
     }
 
