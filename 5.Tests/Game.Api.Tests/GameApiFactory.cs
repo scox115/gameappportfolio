@@ -1,3 +1,4 @@
+using Game.Api.Messaging;
 using Game.Api.Workers;
 using Game.Core.Battles;
 using Game.Infrastructure.Data;
@@ -48,9 +49,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
             services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_databaseName));
 
-            // The telemetry consumer needs a live broker; it isn't part of what these tests cover.
-            var worker = services.Single(d => d.ImplementationType == typeof(MatchConsumerWorker));
-            services.Remove(worker);
+            // The telemetry sender and consumer need a live broker; they aren't part of what these tests cover.
+            services.Remove(services.Single(d => d.ImplementationType == typeof(MatchConsumerWorker)));
+            services.Remove(services.Single(d => d.ImplementationType == typeof(MatchTelemetrySender)));
 
             // Every roll is the minimum, which always favours the player: cards always land and
             // the boss always uses a plain Slash, so battle outcomes are predictable.

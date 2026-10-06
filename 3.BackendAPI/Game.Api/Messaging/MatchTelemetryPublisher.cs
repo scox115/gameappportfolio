@@ -1,42 +1,31 @@
-using System.Text;
-using System.Text.Json;
+using System.Threading.Channels;
 using Game.Core.Events;
-using RabbitMQ.Client;
 
 namespace Game.Api.Messaging;
 
-// Publishes a fire-and-forget telemetry notice after a match is settled. Rewards are
-// already saved by then, so a broker outage must never fail the player's request.
-public class MatchTelemetryPublisher(IConnectionFactory connectionFactory, ILogger<MatchTelemetryPublisher> logger)
+// Queues a telemetry notice after a match is settled. Rewards are already saved by then, so this
+// only drops the event into memory and returns; MatchTelemetrySender delivers it to RabbitMQ in the
+// background. A slow or missing broker therefore never delays or fails the player's request.
+public class MatchTelemetryPublisher(ILogger<MatchTelemetryPublisher> logger)
 {
     public const string MatchCompletedQueue = "match-completed-queue";
 
-    public async Task PublishAsync(MatchCompletedEvent matchEvent, CancellationToken cancellationToken = default)
+    /// <summary>Events waiting to be sent. If the broker is down for long, the oldest are dropped first.</summary>
+    public const int Capacity = 1_000;
+
+    private readonly Channel<MatchCompletedEvent> _pending = Channel.CreateBounded<MatchCompletedEvent>(
+        new BoundedChannelOptions(Capacity)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true
+        },
+        dropped => logger.LogWarning("Telemetry backlog is full; dropped match {MatchId}.", dropped.MatchId));
+
+    public ChannelReader<MatchCompletedEvent> Pending => _pending.Reader;
+
+    public Task PublishAsync(MatchCompletedEvent matchEvent, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
-            using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
-
-            await channel.QueueDeclareAsync(
-                queue: MatchCompletedQueue,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: null,
-                cancellationToken: cancellationToken);
-
-            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(matchEvent));
-
-            await channel.BasicPublishAsync(
-                exchange: string.Empty,
-                routingKey: MatchCompletedQueue,
-                body: body,
-                cancellationToken: cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Could not publish match telemetry for match {MatchId}.", matchEvent.MatchId);
-        }
+        _pending.Writer.TryWrite(matchEvent);
+        return Task.CompletedTask;
     }
 }

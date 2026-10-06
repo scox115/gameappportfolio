@@ -25,64 +25,94 @@ public class MatchConsumerWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        try
+        // RabbitMQ may not be up yet (or may be restarting), so keep trying instead of giving up.
+        // Once connected, the client's automatic recovery reconnects the consumer after a drop.
+        for (var attempt = 0; !stoppingToken.IsCancellationRequested; attempt++)
         {
-            // 1. Establish the connection channels down to port 5672 inside Docker
-            _connection = await _connectionFactory.CreateConnectionAsync(stoppingToken);
-            _channel = await _connection.CreateChannelAsync(cancellationToken: stoppingToken);
-
-            // 2. Ensure the target queue exists before reading from it
-            await _channel.QueueDeclareAsync(
-                queue: QueueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: null,
-                cancellationToken: stoppingToken);
-
-            _logger.LogInformation("🚀 Free RabbitMQ Background Consumer Worker initialized and listening on {Queue}...", QueueName);
-
-            // 3. Set up the event-driven consumer listener pipeline
-            var consumer = new AsyncEventingBasicConsumer(_channel);
-            consumer.ReceivedAsync += async (model, ea) =>
+            try
             {
-                var body = ea.Body.ToArray();
-                var messageJson = Encoding.UTF8.GetString(body);
-                
-                _logger.LogInformation("📨 Raw message pulled off the queue: {Message}", messageJson);
-
+                await StartConsumingAsync(stoppingToken);
+                await Task.Delay(Timeout.Infinite, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                var delay = Messaging.RabbitMqRetry.DelayFor(attempt);
+                _logger.LogWarning("Telemetry consumer couldn't reach RabbitMQ ({Error}); retrying in {Delay}s.", ex.Message, delay.TotalSeconds);
+                await CloseAsync();
                 try
                 {
-                    // 4. Parse the message body text contract back into a usable payload object
-                    var matchEvent = JsonSerializer.Deserialize<MatchCompletedEvent>(messageJson);
-                    if (matchEvent != null)
-                    {
-                        RecordTelemetry(matchEvent);
-                    }
-
-                    // Acknowledge the message was successfully processed so RabbitMQ can safely delete it
-                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
+                    await Task.Delay(delay, stoppingToken);
                 }
-                catch (Exception ex)
+                catch (OperationCanceledException)
                 {
-                    _logger.LogError(ex, "❌ Failed to read match telemetry message.");
-                    // Drop malformed telemetry instead of requeueing it forever
-                    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken: stoppingToken);
+                    return;
                 }
-            };
-
-            // Start consuming text packets off the queue stream
-            await _channel.BasicConsumeAsync(QueueName, autoAck: false, consumer: consumer, cancellationToken: stoppingToken);
-
-            // Keep the background loop alive until .NET tells the host process to shut down
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                await Task.Delay(1000, stoppingToken);
             }
+        }
+    }
+
+    private async Task StartConsumingAsync(CancellationToken stoppingToken)
+    {
+        _connection = await _connectionFactory.CreateConnectionAsync("card-arena-telemetry-consumer", stoppingToken);
+        var channel = await _connection.CreateChannelAsync(cancellationToken: stoppingToken);
+        _channel = channel;
+
+        // Ensure the target queue exists before reading from it
+        await channel.QueueDeclareAsync(
+            queue: QueueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null,
+            cancellationToken: stoppingToken);
+
+        var consumer = new AsyncEventingBasicConsumer(channel);
+        consumer.ReceivedAsync += async (model, ea) =>
+        {
+            var messageJson = Encoding.UTF8.GetString(ea.Body.Span);
+
+            try
+            {
+                var matchEvent = JsonSerializer.Deserialize<MatchCompletedEvent>(messageJson);
+                if (matchEvent != null)
+                {
+                    RecordTelemetry(matchEvent);
+                }
+
+                // Acknowledge the message was processed so RabbitMQ can delete it
+                await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read match telemetry message: {Message}", messageJson);
+                // Drop malformed telemetry instead of requeueing it forever
+                await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken: stoppingToken);
+            }
+        };
+
+        await channel.BasicConsumeAsync(QueueName, autoAck: false, consumer: consumer, cancellationToken: stoppingToken);
+        _logger.LogInformation("Telemetry consumer listening on {Queue}.", QueueName);
+    }
+
+    private async Task CloseAsync()
+    {
+        try
+        {
+            if (_channel is not null) await _channel.DisposeAsync();
+            if (_connection is not null) await _connection.DisposeAsync();
         }
         catch (Exception ex)
         {
-            _logger.LogCritical(ex, "💥 Critical crash occurred inside the background messaging consumer runtime.");
+            _logger.LogDebug(ex, "Ignoring an error while closing the telemetry consumer connection.");
+        }
+        finally
+        {
+            _channel = null;
+            _connection = null;
         }
     }
 
