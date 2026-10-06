@@ -103,14 +103,18 @@
 
         case GameScreen.CharacterDashboard:
                             <!-- RENDERS TOWN INVENTORY AND AVATAR FILE UPLOADER -->
-                            <div style="display: flex; gap: 30px; max-width: 1100px; margin: 0 auto;">
+                            <div style="max-width: 480px; margin: 0 auto;">
                 
                                 <!-- CHARACTER CARD BOX -->
                                 <div
-                                    style="flex: 1; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155; text-align: center;">
+                                    style="background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155; text-align: center;">
                                     <img src="@(string.IsNullOrEmpty(State.AvatarUrl) ? "https://dicebear.com" + State.Username : State.AvatarUrl)"
                                          style="width: 160px; height: 160px; border-radius: 50%; @CosmeticStyles.Frame(State.Frame, 5, "4px solid #6366f1") object-fit: cover; background: #0f172a; margin-bottom: 15px;" />
                                     <h2 style="margin: 0; color: #f1f5f9;">@State.Username</h2>
+                                    <button @onclick="OpenPortraitPopup"
+                                            style="background: none; border: 1px solid #475569; color: #94a3b8; border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; cursor: pointer; margin-top: 8px;">
+                                        🖼️ Change portrait
+                                    </button>
                                     <ClassSwitcher />
                     
                                     <button @onclick="() => EnterArena()"
@@ -132,28 +136,33 @@
                                     }
                                 </div>
 
-                                <!-- CLOUD UPLOADER BOX -->
-                                <div
-                                    style="flex: 1.5; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155; display: flex; flex-direction: column; justify-content: space-between;">
-                                    <div>
-                                        <h4 style="margin-top: 0; color: #f1f5f9; font-size: 1.2rem;">🛡️ Hero Customization</h4>
-                                        <p style="color: #94a3b8; font-size: 0.9rem; line-height: 1.5;">Upload a custom image file to set your
-                                            portrait banner card. This streams bytes directly to Azurite Cloud Storage emulation over port
-                                            10000.</p>
-                        
-                                            <div
-                                                style="border: 2px dashed #475569; padding: 25px; border-radius: 12px; text-align: center; margin-top: 20px; background: #0f172a;">
-                                                <InputFile OnChange="HandleFileSelected" accept=".png,.jpg,.jpeg" style="color: #94a3b8;" />
-                                            </div>
-                                        </div>
+                            </div>
 
+                            @if (showPortraitPopup)
+                            {
+                                <!-- PORTRAIT UPLOAD POPUP -->
+                                <div role="dialog" aria-modal="true" aria-labelledby="portrait-title" @onclick="ClosePortraitPopup"
+                                     style="position: fixed; inset: 0; background: rgba(2,6,23,0.75); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;">
+                                    <div @onclick:stopPropagation="true"
+                                         style="background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; width: 100%; max-width: 380px; color: #f1f5f9;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <h4 id="portrait-title" style="margin: 0; font-size: 1.1rem;">🛡️ Change portrait</h4>
+                                            <button aria-label="Close" @onclick="ClosePortraitPopup"
+                                                    style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;">✕</button>
+                                        </div>
+                                        <p style="color: #94a3b8; font-size: 0.85rem; margin: 8px 0 14px;">PNG or JPG, up to 5 MB.</p>
+                                        <InputFile OnChange="HandleFileSelected" accept=".png,.jpg,.jpeg" style="color: #94a3b8; width: 100%;" />
+                                        @if (!string.IsNullOrEmpty(uploadError))
+                                        {
+                                            <p style="color: #f87171; font-size: 0.85rem; margin: 10px 0 0;">@uploadError</p>
+                                        }
                                         <button @onclick="ExecuteAvatarUpload" disabled="@(selectedFile == null || uploading)"
-                                                style="width: 100%; background: #6366f1; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 20px;">
-                                            @(uploading ? "Uploading Binary Blocks..." : "Commit Image to Cloud Storage")
+                                                style="width: 100%; background: #6366f1; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; margin-top: 16px; cursor: @(selectedFile == null || uploading ? "not-allowed" : "pointer"); opacity: @(selectedFile == null || uploading ? "0.5" : "1");">
+                                            @(uploading ? "Uploading..." : "Save portrait")
                                         </button>
                                     </div>
-
                                 </div>
+                            }
                                 <BountyBoard />
                                 break;
 
@@ -374,6 +383,20 @@
     private string statusMsg = string.Empty;
     private bool uploading = false;
     private IBrowserFile? selectedFile;
+    private bool showPortraitPopup;
+    private string uploadError = string.Empty;
+
+    private void OpenPortraitPopup()
+    {
+        selectedFile = null;
+        uploadError = string.Empty;
+        showPortraitPopup = true;
+    }
+
+    private void ClosePortraitPopup()
+    {
+        if (!uploading) showPortraitPopup = false;
+    }
 
     // Arena State (mirrors the server's battle; the server decides every outcome)
     private Guid battleId;
@@ -481,7 +504,11 @@
         return "Registration failed. Please check your details.";
     }
 
-    private void HandleFileSelected(InputFileChangeEventArgs e) => selectedFile = e.File;
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        uploadError = string.Empty;
+    }
 
     private async Task ExecuteAvatarUpload()
     {
@@ -489,6 +516,7 @@
         try
         {
             uploading = true;
+            uploadError = string.Empty;
             using var content = new MultipartFormDataContent();
             var fileStream = selectedFile.OpenReadStream(maxAllowedSize: 1024 * 1024 * 5);
             var streamContent = new StreamContent(fileStream);
@@ -501,8 +529,13 @@
                 var result = await res.Content.ReadFromJsonAsync<UploadResponse>();
                 if (result != null) State.UpdateAvatar(result.avatarUrl);
                 selectedFile = null;
+                showPortraitPopup = false;
             }
+            else uploadError = res.StatusCode == HttpStatusCode.BadRequest
+                ? "That file couldn't be used. Pick a PNG or JPG under 5 MB."
+                : "Upload failed. Please try again.";
         }
+        catch { uploadError = "Upload failed. Make sure the file is a PNG or JPG under 5 MB and try again."; }
         finally { uploading = false; }
     }
 
