@@ -97,9 +97,41 @@ public static class PlayerEndpoints
         group.MapGet("/stats", async (AppDbContext dbContext) =>
             Results.Ok(new PlayerStatsResponse(await dbContext.Players.CountAsync())));
 
-        // GET: /api/players/leaderboard
-        group.MapGet("/leaderboard", async (AppDbContext dbContext) =>
+        // GET: /api/players/leaderboard[?class=Paladin]
+        group.MapGet("/leaderboard", async (AppDbContext dbContext, HeroClass? @class) =>
         {
+            if (@class is { } heroClass)
+            {
+                if (!Enum.IsDefined(heroClass))
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["class"] = ["Unknown class."]
+                    });
+                }
+
+                // Top 10 duelists as this class, by wins then fewest losses; rating breaks ties.
+                var classLeaders = await dbContext.Players
+                    .SelectMany(p => p.ClassRecords
+                        .Where(r => r.Class == heroClass && r.Wins + r.Losses > 0)
+                        .Select(r => new { Player = p, r.Wins, r.Losses }))
+                    .OrderByDescending(x => x.Wins)
+                    .ThenBy(x => x.Losses)
+                    .ThenByDescending(x => x.Player.Rating)
+                    .Take(10)
+                    .Select(x => new
+                    {
+                        x.Player.Id, x.Player.Username, x.Player.Level, x.Player.Gold, x.Player.AvatarUrl,
+                        x.Player.EquippedTitle, PvpWins = x.Wins, PvpLosses = x.Losses, x.Player.Rating,
+                        x.Player.EquippedFrame, x.Player.Class
+                    })
+                    .ToListAsync();
+
+                return Results.Ok(classLeaders.Select(p => LeaderboardRow(
+                    p.Id, p.Username, p.EquippedTitle, p.Level, p.Gold, p.Rating, p.PvpWins, p.PvpLosses,
+                    p.AvatarUrl, p.EquippedFrame, p.Class)));
+            }
+
             // Top 10 by PvP rating; level and experience break ties (such as players who haven't dueled yet)
             var topPlayers = await dbContext.Players
                 .OrderByDescending(p => p.Rating)
@@ -109,20 +141,26 @@ public static class PlayerEndpoints
                 .Select(p => new { p.Id, p.Username, p.Level, p.Gold, p.AvatarUrl, p.EquippedTitle, p.PvpWins, p.PvpLosses, p.Rating, p.EquippedFrame, p.Class })
                 .ToListAsync();
 
-            return Results.Ok(topPlayers.Select(p => new
-            {
-                id = p.Id,
-                username = p.Username,
-                title = p.EquippedTitle is { } title ? PlayerTitles.Get(title).Name : null,
-                level = p.Level,
-                gold = p.Gold,
-                rating = p.Rating,
-                pvpWins = p.PvpWins,
-                pvpLosses = p.PvpLosses,
-                avatarUrl = p.AvatarUrl,
-                frame = p.EquippedFrame,
-                heroClass = HeroClasses.Get(p.Class).Name
-            }));
+            return Results.Ok(topPlayers.Select(p => LeaderboardRow(
+                p.Id, p.Username, p.EquippedTitle, p.Level, p.Gold, p.Rating, p.PvpWins, p.PvpLosses,
+                p.AvatarUrl, p.EquippedFrame, p.Class)));
         });
     }
+
+    private static object LeaderboardRow(Guid id, string username, PlayerTitle? title, int level, int gold, int rating,
+        int pvpWins, int pvpLosses, string? avatarUrl, Cosmetic? frame, HeroClass heroClass) => new
+    {
+        id,
+        username,
+        title = title is { } t ? PlayerTitles.Get(t).Name : null,
+        level,
+        gold,
+        rating,
+        pvpWins,
+        pvpLosses,
+        avatarUrl,
+        frame,
+        heroClass = HeroClasses.Get(heroClass).Name
+    };
+
 }

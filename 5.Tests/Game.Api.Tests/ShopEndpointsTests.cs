@@ -180,6 +180,31 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
     }
 
     [Fact]
+    public async Task TheLeaderboardCanShowOneClassesRecords()
+    {
+        var (client, playerId) = await SignedInPlayerAsync();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FindAsync(playerId);
+            for (var i = 0; i < 1_000; i++) player!.RecordPvpWin(ratingGained: 0, playedAs: HeroClass.Paladin);
+            player!.RecordPvpLoss(ratingLost: 0, playedAs: HeroClass.Ranger);
+            await db.SaveChangesAsync();
+        }
+
+        var paladins = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/players/leaderboard?class=Paladin", Json);
+        var rangers = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/players/leaderboard?class=Ranger", Json);
+        var sorcerers = await client.GetFromJsonAsync<List<LeaderboardRow>>("/api/players/leaderboard?class=Sorcerer", Json);
+
+        Assert.Equal(playerId, paladins![0].Id);
+        Assert.Equal((1_000, 0), (paladins[0].PvpWins, paladins[0].PvpLosses));
+        var asRanger = rangers!.Single(r => r.Id == playerId);
+        Assert.Equal((0, 1), (asRanger.PvpWins, asRanger.PvpLosses));
+        Assert.DoesNotContain(sorcerers!, r => r.Id == playerId);
+        Assert.Equal(paladins.OrderByDescending(r => r.PvpWins).Select(r => r.Id), paladins.Select(r => r.Id));
+    }
+
+    [Fact]
     public async Task Cosmetics_CanBeBoughtWornAndTakenOff()
     {
         var (client, playerId) = await SignedInPlayerAsync();

@@ -272,7 +272,8 @@ public class PvpBattleService(
 
         var match = new GameMatch(battle.PlayerOneId, battle.PlayerTwoId);
         dbContext.Matches.Add(match);
-        var settlement = new MatchRulesEngine(timeProvider).ProcessMatchWin(match, winner, loser, battle.Wager);
+        var settlement = new MatchRulesEngine(timeProvider).ProcessMatchWin(match, winner, loser, battle.Wager,
+            battle.ClassOf(winnerId), battle.ClassOf(loserId));
         battle.AttachMatch(match.Id);
 
         var rewards = new Dictionary<Guid, BattleRewardResponse>

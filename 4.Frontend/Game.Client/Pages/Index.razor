@@ -168,10 +168,24 @@
                                 <div style="max-width: 800px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
                                     <div style="text-align: center; margin-bottom: 25px;">
                                         <h3 style="margin: 0; color: #fbbf24; font-size: 1.8rem; font-weight: 800;">🏆 GLOBAL HERO RANKINGS</h3>
-                                        <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 5px;">Ranked by PvP rating: beat stronger heroes to climb faster</p>
+                                        <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 5px;">@(leaderboardClass is null
+                                            ? "Ranked by PvP rating: beat stronger heroes to climb faster"
+                                            : $"Duels fought as a {leaderboardClass}, ranked by wins")</p>
                                         @if (registeredPlayers is { } total)
                                         {
                                             <p style="color: #22d3ee; font-weight: bold; margin: 10px 0 0;">👥 @total.ToString("N0") registered hero@(total == 1 ? "" : "es")</p>
+                                        }
+                                    </div>
+
+                                    <!-- ALL HEROES, OR ONE CLASS'S DUEL RECORDS -->
+                                    <div role="tablist" style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;">
+                                        @foreach (var tab in LeaderboardTabs)
+                                        {
+                                            var active = tab == leaderboardClass;
+                                            <button role="tab" aria-selected="@(active ? "true" : "false")" @onclick="() => ShowLeaderboard(tab)"
+                                                    style="background: @(active ? "#312e81" : "#0f172a"); color: @(active ? "white" : "#94a3b8"); border: 1px solid @(active ? "#818cf8" : "#334155"); border-radius: 20px; padding: 6px 14px; cursor: pointer; font-weight: bold;">
+                                                @(tab is null ? "🌐 All" : $"{HeroClassIcons.For(tab)} {tab}")
+                                            </button>
                                         }
                                     </div>
 
@@ -181,7 +195,7 @@
                                     }
                                     else if (leaderboardPlayers == null || !leaderboardPlayers.Any())
                                     {
-                                        <p style="text-align: center; color: #f87171;">No heroes have claimed records inside the arena yet.</p>
+                                        <p style="text-align: center; color: #f87171;">@(leaderboardClass is null ? "No heroes have claimed records inside the arena yet." : $"No {leaderboardClass} has fought a duel yet.")</p>
                                     }
                                     else
                                     {
@@ -193,7 +207,7 @@
                                                         <th style="padding: 12px;">Hero</th>
                                                         <th style="padding: 12px; text-align: center;">Rating</th>
                                                         <th style="padding: 12px; text-align: center;">Level</th>
-                                                        <th style="padding: 12px; text-align: center;">Duels W-L</th>
+                                                        <th style="padding: 12px; text-align: center;">@(leaderboardClass is null ? "Duels W-L" : $"{leaderboardClass} W-L")</th>
                                                         <th style="padding: 12px; text-align: right;">Gold Reserves</th>
                                                     </tr>
                                                 </thead>
@@ -212,7 +226,7 @@
                                                                 <span style="color: @(isCurrentUser ? "#818cf8" : "#f1f5f9");">@item.username @(isCurrentUser ? " (You)" : "")</span>
                                                                 @if (item.heroClass is { } heroClass)
                                                                 {
-                                                                    <span title="@heroClass">@HeroClassIcons.For(heroClass)</span>
+                                                                    <span title="Plays @heroClass now">@HeroClassIcons.For(heroClass)</span>
                                                                 }
                                                                 @if (!string.IsNullOrEmpty(item.title))
                                                                 {
@@ -668,15 +682,29 @@
     private record BattleResultView(bool won, int goldEarned, int experienceEarned, bool leveledUp, int newLevel,
         int streakBonus, IReadOnlyList<RewardBonuses.BountyLine> bounties, bool reducedBossReward, int? fullRewardWinsLeft);
 
+    // null is every hero ranked by rating; a class shows only duels fought as that class.
+    private static readonly string?[] LeaderboardTabs = { null, "Sorcerer", "Paladin", "Ranger" };
+    private string? leaderboardClass;
+
     private async Task LaunchLeaderboardView()
     {
         State.ChangeScreen(GameScreen.Leaderboard);
+        await ShowLeaderboard(null);
+    }
+
+    private async Task ShowLeaderboard(string? heroClass)
+    {
+        leaderboardClass = heroClass;
         try
         {
             leaderboardLoading = true;
             var stats = Http.GetFromJsonAsync<PlayerStatsDto>("/api/players/stats");
-            leaderboardPlayers = await Http.GetFromJsonAsync<List<PlayerProfileDto>>("/api/players/leaderboard");
-            registeredPlayers = (await stats)?.registeredPlayers;
+            var players = await Http.GetFromJsonAsync<List<PlayerProfileDto>>(
+                heroClass is null ? "/api/players/leaderboard" : $"/api/players/leaderboard?class={heroClass}");
+            var registered = (await stats)?.registeredPlayers;
+            if (leaderboardClass != heroClass) return; // Another tab was picked while this one loaded
+            leaderboardPlayers = players;
+            registeredPlayers = registered;
         }
         catch
         {

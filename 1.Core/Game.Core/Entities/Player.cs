@@ -14,6 +14,7 @@ public class Player
     private readonly List<OwnedTitle> _titles = new();
     private readonly List<OwnedCosmetic> _cosmetics = new();
     private readonly List<BountyProgress> _bounties = new();
+    private readonly List<ClassRecord> _classRecords = new();
 
     /// <summary>Extra gold per win in a row after the first, up to <see cref="MaxStreakBonus"/>.</summary>
     public const int StreakBonusPerWin = 10;
@@ -49,6 +50,9 @@ public class Player
 
     /// <summary>PvP duels lost.</summary>
     public int PvpLosses { get; private set; }
+
+    /// <summary>PvP wins and losses split by the class the hero played, one entry per class dueled with.</summary>
+    public IReadOnlyCollection<ClassRecord> ClassRecords => _classRecords;
 
     /// <summary>Elo-style PvP rating; everyone starts at <see cref="EloRating.StartingRating"/>.</summary>
     public int Rating { get; private set; } = EloRating.StartingRating;
@@ -147,20 +151,35 @@ public class Player
         Version = Guid.NewGuid();
     }
 
-    public void RecordPvpWin(int ratingGained)
+    /// <param name="playedAs">The class the hero dueled as; defaults to their current class.</param>
+    public void RecordPvpWin(int ratingGained, HeroClass? playedAs = null)
     {
         if (ratingGained < 0) throw new ArgumentException("Rating gained cannot be negative.");
         PvpWins++;
+        ClassRecordFor(playedAs ?? Class).AddWin();
         Rating += ratingGained;
         Version = Guid.NewGuid();
     }
 
-    public void RecordPvpLoss(int ratingLost)
+    /// <param name="playedAs">The class the hero dueled as; defaults to their current class.</param>
+    public void RecordPvpLoss(int ratingLost, HeroClass? playedAs = null)
     {
         if (ratingLost < 0) throw new ArgumentException("Rating lost cannot be negative.");
         PvpLosses++;
+        ClassRecordFor(playedAs ?? Class).AddLoss();
         Rating = Math.Max(EloRating.MinimumRating, Rating - ratingLost);
         Version = Guid.NewGuid();
+    }
+
+    private ClassRecord ClassRecordFor(HeroClass heroClass)
+    {
+        var record = _classRecords.FirstOrDefault(r => r.Class == heroClass);
+        if (record is null)
+        {
+            record = new ClassRecord(heroClass);
+            _classRecords.Add(record);
+        }
+        return record;
     }
 
     public bool OwnsTitle(PlayerTitle title) => _titles.Any(t => t.Title == title);

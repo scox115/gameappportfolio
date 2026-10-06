@@ -1,3 +1,4 @@
+using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Core.Services;
 
@@ -153,6 +154,25 @@ public class MatchRulesEngineTests
         Assert.Equal(0, loser.PvpWins);
         Assert.Equal(0, winner.PvpLosses);
         Assert.Equal(1, loser.PvpLosses);
+    }
+
+    [Fact]
+    public void Pvp_RecordsTheResultUnderTheClassEachHeroDueledAs()
+    {
+        var winner = NewPlayer("a");
+        var loser = NewPlayer("b");
+
+        // The winner switched class mid-duel; the duel still counts for the class they fought as.
+        _engine.ProcessMatchWin(new GameMatch(winner.Id, loser.Id), winner, loser,
+            winnerClass: HeroClass.Paladin, loserClass: HeroClass.Ranger);
+        _engine.ProcessMatchWin(new GameMatch(winner.Id, loser.Id), winner, loser);
+
+        Assert.Equal(2, winner.PvpWins);
+        Assert.Equal(1, winner.ClassRecords.Single(r => r.Class == HeroClass.Paladin).Wins);
+        Assert.Equal(1, winner.ClassRecords.Single(r => r.Class == winner.Class).Wins);
+        Assert.All(winner.ClassRecords, r => Assert.Equal(0, r.Losses));
+        Assert.Equal(1, loser.ClassRecords.Single(r => r.Class == HeroClass.Ranger).Losses);
+        Assert.Equal(2, loser.ClassRecords.Sum(r => r.Losses));
     }
 
     [Fact]
