@@ -54,18 +54,20 @@
                     style="max-width: 450px; margin: 60px auto; background: #1e293b; padding: 35px; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
                     <h3 style="text-align: center; margin-top: 0; color: #f1f5f9;">@(creatingHero ? "Create a New Hero" : "Enter the Realm")</h3>
                 
+                    <!-- A FORM SO PRESSING ENTER IN EITHER FIELD SIGNS IN (OR CREATES THE HERO) -->
+                    <form @onsubmit="SubmitCredentials">
                     <div style="margin-bottom: 20px; margin-top: 25px;">
                         <label
                             style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Character
                             Name:</label>
-                            <input type="text" @bind="inputUsername" placeholder="Enter Character name..." autocomplete="username"
+                            <input type="text" @bind="inputUsername" @bind:event="oninput" placeholder="Enter Character name..." autocomplete="username"
                                    style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
                         </div>
 
                     <div style="margin-bottom: 20px;">
                         <label
                             style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Password:</label>
-                            <input type="password" @bind="inputPassword" placeholder="At least 8 characters..." autocomplete="@(creatingHero ? "new-password" : "current-password")"
+                            <input type="password" @bind="inputPassword" @bind:event="oninput" placeholder="At least 8 characters..." autocomplete="@(creatingHero ? "new-password" : "current-password")"
                                    style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
                         </div>
 
@@ -73,14 +75,15 @@
                     {
                         <!-- ONLY NEW HEROES PICK A CLASS; RETURNING HEROES KEEP THEIRS -->
                         <ClassPicker @bind-Selected="chosenClass" Heading="Choose your class:" />
-                        <button @onclick="HandleRegister"
+                        <button type="submit"
                                 style="width: 100%; background: #059669; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Create Hero</button>
                     }
                     else
                     {
-                        <button @onclick="HandleLogin"
+                        <button type="submit"
                                 style="width: 100%; background: #4f46e5; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">Play Game</button>
                     }
+                    </form>
                     <p style="text-align: center; color: #94a3b8; font-size: 0.9rem; margin: 18px 0 0;">
                         @(creatingHero ? "Already have a hero?" : "New to the arena?")
                         <button @onclick="ToggleCreatingHero" style="background: transparent; border: none; color: #818cf8; cursor: pointer; font-weight: bold; text-decoration: underline; font-size: 0.9rem;">
@@ -409,6 +412,8 @@
     {
         if (firstRender) await Sounds.LoadAsync();
     }
+
+    private Task SubmitCredentials() => creatingHero ? HandleRegister() : HandleLogin();
 
     private async Task HandleLogin()
     {
