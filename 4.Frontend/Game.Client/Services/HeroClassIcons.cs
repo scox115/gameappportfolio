@@ -10,4 +10,13 @@ public static class HeroClassIcons
         "Ranger" => "🏹",
         _ => "❔"
     };
+
+    /// <summary>The card a class boosts, matching HeroClasses on the server, which applies the boost.</summary>
+    public static string? SignatureCard(string? heroClass) => heroClass switch
+    {
+        "Sorcerer" => "Fireball",
+        "Paladin" => "HolyShield",
+        "Ranger" => "DragonClaw",
+        _ => null
+    };
 }
