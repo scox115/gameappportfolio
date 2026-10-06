@@ -1,0 +1,22 @@
+# Architecture Decision Records
+
+Each record explains one decision that shapes this codebase: what problem it solved, what was chosen, what was turned down, and what it costs. They follow Michael Nygard's [ADR format](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions). A record is never rewritten after the fact. If a decision changes, a new record supersedes the old one and says so.
+
+| # | Decision | Status |
+| --- | --- | --- |
+| [0001](0001-clean-architecture.md) | Clean Architecture with a framework-free domain | Accepted |
+| [0002](0002-server-authoritative-battles.md) | The server plays every battle; the client only picks cards | Accepted |
+| [0003](0003-rewards-synchronous-messaging-for-read-models.md) | Pay rewards in the request, use RabbitMQ only for read models | Accepted |
+| [0004](0004-optimistic-concurrency.md) | Optimistic concurrency on players and battles | Accepted |
+| [0005](0005-identity-jwt-refresh-tokens.md) | ASP.NET Core Identity with short JWTs and rotating refresh tokens | Accepted |
+| [0006](0006-single-replica-signalr.md) | Real-time duels on SignalR with an in-memory lobby, one replica | Accepted |
+| [0007](0007-free-tier-azure-hosting.md) | Host on Azure free tiers, scaling to zero | Accepted |
+| [0008](0008-passwordless-azure-access.md) | No stored Azure credentials: managed identity and GitHub OIDC | Accepted |
+| [0009](0009-url-segment-api-versioning.md) | Version the API in the URL | Accepted |
+| [0010](0010-output-caching-with-tag-eviction.md) | Output caching evicted by EF Core saves, not Redis | Accepted |
+| [0011](0011-feature-flags.md) | Feature flags in configuration, with optional Azure App Configuration | Accepted |
+| [0012](0012-testing-strategy.md) | A test pyramid that runs on every pull request | Accepted |
+| [0013](0013-aspire-for-local-orchestration.md) | .NET Aspire for local runs, Docker Compose kept | Accepted |
+| [0014](0014-simulation-driven-balance.md) | Tune game balance with simulations, not guesses | Accepted |
+
+To add one, copy [template.md](template.md), give it the next number, and add it to the table.
