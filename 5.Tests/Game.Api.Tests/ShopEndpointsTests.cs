@@ -94,11 +94,12 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
         Assert.Equal(battle.PlayerHp, battle.PlayerMaxHp);
         var fireball = battle.Cards.Single(c => c.Card == BattleCard.Fireball);
         Assert.Equal(2, fireball.Level);
-        Assert.Equal(25, fireball.Damage);
+        // A level-2 Fireball, plus the Sorcerer's class boost.
+        Assert.Equal(HeroClasses.CardFor(HeroClass.Sorcerer, BattleCard.Fireball, 2).Damage, fireball.Damage);
 
         var turn = await client.PostAsJsonAsync($"/api/battles/pve/{battle.Id}/turns", new { Card = "Fireball" });
         var played = (await turn.Content.ReadFromJsonAsync<PlayCardResponse>(Json))!;
-        Assert.Equal(25, played.TurnResult.DamageDealt);
+        Assert.Equal(fireball.Damage, played.TurnResult.DamageDealt);
 
         var shop = await client.GetFromJsonAsync<ShopResponse>("/api/shop", Json);
         Assert.Equal(0, shop!.Offers.Single(o => o.Item == ShopItem.BattleElixir).Owned);

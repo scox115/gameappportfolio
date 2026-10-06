@@ -36,6 +36,14 @@ public static class AuthEndpoints
                 });
             }
 
+            if (request.Class is { } chosen && !Enum.IsDefined(chosen))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(RegisterRequest.Class)] = ["Unknown class."]
+                });
+            }
+
             if (await dbContext.Players.AnyAsync(p => p.Username == username))
             {
                 return Results.Conflict(new { message = $"The username '{username}' is already taken." });
@@ -43,6 +51,7 @@ public static class AuthEndpoints
 
             var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = username };
             var player = new Player(user.Id, username, Player.StartingGold);
+            if (request.Class is { } heroClass) player.ChooseStartingClass(heroClass);
 
             // The player is tracked on the same DbContext the Identity store saves with,
             // so the account and the profile are written in one SaveChanges call.

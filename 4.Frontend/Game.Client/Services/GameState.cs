@@ -85,6 +85,15 @@ public class GameState
         NotifyStateChanged();
     }
 
+    /// <summary>The hero's class, such as "Paladin".</summary>
+    public string HeroClass { get; private set; } = "Sorcerer";
+
+    public void UpdateClass(string heroClass)
+    {
+        HeroClass = heroClass;
+        NotifyStateChanged();
+    }
+
     public void UpdateAvatar(string url)
     {
         AvatarUrl = url;

@@ -59,8 +59,8 @@ public class HeroicBossTests
     [Fact]
     public void HeroicBoss_EnragesAtHalfHealth()
     {
-        // Level-3 Dragon Claw hits for 45: 200 -> 155 -> 110 (not yet enraged), Fireball 30 -> 80.
-        var battle = PveBattle.Start(Guid.NewGuid(), Now, new BattleLoadout(3, 3, 3, 0), BossDifficulty.Heroic);
+        // A Paladin's level-3 Dragon Claw hits for 45 and Fireball for 30: 200 -> 155 -> 125 -> 80.
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, new BattleLoadout(3, 3, 3, 0, HeroClass.Paladin), BossDifficulty.Heroic);
         battle.PlayCard(BattleCard.DragonClaw, new LowRolls(), Now);
         battle.PlayCard(BattleCard.Fireball, new LowRolls(), Now);
         Assert.False(battle.IsEnraged);

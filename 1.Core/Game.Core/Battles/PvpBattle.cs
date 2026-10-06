@@ -55,6 +55,8 @@ public class PvpBattle
     // Elixir) and card levels.
     public int PlayerOneMaxHp { get; private set; } = BasePlayerMaxHp;
     public int PlayerTwoMaxHp { get; private set; } = BasePlayerMaxHp;
+    public HeroClass PlayerOneClass { get; private set; }
+    public HeroClass PlayerTwoClass { get; private set; }
     public int PlayerOneFireballLevel { get; private set; } = 1;
     public int PlayerOneHolyShieldLevel { get; private set; } = 1;
     public int PlayerOneDragonClawLevel { get; private set; } = 1;
@@ -121,10 +123,12 @@ public class PvpBattle
             Id = Guid.NewGuid(),
             PlayerOneId = firstPlayerId,
             PlayerTwoId = secondPlayerId,
-            PlayerOneHp = BasePlayerMaxHp + firstLoadout.BonusHp,
-            PlayerTwoHp = BasePlayerMaxHp + secondLoadout.BonusHp,
-            PlayerOneMaxHp = BasePlayerMaxHp + firstLoadout.BonusHp,
-            PlayerTwoMaxHp = BasePlayerMaxHp + secondLoadout.BonusHp,
+            PlayerOneHp = MaxHpFor(firstLoadout),
+            PlayerTwoHp = MaxHpFor(secondLoadout),
+            PlayerOneMaxHp = MaxHpFor(firstLoadout),
+            PlayerTwoMaxHp = MaxHpFor(secondLoadout),
+            PlayerOneClass = firstLoadout.Class,
+            PlayerTwoClass = secondLoadout.Class,
             PlayerOneFireballLevel = firstLoadout.FireballLevel,
             PlayerOneHolyShieldLevel = firstLoadout.HolyShieldLevel,
             PlayerOneDragonClawLevel = firstLoadout.DragonClawLevel,
@@ -149,6 +153,11 @@ public class PvpBattle
         }
         return battle;
     }
+
+    private static int MaxHpFor(BattleLoadout loadout) =>
+        BasePlayerMaxHp + HeroClasses.Get(loadout.Class).BonusHp + loadout.BonusHp;
+
+    public HeroClass ClassOf(Guid playerId) => IsPlayerOne(playerId) ? PlayerOneClass : PlayerTwoClass;
 
     public bool IsFinished => Status == PvpBattleStatus.Finished;
 
@@ -180,7 +189,8 @@ public class PvpBattle
     }
 
     /// <summary>A card as this player holds it in this battle, upgrades included.</summary>
-    public BattleCardDefinition CardFor(Guid playerId, BattleCard card) => BattleCards.AtLevel(card, LevelOf(playerId, card));
+    public BattleCardDefinition CardFor(Guid playerId, BattleCard card) =>
+        HeroClasses.CardFor(ClassOf(playerId), card, LevelOf(playerId, card));
 
     public bool IsShielded(Guid playerId) => IsPlayerOne(playerId) ? PlayerOneShielded : PlayerTwoShielded;
 

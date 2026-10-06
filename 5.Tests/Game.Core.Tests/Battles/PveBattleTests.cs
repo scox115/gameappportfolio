@@ -17,6 +17,9 @@ public class PveBattleTests
     }
 
     private static IBattleRandom Lucky(params int[] rolls) => new ScriptedRandom(0, rolls);
+
+    // A Paladin's class boost is on Holy Shield, so Fireball and Dragon Claw keep their base numbers.
+    private static readonly BattleLoadout Plain = new(1, 1, 1, 0, HeroClass.Paladin);
     private static IBattleRandom Unlucky => new ScriptedRandom(99);
 
     [Fact]
@@ -44,7 +47,7 @@ public class PveBattleTests
     [Fact]
     public void PlayCard_DamagesBossThenBossStrikesAndAnnouncesItsNextMove()
     {
-        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, Plain);
 
         var result = battle.PlayCard(BattleCard.Fireball, Lucky(), Now);
 
@@ -64,7 +67,7 @@ public class PveBattleTests
     [InlineData(BattleCard.DragonClaw, 75)]
     public void PlayCard_TheBossCanResistOrDodgeAttacks(BattleCard card, int failingRoll)
     {
-        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, Plain);
 
         var result = battle.PlayCard(card, Lucky(failingRoll), Now);
 
@@ -143,7 +146,7 @@ public class PveBattleTests
     [Fact]
     public void LifeDrain_HealsTheBossByTheDamageDealt()
     {
-        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, Plain);
         battle.PlayCard(BattleCard.Fireball, Lucky(0, 80, 0), Now);
 
         var result = battle.PlayCard(BattleCard.Fireball, Lucky(), Now);
@@ -158,7 +161,7 @@ public class PveBattleTests
     [Fact]
     public void LifeDrain_HealsNothingWhenBlocked()
     {
-        var battle = PveBattle.Start(Guid.NewGuid(), Now);
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, Plain);
         battle.PlayCard(BattleCard.Fireball, Lucky(0, 80, 0), Now);
 
         var result = battle.PlayCard(BattleCard.HolyShield, Lucky(), Now);
@@ -280,7 +283,7 @@ public class PveBattleLoadoutTests
     [Fact]
     public void AnUpgradedCardHitsHarder()
     {
-        var battle = PveBattle.Start(Guid.NewGuid(), Now, new BattleLoadout(3, 1, 1, 0));
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, new BattleLoadout(3, 1, 1, 0, HeroClass.Paladin));
 
         var turn = battle.PlayCard(BattleCard.Fireball, new AlwaysMin(), Now);
 
@@ -323,7 +326,8 @@ public class PveBattleEnrageTests
     public void TheBossHitsHarderOnceBadlyHurt()
     {
         // Fully upgraded: Dragon Claw 45, Fireball 30. Every roll lands and the boss always Slashes.
-        var battle = PveBattle.Start(Guid.NewGuid(), Now, new BattleLoadout(3, 1, 3, 0));
+        // Paladin, so the class boost (on Holy Shield) doesn't change these numbers.
+        var battle = PveBattle.Start(Guid.NewGuid(), Now, new BattleLoadout(3, 1, 3, 0, HeroClass.Paladin));
         battle.PlayCard(BattleCard.DragonClaw, new AlwaysMin(), Now);
         battle.PlayCard(BattleCard.Fireball, new AlwaysMin(), Now);
 

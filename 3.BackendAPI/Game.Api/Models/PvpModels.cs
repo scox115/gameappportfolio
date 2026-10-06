@@ -5,7 +5,9 @@ namespace Game.Api.Models;
 
 /// <param name="Title">The title the player chose in the Gold Shop, such as "the Gladiator".</param>
 /// <param name="Rating">The player's PvP rating.</param>
-public record PvpPlayerView(Guid Id, string Username, string? Title, int Rating, string? AvatarUrl, Cosmetic? Frame, int Hp, int MaxHp, bool Shielded);
+/// <param name="Class">The class the player fights as in this duel.</param>
+public record PvpPlayerView(Guid Id, string Username, string? Title, int Rating, string? AvatarUrl, Cosmetic? Frame, int Hp, int MaxHp, bool Shielded,
+    HeroClass Class);
 
 /// <summary>A battle as one of its players sees it.</summary>
 public record PvpBattleView(
@@ -42,7 +44,8 @@ public record PvpBattleView(
             BattleCards.All.Select(c => BattleCardResponse.From(battle.CardFor(viewerId, c.Card), battle.LevelOf(viewerId, c.Card))).ToList());
 
     private static PvpPlayerView PlayerView(PvpBattle battle, Player player) =>
-        new(player.Id, player.Username, player.TitleName, player.Rating, player.AvatarUrl, player.EquippedFrame, battle.HpOf(player.Id), battle.MaxHpOf(player.Id), battle.IsShielded(player.Id));
+        new(player.Id, player.Username, player.TitleName, player.Rating, player.AvatarUrl, player.EquippedFrame, battle.HpOf(player.Id), battle.MaxHpOf(player.Id), battle.IsShielded(player.Id),
+            battle.ClassOf(player.Id));
 }
 
 /// <summary>The card just played, as one of the players sees it.</summary>

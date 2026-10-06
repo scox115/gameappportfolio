@@ -1,14 +1,17 @@
+using System.Text.Json.Serialization;
+using Game.Core.Battles;
 using Game.Core.Entities;
 
 namespace Game.Api.Models;
 
 public record PlayerProfileResponse(
     Guid Id, string Username, int Gold, int Level, int ExperiencePoints, string? AvatarUrl, int Rating, int PvpWins, int PvpLosses,
-    Cosmetic? Frame, Cosmetic? CardSkin, int WinStreak)
+    Cosmetic? Frame, Cosmetic? CardSkin, int WinStreak,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] HeroClass Class)
 {
     public static PlayerProfileResponse From(Player player) =>
         new(player.Id, player.Username, player.Gold, player.Level, player.ExperiencePoints, player.AvatarUrl,
-            player.Rating, player.PvpWins, player.PvpLosses, player.EquippedFrame, player.EquippedCardSkin, player.WinStreak);
+            player.Rating, player.PvpWins, player.PvpLosses, player.EquippedFrame, player.EquippedCardSkin, player.WinStreak, player.Class);
 }
 
 /// <summary>

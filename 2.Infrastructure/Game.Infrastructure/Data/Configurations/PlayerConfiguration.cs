@@ -28,6 +28,11 @@ public class PlayerConfiguration : IEntityTypeConfiguration<Player>
         builder.Property(p => p.ExperiencePoints)
             .IsRequired();
             
+        builder.Property(p => p.Class)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
         // Purchases and rewards both change gold; this stops two requests spending the same gold.
         builder.Property(p => p.Version)
             .IsConcurrencyToken();
