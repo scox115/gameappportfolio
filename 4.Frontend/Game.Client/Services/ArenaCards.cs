@@ -7,7 +7,7 @@ public static class ArenaCards
 {
     public static readonly HandCard[] Hand =
     [
-        new("Fireball", "🔥", "Fireball", "20 DMG", "10% resisted", "Reliable damage you can cast every turn.", "#ea580c"),
+        new("Fireball", "🔥", "Fireball", "20 DMG", "10% resisted", "Reliable damage you can cast every turn.", "#c2410c"),
         new("HolyShield", "🛡️", "Holy Shield", "15 HEAL + BLOCK", "20% interrupted", "Heals and blocks the next attack against you. Needs a turn to recharge.", "#2563eb"),
         new("DragonClaw", "🐉", "Dragon Claw", "35 DMG", "25% dodged", "Big damage. Needs a turn to recharge.", "#7c3aed")
     ];
