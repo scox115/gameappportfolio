@@ -2,6 +2,8 @@
 
 **Run it locally:** see [docs/local-development.md](docs/local-development.md).
 
+**Deploy it to Azure:** see [docs/azure-deployment.md](docs/azure-deployment.md).
+
 ========================================================================
 🤖 AI COLLABORATION RESUME CHECKLIST: CLOUD-BACKED CARD ARENA APPS
 ========================================================================

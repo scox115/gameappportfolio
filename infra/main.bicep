@@ -1,0 +1,363 @@
+// Kings of the Card Arena on Azure, sized for free and near-free tiers.
+//
+//   Static Web Apps (Free)            Blazor WebAssembly client
+//   Container Apps (Consumption)      API + RabbitMQ sidecar, scales to zero, one replica at most
+//   Azure SQL Database (free offer)   serverless, pauses when idle, Entra ID sign-in only
+//   Storage account (Standard LRS)    portraits, reached with the API's managed identity
+//   Key Vault (Standard)              JWT signing key and RabbitMQ password
+//   Log Analytics + App Insights      logs, traces and metrics from OpenTelemetry
+//
+// The managed identity and the SQL admin group are created once by infra/setup.ps1, because
+// creating Entra groups needs directory permissions the deploy pipeline shouldn't have.
+
+targetScope = 'resourceGroup'
+
+@description('Region for everything except the Static Web App.')
+param location string = resourceGroup().location
+
+@description('Static Web Apps (Free) only runs in a few regions.')
+@allowed(['westus2', 'centralus', 'eastus2', 'westeurope', 'eastasia'])
+param staticWebAppLocation string = 'eastus2'
+
+@description('Short lowercase name used to build every resource name.')
+@minLength(3)
+@maxLength(12)
+param appName string = 'cardarena'
+
+@description('API container image, for example ghcr.io/owner/card-arena-api:<sha>.')
+param apiImage string
+
+@description('User-assigned managed identity the API runs as (created by setup.ps1).')
+param apiIdentityName string
+
+@description('Display name of the Entra group that administers the SQL server (created by setup.ps1).')
+param sqlAdminGroupName string
+
+@description('Object id of that Entra group.')
+param sqlAdminGroupObjectId string
+
+@secure()
+@minLength(32)
+@description('HMAC key that signs access tokens.')
+param jwtSigningKey string
+
+@secure()
+@minLength(16)
+@description('Password for the RabbitMQ sidecar.')
+param rabbitMqPassword string
+
+@description('User that can read the API image from GitHub Container Registry. Leave empty if the package is public.')
+param registryUsername string = ''
+
+@secure()
+@description('Token with read:packages for that user. Leave empty if the package is public.')
+param registryPassword string = ''
+
+var suffix = uniqueString(resourceGroup().id)
+var tags = { app: 'kings-of-the-card-arena' }
+var databaseName = 'GameDb'
+var usePrivateRegistry = !empty(registryUsername)
+
+resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: apiIdentityName
+}
+
+// --- Monitoring ---
+
+resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+  name: 'log-${appName}-${suffix}'
+  location: location
+  tags: tags
+  properties: {
+    sku: { name: 'PerGB2018' }
+    retentionInDays: 30
+    // The first 5 GB a month are free; a cap keeps a log storm from costing money.
+    workspaceCapping: { dailyQuotaGb: json('0.15') }
+  }
+}
+
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: 'appi-${appName}-${suffix}'
+  location: location
+  tags: tags
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logs.id
+  }
+}
+
+// --- Secrets ---
+
+resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: 'kv-${appName}-${take(suffix, 8)}'
+  location: location
+  tags: tags
+  properties: {
+    tenantId: subscription().tenantId
+    sku: { family: 'A', name: 'standard' }
+    enableRbacAuthorization: true
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 7
+  }
+}
+
+resource jwtSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: vault
+  name: 'jwt-signing-key'
+  properties: { value: jwtSigningKey }
+}
+
+resource rabbitSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: vault
+  name: 'rabbitmq-password'
+  properties: { value: rabbitMqPassword }
+}
+
+var keyVaultSecretsUser = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+
+resource apiReadsSecrets 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(vault.id, apiIdentity.id, keyVaultSecretsUser)
+  scope: vault
+  properties: {
+    roleDefinitionId: keyVaultSecretsUser
+    principalId: apiIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// --- Portraits ---
+
+resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: 'st${appName}${take(suffix, 10)}'
+  location: location
+  tags: tags
+  kind: 'StorageV2'
+  sku: { name: 'Standard_LRS' }
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    // Portraits are shown straight from blob storage, so their container allows anonymous reads...
+    allowBlobPublicAccess: true
+    // ...but nothing can write with an account key: only the API's managed identity can upload.
+    allowSharedKeyAccess: false
+  }
+}
+
+var storageBlobDataContributor = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+
+resource apiWritesBlobs 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storage.id, apiIdentity.id, storageBlobDataContributor)
+  scope: storage
+  properties: {
+    roleDefinitionId: storageBlobDataContributor
+    principalId: apiIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// --- Database ---
+
+resource sqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = {
+  name: 'sql-${appName}-${suffix}'
+  location: location
+  tags: tags
+  properties: {
+    minimalTlsVersion: '1.2'
+    publicNetworkAccess: 'Enabled'
+    // No SQL logins or passwords: members of the admin group (the API's identity and you) sign in with Entra ID.
+    administrators: {
+      administratorType: 'ActiveDirectory'
+      azureADOnlyAuthentication: true
+      login: sqlAdminGroupName
+      sid: sqlAdminGroupObjectId
+      tenantId: subscription().tenantId
+      principalType: 'Group'
+    }
+  }
+}
+
+// Container Apps on the Consumption plan have no fixed outbound address, so allow Azure services.
+resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-preview' = {
+  parent: sqlServer
+  name: 'AllowAllWindowsAzureIps'
+  properties: {
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '0.0.0.0'
+  }
+}
+
+resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+  parent: sqlServer
+  name: databaseName
+  location: location
+  tags: tags
+  sku: {
+    name: 'GP_S_Gen5'
+    tier: 'GeneralPurpose'
+    family: 'Gen5'
+    capacity: 2
+  }
+  properties: {
+    // The Azure SQL free offer: 100,000 vCore seconds and 32 GB a month. When the month's
+    // allowance runs out the database pauses instead of billing.
+    useFreeLimit: true
+    freeLimitExhaustionBehavior: 'AutoPause'
+    autoPauseDelay: 60
+    minCapacity: json('0.5')
+    maxSizeBytes: 34359738368
+    zoneRedundant: false
+    requestedBackupStorageRedundancy: 'Local'
+  }
+}
+
+// --- Client ---
+
+resource client 'Microsoft.Web/staticSites@2023-12-01' = {
+  name: 'swa-${appName}-${suffix}'
+  location: staticWebAppLocation
+  tags: tags
+  sku: { name: 'Free', tier: 'Free' }
+  properties: {}
+}
+
+// --- API ---
+
+resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
+  name: 'cae-${appName}-${suffix}'
+  location: location
+  tags: tags
+  properties: {
+    appLogsConfiguration: {
+      destination: 'log-analytics'
+      logAnalyticsConfiguration: {
+        customerId: logs.properties.customerId
+        sharedKey: logs.listKeys().primarySharedKey
+      }
+    }
+  }
+}
+
+var sqlConnectionString = 'Server=tcp:${sqlServer.properties.fullyQualifiedDomainName},1433;Database=${databaseName};Authentication=Active Directory Managed Identity;User Id=${apiIdentity.properties.clientId};Encrypt=True;Connect Timeout=60'
+
+resource api 'Microsoft.App/containerApps@2024-03-01' = {
+  name: 'ca-${appName}-api'
+  location: location
+  tags: tags
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: { '${apiIdentity.id}': {} }
+  }
+  dependsOn: [apiReadsSecrets, apiWritesBlobs, allowAzureServices, database]
+  properties: {
+    managedEnvironmentId: environment.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      ingress: {
+        external: true
+        targetPort: 8080
+        transport: 'auto' // HTTP/1.1 and WebSockets, for the SignalR hubs
+        allowInsecure: false
+      }
+      secrets: concat([
+        {
+          name: 'jwt-signing-key'
+          keyVaultUrl: jwtSecret.properties.secretUri
+          identity: apiIdentity.id
+        }
+        {
+          name: 'rabbitmq-password'
+          keyVaultUrl: rabbitSecret.properties.secretUri
+          identity: apiIdentity.id
+        }
+      ], usePrivateRegistry ? [
+        {
+          name: 'registry-password'
+          value: registryPassword
+        }
+      ] : [])
+      registries: usePrivateRegistry ? [
+        {
+          server: 'ghcr.io'
+          username: registryUsername
+          passwordSecretRef: 'registry-password'
+        }
+      ] : []
+    }
+    template: {
+      containers: [
+        {
+          name: 'api'
+          image: apiImage
+          resources: { cpu: json('0.5'), memory: '1Gi' }
+          env: [
+            { name: 'ASPNETCORE_ENVIRONMENT', value: 'Production' }
+            { name: 'AZURE_CLIENT_ID', value: apiIdentity.properties.clientId }
+            { name: 'ConnectionStrings__DefaultConnection', value: sqlConnectionString }
+            { name: 'ConnectionStrings__AzureBlobStorage', value: storage.properties.primaryEndpoints.blob }
+            { name: 'Cors__AllowedOrigins__0', value: 'https://${client.properties.defaultHostname}' }
+            { name: 'Jwt__SigningKey', secretRef: 'jwt-signing-key' }
+            { name: 'RabbitMq__HostName', value: '127.0.0.1' }
+            { name: 'RabbitMq__UserName', value: 'cardarena' }
+            { name: 'RabbitMq__Password', secretRef: 'rabbitmq-password' }
+            { name: 'ForwardedHeaders__TrustAllProxies', value: 'true' }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
+          ]
+          probes: [
+            {
+              // Database migrations run before the API starts listening, and a paused database can
+              // take a minute to wake, so allow up to five minutes before liveness checks begin.
+              type: 'Startup'
+              httpGet: { path: '/health/live', port: 8080 }
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              failureThreshold: 30
+            }
+            {
+              type: 'Liveness'
+              httpGet: { path: '/health/live', port: 8080 }
+              periodSeconds: 30
+            }
+            {
+              type: 'Readiness'
+              httpGet: { path: '/health/ready', port: 8080 }
+              periodSeconds: 10
+              failureThreshold: 6
+            }
+          ]
+        }
+        {
+          // RabbitMQ runs beside the API in the same replica (it's reached on localhost), so it costs
+          // no extra app. Its queue lives in the container, which is fine here: the API publishes and
+          // consumes in the same replica and drains the queue within seconds.
+          name: 'rabbitmq'
+          image: 'docker.io/library/rabbitmq:3.13-alpine'
+          resources: { cpu: json('0.25'), memory: '0.5Gi' }
+          env: [
+            { name: 'RABBITMQ_DEFAULT_USER', value: 'cardarena' }
+            { name: 'RABBITMQ_DEFAULT_PASS', secretRef: 'rabbitmq-password' }
+          ]
+        }
+      ]
+      scale: {
+        // Scale to zero when nobody is playing, so an idle game costs nothing. The first visit after
+        // a quiet spell waits for the container (and the database) to start.
+        minReplicas: 0
+        // The PvP lobby is kept in memory, so there must never be two replicas.
+        maxReplicas: 1
+        rules: [
+          {
+            name: 'http'
+            http: { metadata: { concurrentRequests: '50' } }
+          }
+        ]
+      }
+    }
+  }
+}
+
+output apiUrl string = 'https://${api.properties.configuration.ingress.fqdn}'
+output clientUrl string = 'https://${client.properties.defaultHostname}'
+output staticWebAppName string = client.name
+output sqlServer string = sqlServer.properties.fullyQualifiedDomainName
+output storageAccount string = storage.name
