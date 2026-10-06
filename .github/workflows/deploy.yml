@@ -63,7 +63,8 @@ jobs:
             -p:ContainerRegistry=ghcr.io \
             -p:ContainerRepository="$repository" \
             -p:ContainerImageTags="\"$tag;latest\"" \
-            -p:ContainerFamily=noble-chiseled-extra
+            -p:ContainerFamily=noble-chiseled-extra \
+            -p:Version="1.0.${GITHUB_RUN_NUMBER}" -p:SourceRevisionId="$HEAD_SHA"
           echo "name=ghcr.io/$repository:$tag" >> "$GITHUB_OUTPUT"
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -152,7 +153,10 @@ jobs:
       - name: Build the client against the deployed API
         run: |
           echo "{ \"ApiBaseUrl\": \"${{ steps.infra.outputs.api }}\" }" > 4.Frontend/Game.Client/wwwroot/appsettings.Production.json
-          dotnet publish 4.Frontend/Game.Client/Game.Client.csproj -c Release -o out/client
+          dotnet publish 4.Frontend/Game.Client/Game.Client.csproj -c Release -o out/client \
+            -p:Version="1.0.${GITHUB_RUN_NUMBER}" -p:SourceRevisionId="$HEAD_SHA"
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Get the Static Web App deployment token
         id: swa

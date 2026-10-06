@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <!-- Local builds are 1.0.0. The deploy workflow passes Version=1.0.<deploy run number> and the
+         commit, so the version the game shows changes with every deploy. -->
+    <VersionPrefix>1.0.0</VersionPrefix>
+  </PropertyGroup>
+</Project>
