@@ -1,7 +1,8 @@
 namespace Game.Api.Hubs;
 
 /// <summary>
-/// Pairs players who are looking for a battle, first come first served.
+/// Pairs players who are looking for a battle, first come first served. Players only meet
+/// someone who chose the same wager.
 /// </summary>
 /// <remarks>
 /// The queue lives in memory, so it suits a single API instance. Running several instances
@@ -11,23 +12,24 @@ public class PvpMatchmaker
 {
     private readonly Lock _gate = new();
 
-    // Players are paired as soon as a second one arrives, so at most one is ever waiting.
-    private Guid? _waitingPlayerId;
+    // Players are paired as soon as a second one arrives, so at most one is waiting per wager.
+    private readonly Dictionary<int, Guid> _waitingByWager = new();
 
     /// <summary>
-    /// Returns the waiting opponent to battle, or null after putting this player in the queue.
+    /// Returns the waiting opponent with the same wager to battle, or null after putting this
+    /// player in the queue. Joining again with a different wager moves the player.
     /// </summary>
-    public Guid? JoinOrPair(Guid playerId)
+    public Guid? JoinOrPair(Guid playerId, int wager = 0)
     {
         lock (_gate)
         {
-            if (_waitingPlayerId is { } opponentId && opponentId != playerId)
+            RemoveLocked(playerId);
+            if (_waitingByWager.Remove(wager, out var opponentId))
             {
-                _waitingPlayerId = null;
                 return opponentId;
             }
 
-            _waitingPlayerId = playerId;
+            _waitingByWager[wager] = playerId;
             return null;
         }
     }
@@ -36,10 +38,7 @@ public class PvpMatchmaker
     {
         lock (_gate)
         {
-            if (_waitingPlayerId == playerId)
-            {
-                _waitingPlayerId = null;
-            }
+            RemoveLocked(playerId);
         }
     }
 
@@ -47,7 +46,15 @@ public class PvpMatchmaker
     {
         lock (_gate)
         {
-            return _waitingPlayerId == playerId;
+            return _waitingByWager.ContainsValue(playerId);
+        }
+    }
+
+    private void RemoveLocked(Guid playerId)
+    {
+        foreach (var (wager, waiting) in _waitingByWager.ToList())
+        {
+            if (waiting == playerId) _waitingByWager.Remove(wager);
         }
     }
 }

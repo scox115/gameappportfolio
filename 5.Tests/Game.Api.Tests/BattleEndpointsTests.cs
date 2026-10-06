@@ -96,9 +96,13 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
         var final = await PlayUntilFinishedAsync(client, battle.Id);
 
         Assert.Equal(BattleStatus.Won, final.Battle.Status);
-        Assert.Equal(MatchRulesEngine.WinGold, final.Reward!.GoldEarned);
+        // A first win has no streak bonus; today's bounties may include "Defeat the Shadow Overlord".
+        var bountyGold = final.Reward!.BountiesCompleted!.Sum(b => b.Reward);
+        Assert.Equal(0, final.Reward.StreakBonus);
+        Assert.Equal(MatchRulesEngine.WinGold + bountyGold, final.Reward.GoldEarned);
         var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
-        Assert.Equal(500 + MatchRulesEngine.WinGold, me!.Gold);
+        Assert.Equal(500 + MatchRulesEngine.WinGold + bountyGold, me!.Gold);
+        Assert.Equal(1, me.WinStreak);
 
         var extraMove = await client.PostAsJsonAsync($"/api/battles/pve/{battle.Id}/turns", new { Card = "Fireball" });
         Assert.Equal(HttpStatusCode.Conflict, extraMove.StatusCode);

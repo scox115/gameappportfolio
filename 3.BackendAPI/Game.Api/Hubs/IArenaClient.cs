@@ -10,4 +10,7 @@ public interface IArenaClient
 
     /// <summary>A card was played, a turn timed out or someone forfeited.</summary>
     Task BattleUpdated(PvpUpdate update);
+
+    /// <summary>The player was taken out of the lobby, for example because they can no longer cover their wager.</summary>
+    Task SearchCancelled(string reason);
 }

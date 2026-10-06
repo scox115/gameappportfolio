@@ -32,6 +32,10 @@ public class GameState
     public int Level { get; private set; }
     public string AvatarUrl { get; private set; } = string.Empty;
 
+    /// <summary>The avatar frame and card skin the player wears (Gold Shop cosmetics), or null.</summary>
+    public string? Frame { get; private set; }
+    public string? CardSkin { get; private set; }
+
     public event Action? OnStateChanged;
 
     public void ChangeScreen(GameScreen newScreen)
@@ -74,6 +78,13 @@ public class GameState
         NotifyStateChanged();
     }
 
+    public void UpdateCosmetics(string? frame, string? cardSkin)
+    {
+        Frame = frame;
+        CardSkin = cardSkin;
+        NotifyStateChanged();
+    }
+
     public void UpdateAvatar(string url)
     {
         AvatarUrl = url;
@@ -90,6 +101,8 @@ public class GameState
         Gold = 0;
         Level = 0;
         AvatarUrl = string.Empty;
+        Frame = null;
+        CardSkin = null;
         CurrentScreen = GameScreen.LoginMenu;
         NotifyStateChanged();
     }

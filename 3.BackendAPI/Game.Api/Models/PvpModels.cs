@@ -5,7 +5,7 @@ namespace Game.Api.Models;
 
 /// <param name="Title">The title the player chose in the Gold Shop, such as "the Gladiator".</param>
 /// <param name="Rating">The player's PvP rating.</param>
-public record PvpPlayerView(Guid Id, string Username, string? Title, int Rating, string? AvatarUrl, int Hp, int MaxHp, bool Shielded);
+public record PvpPlayerView(Guid Id, string Username, string? Title, int Rating, string? AvatarUrl, Cosmetic? Frame, int Hp, int MaxHp, bool Shielded);
 
 /// <summary>A battle as one of its players sees it.</summary>
 public record PvpBattleView(
@@ -19,6 +19,7 @@ public record PvpBattleView(
     BattleCard? RechargingCard,
     PvpBattleStatus Status,
     bool? YouWon,
+    int Wager,
     PvpEndReason? EndReason,
     IReadOnlyList<BattleCardResponse> YourCards)
 {
@@ -34,11 +35,12 @@ public record PvpBattleView(
             battle.RechargingCardOf(viewerId),
             battle.Status,
             battle.WinnerId is { } winner ? winner == viewerId : null,
+            battle.Wager,
             battle.EndReason,
             BattleCards.All.Select(c => BattleCardResponse.From(battle.CardFor(viewerId, c.Card), battle.LevelOf(viewerId, c.Card))).ToList());
 
     private static PvpPlayerView PlayerView(PvpBattle battle, Player player) =>
-        new(player.Id, player.Username, player.TitleName, player.Rating, player.AvatarUrl, battle.HpOf(player.Id), battle.MaxHpOf(player.Id), battle.IsShielded(player.Id));
+        new(player.Id, player.Username, player.TitleName, player.Rating, player.AvatarUrl, player.EquippedFrame, battle.HpOf(player.Id), battle.MaxHpOf(player.Id), battle.IsShielded(player.Id));
 }
 
 /// <summary>The card just played, as one of the players sees it.</summary>

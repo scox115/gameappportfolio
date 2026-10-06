@@ -17,6 +17,9 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker) : Hub<
     /// <summary>Joins the lobby. Returns true when waiting, false when a battle started or resumed.</summary>
     public Task<bool> FindOpponent() => battles.FindOpponentAsync(PlayerId);
 
+    /// <summary>Joins the lobby staking gold on the duel; only players with the same wager are paired.</summary>
+    public Task<bool> FindWageredOpponent(int wager) => battles.FindOpponentAsync(PlayerId, wager);
+
     public void CancelSearch() => matchmaker.Leave(PlayerId);
 
     public Task PlayCard(Guid battleId, BattleCard card) => battles.PlayCardAsync(PlayerId, battleId, card);

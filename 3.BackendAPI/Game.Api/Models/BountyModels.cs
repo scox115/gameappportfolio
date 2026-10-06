@@ -1,0 +1,24 @@
+using Game.Core.Bounties;
+using Game.Core.Entities;
+
+namespace Game.Api.Models;
+
+public record BountyResponse(Bounty Bounty, string Name, int Goal, int Progress, int Reward, bool Completed);
+
+/// <param name="ResetsAt">When today's bounties are replaced (midnight UTC).</param>
+/// <param name="StreakBonus">The extra gold the player's next win would pay.</param>
+public record BountiesResponse(DateTime ResetsAt, int WinStreak, int StreakBonus, IReadOnlyList<BountyResponse> Bounties)
+{
+    public static BountiesResponse For(Player player, DateTime now)
+    {
+        var today = DateOnly.FromDateTime(now);
+        var nextBonus = Math.Min(player.WinStreak * Player.StreakBonusPerWin, Player.MaxStreakBonus);
+        return new(today.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
+            player.WinStreak,
+            nextBonus,
+            player.BountiesFor(today)
+                .Select(b => new BountyResponse(b.Definition.Bounty, b.Definition.Name, b.Definition.Goal,
+                    Math.Min(b.Progress, b.Definition.Goal), b.Definition.Reward, b.Completed))
+                .ToList());
+    }
+}

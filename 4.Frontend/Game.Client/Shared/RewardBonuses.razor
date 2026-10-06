@@ -1,0 +1,24 @@
+@* The extras on top of a battle's base reward: a wager's result, the win-streak bonus and any
+   daily bounties the battle completed. Their gold is already included in the total shown above. *@
+@if (WagerResult is { } wager)
+{
+    <div style="font-weight: bold; margin-bottom: 8px; color: @(wager > 0 ? "#4ade80" : "#f87171");">
+        🎲 @(wager > 0 ? $"Wager won: +{wager} gold (after the 10% arena fee)" : $"Wager lost: {wager} gold")
+    </div>
+}
+@if (StreakBonus > 0)
+{
+    <div style="color: #fb923c; font-weight: bold; margin-bottom: 8px;">🔥 Win streak bonus: +@StreakBonus gold</div>
+}
+@foreach (var bounty in Bounties)
+{
+    <div style="color: #fbbf24; font-weight: bold; margin-bottom: 8px;">📜 Bounty complete: @bounty.Name (+@bounty.Reward gold)</div>
+}
+
+@code {
+    [Parameter] public int? WagerResult { get; set; }
+    [Parameter] public int StreakBonus { get; set; }
+    [Parameter] public IReadOnlyList<BountyLine> Bounties { get; set; } = [];
+
+    public record BountyLine(string Name, int Reward);
+}

@@ -80,6 +80,9 @@ public class PvpBattle
     public DateTime StartedAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
 
+    /// <summary>Gold each player staked on this duel (0 for a friendly duel). Taken when the battle starts.</summary>
+    public int Wager { get; private set; }
+
     /// <summary>The settled match record, set when the battle ends.</summary>
     public Guid? MatchId { get; private set; }
 
@@ -91,10 +94,13 @@ public class PvpBattle
     /// <summary>
     /// Starts a battle. <paramref name="firstPlayerId"/> takes the first turn. Each player brings
     /// their own loadout of upgraded cards and elixir health; none means plain level-1 cards.
+    /// <paramref name="wager"/> is the gold each player has staked, which the caller takes from them.
     /// </summary>
     public static PvpBattle Start(Guid firstPlayerId, Guid secondPlayerId, DateTime startedAt,
-        BattleLoadout? firstLoadout = null, BattleLoadout? secondLoadout = null)
+        BattleLoadout? firstLoadout = null, BattleLoadout? secondLoadout = null, int wager = 0)
     {
+        if (!DuelWagers.IsAllowed(wager))
+            throw new ArgumentOutOfRangeException(nameof(wager), wager, "That isn't one of the wager amounts.");
         firstLoadout ??= BattleLoadout.Basic;
         secondLoadout ??= BattleLoadout.Basic;
         if (firstPlayerId == Guid.Empty || secondPlayerId == Guid.Empty)
@@ -125,6 +131,7 @@ public class PvpBattle
             Turn = 1,
             Status = PvpBattleStatus.InProgress,
             StartedAt = startedAt,
+            Wager = wager,
             Version = Guid.NewGuid()
         };
 

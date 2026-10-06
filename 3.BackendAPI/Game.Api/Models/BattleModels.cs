@@ -1,3 +1,5 @@
+using Game.Core.Services;
+using Game.Core.Entities;
 using Game.Core.Battles;
 
 namespace Game.Api.Models;
@@ -52,7 +54,30 @@ public record BattleTurnResponse(
             turn.BossDamage, turn.AttackBlocked, turn.BossHealed);
 }
 
+/// <param name="GoldEarned">All gold this battle paid: the base reward plus the streak bonus, bounties and any wager winnings.</param>
 /// <param name="RatingChange">PvP only: rating points gained (positive) or lost (negative) in this duel.</param>
-public record BattleRewardResponse(int GoldEarned, int ExperienceEarned, PlayerProfileResponse Player, int? RatingChange = null);
+/// <param name="StreakBonus">Extra gold for winning several battles in a row.</param>
+/// <param name="BountiesCompleted">Daily bounties this battle completed; their gold is in <paramref name="GoldEarned"/>.</param>
+/// <param name="WagerResult">PvP only: the wager payout won, or the stake lost as a negative number; null for a friendly duel or a boss fight.</param>
+public record BattleRewardResponse(
+    int GoldEarned,
+    int ExperienceEarned,
+    PlayerProfileResponse Player,
+    int? RatingChange = null,
+    int StreakBonus = 0,
+    IReadOnlyList<BountyRewardResponse>? BountiesCompleted = null,
+    int? WagerResult = null)
+{
+    public static BattleRewardResponse From(BattleReward reward, Player player, bool isDuel) =>
+        new(reward.Gold,
+            reward.Experience,
+            PlayerProfileResponse.From(player),
+            isDuel ? reward.RatingChange : null,
+            reward.Bonuses.StreakBonus,
+            reward.Bonuses.CompletedBounties.Select(b => new BountyRewardResponse(b.Name, b.Reward)).ToList(),
+            reward.WagerResult == 0 ? null : reward.WagerResult);
+}
+
+public record BountyRewardResponse(string Name, int Reward);
 
 public record PlayCardResponse(BattleStateResponse Battle, BattleTurnResponse TurnResult, BattleRewardResponse? Reward);

@@ -149,6 +149,58 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
     }
 
     [Fact]
+    public async Task AWageredDuel_TakesBothStakesAndPaysTheWinnerThePot()
+    {
+        await using var alice = await ConnectAsync();
+        await using var bob = await ConnectAsync();
+
+        Assert.True(await alice.FindWageredOpponentAsync(100));
+        Assert.False(await bob.FindWageredOpponentAsync(100));
+        var battle = (await alice.MatchFound.ReadAsync()).Battle;
+        await bob.MatchFound.ReadAsync();
+        Assert.Equal(100, battle.Wager);
+        var staked = await alice.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/players/me", Json);
+        Assert.Equal(400, staked!.Gold);
+
+        await alice.ForfeitAsync(battle.Id);
+
+        var bobReward = (await bob.Updates.ReadAsync()).Reward!;
+        var aliceReward = (await alice.Updates.ReadAsync()).Reward!;
+        Assert.Equal(DuelWagers.Payout(100), bobReward.WagerResult);
+        Assert.Equal(-100, aliceReward.WagerResult);
+        Assert.Equal(400 + MatchRulesEngine.WinGold + DuelWagers.Payout(100) + BonusGold(bobReward), bobReward.Player.Gold);
+        Assert.Equal(400 + MatchRulesEngine.LossGold + BonusGold(aliceReward), aliceReward.Player.Gold);
+    }
+
+    [Fact]
+    public async Task PlayersWithDifferentWagers_AreNotPaired()
+    {
+        await using var alice = await ConnectAsync();
+        await using var bob = await ConnectAsync();
+
+        Assert.True(await alice.FindWageredOpponentAsync(250));
+        Assert.True(await bob.FindWageredOpponentAsync(50));
+
+        await alice.Connection.InvokeAsync(nameof(ArenaHub.CancelSearch));
+        await bob.Connection.InvokeAsync(nameof(ArenaHub.CancelSearch));
+    }
+
+    [Fact]
+    public async Task AWagerNeedsTheGold()
+    {
+        await using var alice = await ConnectAsync();
+
+        var tooRich = await Assert.ThrowsAnyAsync<Exception>(() => alice.FindWageredOpponentAsync(DuelWagers.Stakes.Max() * 2));
+        Assert.Contains("Wagers can be", tooRich.Message);
+
+        await using var bob = await ConnectAsync();
+        var shop = await bob.Http.PostAsJsonAsync("/api/shop/purchases", new { Item = "FireballUpgrade" }, Json);
+        shop.EnsureSuccessStatusCode();
+        var broke = await Assert.ThrowsAnyAsync<Exception>(() => bob.FindWageredOpponentAsync(500));
+        Assert.Contains("You need 500 gold", broke.Message);
+    }
+
+    [Fact]
     public async Task Winning_MovesRatingPointsFromTheLoserToTheWinner()
     {
         var (alice, bob, battleId) = await StartBattleAsync();
@@ -253,6 +305,9 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         await Assert.ThrowsAnyAsync<Exception>(() => connection.StartAsync());
     }
 
+    // Streak bonuses and any bounty today's duel completed.
+    private static int BonusGold(BattleRewardResponse reward) => reward.StreakBonus + reward.BountiesCompleted!.Sum(b => b.Reward);
+
     private async Task<(ArenaPlayer Alice, ArenaPlayer Bob, Guid BattleId)> StartBattleAsync()
     {
         var alice = await ConnectAsync();
@@ -320,6 +375,9 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         public Reader Updates => new(_updates.Reader);
 
         public Task<bool> FindOpponentAsync() => Connection.InvokeAsync<bool>(nameof(ArenaHub.FindOpponent));
+
+        public Task<bool> FindWageredOpponentAsync(int wager) =>
+            Connection.InvokeAsync<bool>(nameof(ArenaHub.FindWageredOpponent), wager);
 
         public Task PlayCardAsync(Guid battleId, BattleCard card) =>
             Connection.InvokeAsync(nameof(ArenaHub.PlayCard), battleId, card);

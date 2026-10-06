@@ -12,7 +12,14 @@ public enum ShopItem
     DuelElixir,
     TitleDuelist,
     TitleGladiator,
-    TitleArenaChampion
+    TitleArenaChampion,
+    FrameBronze,
+    FrameSilver,
+    FrameGold,
+    FrameDragonfire,
+    CardSkinEmber,
+    CardSkinFrost,
+    CardSkinVoid
 }
 
 /// <summary>What a shop item is and what it costs this player right now.</summary>
@@ -22,7 +29,8 @@ public record ShopOffer(ShopItem Item, string Name, string Description, int? Pri
 
 /// <summary>
 /// Where players spend the gold they win. Card upgrades make a card stronger in boss fights and
-/// duels, elixirs add health for the next boss fight or duel, and titles show off duel wins.
+/// duels, elixirs add health for the next boss fight or duel, titles show off duel wins, and
+/// prestige cosmetics give long-time players something big to save for without changing balance.
 /// </summary>
 public static class GoldShop
 {
@@ -50,6 +58,14 @@ public static class GoldShop
                 $"Shown after your name to duel opponents and on the leaderboard. Needs {titleDefinition.DuelWinsNeeded} PvP win{(titleDefinition.DuelWinsNeeded == 1 ? "" : "s")}.",
                 owned ? null : titleDefinition.Price, owned ? 1 : 0, 1,
                 owned || player.PvpWins >= titleDefinition.DuelWinsNeeded ? null : $"Win {titleDefinition.DuelWinsNeeded - player.PvpWins} more duel{(titleDefinition.DuelWinsNeeded - player.PvpWins == 1 ? "" : "s")} to unlock");
+        }
+
+        if (CosmeticFor(item) is { } cosmetic)
+        {
+            var cosmeticDefinition = CosmeticCatalog.Get(cosmetic);
+            var owned = player.OwnsCosmetic(cosmetic);
+            return new ShopOffer(item, cosmeticDefinition.Name, $"{cosmeticDefinition.Description} Looks only; it never changes a battle.",
+                owned ? null : cosmeticDefinition.Price, owned ? 1 : 0, 1);
         }
 
         if (item == ShopItem.BattleElixir)
@@ -92,6 +108,7 @@ public static class GoldShop
         if (offer.Price is not { } price)
         {
             if (TitleFor(item) is not null) throw new InvalidOperationException("You already own that title.");
+            if (CosmeticFor(item) is not null) throw new InvalidOperationException($"You already own the {offer.Name}.");
             throw new InvalidOperationException(item is ShopItem.BattleElixir or ShopItem.DuelElixir
                 ? $"You can carry at most {Player.MaxElixirs} of those elixirs."
                 : $"{offer.Name.Replace(" Upgrade", "")} is already at its top level.");
@@ -106,6 +123,10 @@ public static class GoldShop
         if (TitleFor(item) is { } boughtTitle)
         {
             player.AddTitle(boughtTitle);
+        }
+        else if (CosmeticFor(item) is { } boughtCosmetic)
+        {
+            player.AddCosmetic(boughtCosmetic);
         }
         else if (item == ShopItem.BattleElixir)
         {
@@ -129,6 +150,19 @@ public static class GoldShop
         ShopItem.TitleDuelist => PlayerTitle.Duelist,
         ShopItem.TitleGladiator => PlayerTitle.Gladiator,
         ShopItem.TitleArenaChampion => PlayerTitle.ArenaChampion,
+        _ => null
+    };
+
+    /// <summary>The cosmetic a shop item sells, or null for other items.</summary>
+    public static Cosmetic? CosmeticFor(ShopItem item) => item switch
+    {
+        ShopItem.FrameBronze => Cosmetic.BronzeFrame,
+        ShopItem.FrameSilver => Cosmetic.SilverFrame,
+        ShopItem.FrameGold => Cosmetic.GoldFrame,
+        ShopItem.FrameDragonfire => Cosmetic.DragonfireFrame,
+        ShopItem.CardSkinEmber => Cosmetic.EmberCards,
+        ShopItem.CardSkinFrost => Cosmetic.FrostCards,
+        ShopItem.CardSkinVoid => Cosmetic.VoidCards,
         _ => null
     };
 
