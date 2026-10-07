@@ -10,6 +10,9 @@ A turn-based card battler built with **ASP.NET Core, Blazor WebAssembly, SignalR
 It's a portfolio project, built the way a production service would be: clean architecture, server-authoritative game rules, passwordless cloud access, health checks, OpenTelemetry, a test pyramid from unit to browser to load tests, and an Architecture Decision Record for each significant decision.
 
 **▶ Play it: https://play.scottcoxdev.com** · [System status](https://play.scottcoxdev.com/status)
+
+**New here?** The [five-minute case study](docs/case-study.md) covers the architecture, the key decisions and the numbers, with a live duel recorded in two browsers.
+
 <sub>The API scales to zero when nobody is playing, so the first visit after a quiet spell can take a minute or two to wake up.</sub>
 
 | Town | Boss fight |
@@ -38,7 +41,7 @@ It's a portfolio project, built the way a production service would be: clean arc
 | **Performance** | Output caching evicted automatically by EF Core saves ([ADR 0010](docs/adr/0010-output-caching-with-tag-eviction.md)); load-tested at about 200 simultaneous players on 0.5 CPU ([report](docs/load-testing.md)) |
 | **Operations** | A public [status page](https://play.scottcoxdev.com/status) with live health checks, the running build, recent releases and the last restore drill ([ADR 0018](docs/adr/0018-status-page.md)); a staging copy of the whole game, built from the same Bicep template, that every commit reaches before production, and a preview site for each pull request ([ADR 0026](docs/adr/0026-staging-and-previews.md)); blue-green releases: each build is tested on its own Container Apps revision before players move to it, with one-click rollback ([ADR 0016](docs/adr/0016-blue-green-deploys.md)); a monthly restore drill that proves the database backups work and measures recovery time, with runbooks ([ADR 0017](docs/adr/0017-restore-drills.md)); `/health/live` and `/health/ready`, OpenTelemetry traces and metrics to Application Insights, browser telemetry (screens, load times, API calls traced end to end into the API, and front-end crashes) in the same resource ([ADR 0019](docs/adr/0019-browser-telemetry.md)), email alerts, a scheduled cleanup worker, feature flags you can flip in Azure without a deploy ([ADR 0011](docs/adr/0011-feature-flags.md)) |
 | **Cloud** | Bicep for every resource, GitHub OIDC (no stored Azure credentials), managed identity to SQL, Storage and Key Vault ([ADR 0008](docs/adr/0008-passwordless-azure-access.md)), all on free tiers ([ADR 0007](docs/adr/0007-free-tier-azure-hosting.md)) |
-| **Testing** | 350+ automated tests: domain, API, Aspire wiring, Playwright browser tests with axe-core WCAG 2.1 AA checks, and k6 load tests ([ADR 0012](docs/adr/0012-testing-strategy.md)) |
+| **Testing** | 480+ automated tests: domain, API, Aspire wiring, Playwright browser tests with axe-core WCAG 2.1 AA checks, and k6 load tests ([ADR 0012](docs/adr/0012-testing-strategy.md)) |
 | **Developer experience** | One command runs everything locally with .NET Aspire ([ADR 0013](docs/adr/0013-aspire-for-local-orchestration.md)); Dependabot and a vulnerable-package gate in CI |
 
 ## Architecture
@@ -113,6 +116,7 @@ The k6 load test is described in [docs/load-testing.md](docs/load-testing.md).
 
 ## Documentation
 
+- [Case study](docs/case-study.md): the five-minute tour of the architecture, decisions and numbers
 - [Architecture Decision Records](docs/adr/README.md): why it is built this way
 - [Local development](docs/local-development.md): running, settings, health, caching, feature flags
 - [Azure deployment](docs/azure-deployment.md): costs, security choices, one-time setup, troubleshooting
