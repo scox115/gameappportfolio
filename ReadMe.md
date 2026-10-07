@@ -105,6 +105,7 @@ That starts SQL Server, Azurite and RabbitMQ in Docker, the API on http://localh
 
 ```powershell
 dotnet test --filter "Category!=Browser"   # domain, API and AppHost tests, no Docker needed
+# Set TEST_SQLSERVER to a connection string to also run the concurrency and migration tests on SQL Server (CI always does).
 dotnet test 5.Tests/Game.E2E.Tests          # Playwright browser tests (installs Chromium on first run)
 ```
 

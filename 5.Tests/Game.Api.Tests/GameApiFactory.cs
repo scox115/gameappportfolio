@@ -20,23 +20,26 @@ public class GameApiFactory : WebApplicationFactory<Program>
     private readonly string _databaseName;
     private readonly InMemoryDatabaseRoot? _sharedDatabase;
     private readonly IReadOnlyDictionary<string, string> _settings;
+    private readonly TestDatabase? _sqlServer;
 
-    public GameApiFactory() : this(null, $"game-api-tests-{Guid.NewGuid()}", new Dictionary<string, string>())
+    public GameApiFactory() : this(null, $"game-api-tests-{Guid.NewGuid()}", new Dictionary<string, string>(), null)
     {
     }
 
-    private GameApiFactory(InMemoryDatabaseRoot? sharedDatabase, string databaseName, IReadOnlyDictionary<string, string> settings)
+    private GameApiFactory(InMemoryDatabaseRoot? sharedDatabase, string databaseName, IReadOnlyDictionary<string, string> settings, TestDatabase? sqlServer)
     {
         _sharedDatabase = sharedDatabase;
         _databaseName = databaseName;
         _settings = settings;
+        _sqlServer = sqlServer;
     }
 
     /// <summary>
     /// Two API replicas sharing one database, as in Azure with more than one replica: hub messages pass
-    /// between them through the HubMessages table (see docs/adr/0027-scale-out.md).
+    /// between them through the HubMessages table (see docs/adr/0027-scale-out.md). Given a SQL Server
+    /// database, both use it, and the first to start creates it with the migrations, as in Azure.
     /// </summary>
-    public static (GameApiFactory East, GameApiFactory West) TwoReplicas()
+    public static (GameApiFactory East, GameApiFactory West) TwoReplicas(TestDatabase? sqlServer = null)
     {
         var database = new InMemoryDatabaseRoot();
         var name = $"game-api-replicas-{Guid.NewGuid()}";
@@ -45,7 +48,7 @@ public class GameApiFactory : WebApplicationFactory<Program>
             ["ScaleOut:Backplane"] = "Sql",
             ["ScaleOut:PollInterval"] = "00:00:00.050"
         };
-        return (new GameApiFactory(database, name, settings), new GameApiFactory(database, name, settings));
+        return (new GameApiFactory(database, name, settings, sqlServer), new GameApiFactory(database, name, settings, sqlServer));
     }
 
     /// <summary>The API's clock; tests move it forward to run out a turn timer.</summary>
@@ -88,12 +91,15 @@ public class GameApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            // Swap SQL Server for the in-memory provider.
+            // Swap SQL Server for the in-memory provider (or a throwaway SQL Server database).
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
-            services.AddDbContext<AppDbContext>((sp, options) => options
-                .UseInMemoryDatabase(_databaseName, _sharedDatabase)
-                .AddOutputCacheEviction(sp));
+            services.AddDbContext<AppDbContext>((sp, options) =>
+            {
+                if (_sqlServer is not null) _sqlServer.Configure(options);
+                else options.UseInMemoryDatabase(_databaseName, _sharedDatabase);
+                options.AddOutputCacheEviction(sp);
+            });
 
             // The outbox relay and the consumer need a live broker; they aren't part of what these tests cover.
             services.Remove(services.Single(d => d.ImplementationType == typeof(MatchConsumerWorker)));

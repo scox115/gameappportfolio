@@ -17,14 +17,22 @@ public sealed class ScaleOutTests : IAsyncLifetime
     private const string Password = "Arena-Pass1";
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
 
-    private readonly GameApiFactory _east;
-    private readonly GameApiFactory _west;
+    private GameApiFactory _east = null!;
+    private GameApiFactory _west = null!;
+    private TestDatabase? _sqlServer;
 
-    public ScaleOutTests() => (_east, _west) = GameApiFactory.TwoReplicas();
-
-    [Fact]
-    public async Task PlayersOnDifferentReplicas_ArePairedAndSeeEachOthersMoves()
+    /// <summary>The in-memory database always; SQL Server too when TEST_SQLSERVER is set.</summary>
+    public static TheoryData<string> Databases()
     {
+        var databases = new TheoryData<string> { "in-memory" };
+        if (TestDatabase.SqlServerConnection is not null) databases.Add(TestDatabase.SqlServer);
+        return databases;
+    }
+
+    [Theory, MemberData(nameof(Databases))]
+    public async Task PlayersOnDifferentReplicas_ArePairedAndSeeEachOthersMoves(string database)
+    {
+        StartReplicas(database);
         await using var alice = await JoinAsync(_east);
         await using var bob = await JoinAsync(_west);
 
@@ -50,9 +58,10 @@ public sealed class ScaleOutTests : IAsyncLifetime
         Assert.True((await alice.ReadAsync(alice.Updates)).LastTurn!.YourCard);
     }
 
-    [Fact]
-    public async Task SigningInThroughAnotherReplica_TellsTheOldBrowserAtOnce()
+    [Theory, MemberData(nameof(Databases))]
+    public async Task SigningInThroughAnotherReplica_TellsTheOldBrowserAtOnce(string database)
     {
+        StartReplicas(database);
         var username = NewUsername();
         var first = await SignInAsync(_east, "register", username);
         var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -63,6 +72,15 @@ public sealed class ScaleOutTests : IAsyncLifetime
         await SignInAsync(_west, "login", username);
 
         await ended.Task.WaitAsync(Wait);
+    }
+
+    private void StartReplicas(string database)
+    {
+        if (database == TestDatabase.SqlServer) _sqlServer = TestDatabase.ForApi();
+        (_east, _west) = GameApiFactory.TwoReplicas(_sqlServer);
+        // One at a time, as a deploy brings replicas up: the first creates the database and runs the migrations.
+        _ = _east.Server;
+        _ = _west.Server;
     }
 
     private static async Task<Player> JoinAsync(GameApiFactory replica)
@@ -126,7 +144,8 @@ public sealed class ScaleOutTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _east.DisposeAsync();
-        await _west.DisposeAsync();
+        if (_east is not null) await _east.DisposeAsync();
+        if (_west is not null) await _west.DisposeAsync();
+        _sqlServer?.Dispose();
     }
 }
