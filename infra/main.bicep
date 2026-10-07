@@ -1,7 +1,7 @@
 // Kings of the Card Arena on Azure, sized for free and near-free tiers.
 //
 //   Static Web Apps (Free)            Blazor WebAssembly client
-//   Container Apps (Consumption)      API + RabbitMQ sidecar, scales to zero, one replica at most
+//   Container Apps (Consumption)      API + RabbitMQ sidecar, scales to zero, and out to maxReplicas under load
 //   Azure SQL Database (free offer)   serverless, pauses when idle, Entra ID sign-in only
 //   Storage account (Standard LRS)    portraits, reached with the API's managed identity
 //   Key Vault (Standard)              JWT signing key and RabbitMQ password
@@ -77,6 +77,11 @@ param liveRevision string = ''
 @description('Which copy of the game this is. Staging lives in its own resource group, so every resource gets its own name, and it also accepts calls from the Static Web App\'s pull request previews (see docs/adr/0026-staging-and-previews.md).')
 @allowed(['production', 'staging'])
 param environmentName string = 'production'
+
+@description('The most API replicas Container Apps may run under load. Above 1, the replicas pass live messages to each other through SQL (see docs/adr/0027-scale-out.md). Set 1 to keep a single replica.')
+@minValue(1)
+@maxValue(10)
+param maxReplicas int = 3
 
 var suffix = uniqueString(resourceGroup().id)
 var tags = { app: 'kings-of-the-card-arena', environment: environmentName }
@@ -446,6 +451,8 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'Cors__AllowedOrigins__0', value: 'https://${client.properties.defaultHostname}' }
             { name: 'Admin__Usernames', value: adminUsernames }
             { name: 'Email__ClientBaseUrl', value: gameUrl }
+            // Players on different replicas still see each other's moves (see docs/adr/0027-scale-out.md).
+            { name: 'ScaleOut__Backplane', value: maxReplicas > 1 ? 'Sql' : 'None' }
           ], emailEnabled ? [
             { name: 'Email__Provider', value: 'AzureCommunicationServices' }
             { name: 'Email__Endpoint', value: 'https://${communication!.properties.hostName}' }
@@ -497,9 +504,9 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
         // Scale to zero when nobody is playing, so an idle game costs nothing. The first visit after
         // a quiet spell waits for the container (and the database) to start.
         minReplicas: 0
-        // The PvP lobby is kept in memory, so there must never be two replicas of a revision. During a
-        // release the new revision runs beside the live one, but players only ever reach one of them.
-        maxReplicas: 1
+        // Each replica adds capacity under load. The lobby, the outbox and live messages are shared through
+        // SQL, so a player may reach any replica (see docs/adr/0027-scale-out.md).
+        maxReplicas: maxReplicas
         rules: [
           {
             name: 'http'

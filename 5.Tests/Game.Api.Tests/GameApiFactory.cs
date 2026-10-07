@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -16,7 +17,36 @@ namespace Game.Api.Tests;
 // Runs the real API pipeline in memory, with an in-memory database and no RabbitMQ consumer.
 public class GameApiFactory : WebApplicationFactory<Program>
 {
-    private readonly string _databaseName = $"game-api-tests-{Guid.NewGuid()}";
+    private readonly string _databaseName;
+    private readonly InMemoryDatabaseRoot? _sharedDatabase;
+    private readonly IReadOnlyDictionary<string, string> _settings;
+
+    public GameApiFactory() : this(null, $"game-api-tests-{Guid.NewGuid()}", new Dictionary<string, string>())
+    {
+    }
+
+    private GameApiFactory(InMemoryDatabaseRoot? sharedDatabase, string databaseName, IReadOnlyDictionary<string, string> settings)
+    {
+        _sharedDatabase = sharedDatabase;
+        _databaseName = databaseName;
+        _settings = settings;
+    }
+
+    /// <summary>
+    /// Two API replicas sharing one database, as in Azure with more than one replica: hub messages pass
+    /// between them through the HubMessages table (see docs/adr/0027-scale-out.md).
+    /// </summary>
+    public static (GameApiFactory East, GameApiFactory West) TwoReplicas()
+    {
+        var database = new InMemoryDatabaseRoot();
+        var name = $"game-api-replicas-{Guid.NewGuid()}";
+        var settings = new Dictionary<string, string>
+        {
+            ["ScaleOut:Backplane"] = "Sql",
+            ["ScaleOut:PollInterval"] = "00:00:00.050"
+        };
+        return (new GameApiFactory(database, name, settings), new GameApiFactory(database, name, settings));
+    }
 
     /// <summary>The API's clock; tests move it forward to run out a turn timer.</summary>
     public TestClock Clock { get; } = new();
@@ -54,6 +84,7 @@ public class GameApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Jwt:SigningKey", "integration-tests-signing-key-that-is-long-enough");
         builder.UseSetting("Email:Provider", "Log");
         builder.UseSetting("Email:ClientBaseUrl", FakeEmailSender.ClientBaseUrl);
+        foreach (var (key, value) in _settings) builder.UseSetting(key, value);
 
         builder.ConfigureServices(services =>
         {
@@ -61,7 +92,7 @@ public class GameApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
             services.AddDbContext<AppDbContext>((sp, options) => options
-                .UseInMemoryDatabase(_databaseName)
+                .UseInMemoryDatabase(_databaseName, _sharedDatabase)
                 .AddOutputCacheEviction(sp));
 
             // The outbox relay and the consumer need a live broker; they aren't part of what these tests cover.

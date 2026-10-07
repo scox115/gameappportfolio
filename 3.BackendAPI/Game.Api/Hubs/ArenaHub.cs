@@ -39,7 +39,7 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatu
         }
     }
 
-    public void CancelSearch() => matchmaker.Leave(PlayerId);
+    public Task CancelSearch() => matchmaker.LeaveAsync(PlayerId);
 
     public Task PlayCard(Guid battleId, BattleCard card) => battles.PlayCardAsync(PlayerId, battleId, card);
 
@@ -47,10 +47,10 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatu
 
     // Leaving the page takes a player out of the lobby. A battle in progress carries on, and
     // the turn timer settles it if they don't come back.
-    public override Task OnDisconnectedAsync(Exception? exception)
+    public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        matchmaker.Leave(PlayerId);
-        return base.OnDisconnectedAsync(exception);
+        await matchmaker.LeaveAsync(PlayerId);
+        await base.OnDisconnectedAsync(exception);
     }
 
     private Guid PlayerId => Context.User!.GetPlayerId();

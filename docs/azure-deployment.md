@@ -5,7 +5,7 @@ Every merge to `main` that passes CI is deployed to Azure by [`.github/workflows
 ```
  Browser ──► Static Web Apps (Free)          Blazor WebAssembly client
     │
-    └──────► Container Apps (Consumption)    one replica, scales to zero
+    └──────► Container Apps (Consumption)    up to 3 replicas, scales to zero
                ├─ api        ──► Azure SQL Database (free offer, serverless)   Entra ID sign-in
                │             ──► Storage account (portraits)                   managed identity
                │             ──► Key Vault (JWT key, RabbitMQ password)       managed identity
@@ -27,7 +27,7 @@ Every merge to `main` that passes CI is deployed to Azure by [`.github/workflows
 
 These are estimates. Set a [budget alert](https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-acm-create-budgets) on the resource group (for example $5) so you hear about any surprise. The free SQL offer covers up to 10 databases per subscription, all in one region, so production and staging fit.
 
-**Trade-offs of staying free:** after about five idle minutes the API scales to zero and the database pauses after an hour. The next visitor waits up to a couple of minutes while both start. There is only ever one API replica, because the PvP lobby lives in memory.
+**Trade-offs of staying free:** after about five idle minutes the API scales to zero and the database pauses after an hour. The next visitor waits up to a couple of minutes while both start. Under load the API adds replicas, up to three (`API_MAX_REPLICAS`); they share the duel lobby and live messages through the database ([ADR 0027](adr/0027-scale-out.md)).
 
 ## Security choices
 
@@ -105,6 +105,13 @@ How it works day to day:
 - **Urgent fix while staging is broken:** run **Deploy to Azure** with **Go straight to production** ticked.
 - **Roll back staging:** run **Roll back the API** and choose `staging`.
 - **Turn staging off:** delete the `STAGING_ENABLED` variable (deploys go straight to production again), then `az group delete --name rg-card-arena-staging`.
+
+## Scaling out
+
+The API runs on up to three replicas by default. Container Apps adds one for every 50 concurrent requests, which includes each open live connection, and removes them again when things are quiet, down to zero. Replicas share the duel lobby, live messages and the outbox through the database ([ADR 0027](adr/0027-scale-out.md)), so there is nothing to set up.
+
+- **Change the limit:** set the repository variable `API_MAX_REPLICAS` (1 to 10) and run **Deploy to Azure**; a changed setting always redeploys the infrastructure. `1` returns to a single replica, which also turns off message passing between replicas. A value on the `staging` environment applies to staging only.
+- **See it working:** the Container App's **Revisions and replicas** page lists the replicas running now, and App Insights shows requests split across them under **Role instance**.
 
 ## Custom domain (optional)
 

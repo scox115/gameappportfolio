@@ -15,7 +15,7 @@ public class SessionNotifier(
     public async Task EndOtherSessionsAsync(Guid userId)
     {
         // An old browser waiting in the PvP lobby shouldn't be paired after it's been signed out.
-        matchmaker.Leave(userId);
+        await matchmaker.LeaveAsync(userId);
 
         try
         {
@@ -31,7 +31,7 @@ public class SessionNotifier(
     /// <summary>Call this after a suspension is saved, so every open browser of the player signs out.</summary>
     public async Task SuspendedAsync(Guid userId)
     {
-        matchmaker.Leave(userId);
+        await matchmaker.LeaveAsync(userId);
 
         try
         {

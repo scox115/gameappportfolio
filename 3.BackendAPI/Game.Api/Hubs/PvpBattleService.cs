@@ -90,7 +90,7 @@ public class PvpBattleService(
         // The waiting player may have spent their gold since joining; if so they leave the lobby
         // and this player takes the next opponent, or waits.
         var practiceOnSameNetwork = antiCheat.Value.SameNetworkDuelsArePractice;
-        while (matchmaker.JoinOrPair(playerId, wager, network, avoidSameNetwork: wager > 0 && practiceOnSameNetwork) is { } pairing)
+        while (await matchmaker.JoinOrPairAsync(playerId, wager, network, avoidSameNetwork: wager > 0 && practiceOnSameNetwork) is { } pairing)
         {
             var opponentId = pairing.OpponentId;
             var opponent = await LoadPlayerAsync(opponentId);

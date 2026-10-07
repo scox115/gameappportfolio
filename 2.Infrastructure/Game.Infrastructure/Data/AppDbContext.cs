@@ -32,6 +32,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<PlayerReport> PlayerReports => Set<PlayerReport>();
+    public DbSet<PvpLobbyEntry> PvpLobby => Set<PvpLobbyEntry>();
+    public DbSet<HubMessage> HubMessages => Set<HubMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

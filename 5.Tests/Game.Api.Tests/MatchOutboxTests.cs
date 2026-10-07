@@ -112,6 +112,76 @@ public class MatchOutboxTests
         Assert.Contains("1 match event(s) waiting in the outbox", check.GetProperty("description").GetString());
     }
 
+    [Fact]
+    public async Task TwoReplicasRelayingTheSameOutbox_SendEachEventOnce()
+    {
+        // A SQLite file stands in for the shared database: like SQL Server, it saves each claim in one transaction.
+        var file = Path.Combine(Path.GetTempPath(), $"outbox-{Guid.NewGuid()}.db");
+        var services = new ServiceCollection()
+            .AddLogging()
+            .AddSingleton(TimeProvider.System)
+            .AddDbContext<AppDbContext>(options => options.UseSqlite($"Data Source={file};Default Timeout=30;Pooling=False"))
+            .BuildServiceProvider();
+        try
+        {
+            using (var scope = services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                db.Database.EnsureCreated();
+                var outbox = new MatchOutbox(TimeProvider.System);
+                for (var i = 0; i < 3 * MatchOutboxRelay.BatchSize; i++) outbox.Add(db, NewEvent(DateTime.UtcNow.AddSeconds(i)));
+                await db.SaveChangesAsync();
+            }
+
+            var brokers = new[] { new FakeBroker(), new FakeBroker() };
+            var relays = brokers.Select(broker => new MatchOutboxRelay(
+                new MatchOutbox(TimeProvider.System),
+                services.GetRequiredService<IServiceScopeFactory>(),
+                broker.Factory,
+                new TelemetryBrokerStatus(),
+                TimeProvider.System,
+                NullLogger<MatchOutboxRelay>.Instance)).ToList();
+            await Task.WhenAll(relays.Select(r => r.StartAsync(CancellationToken.None)));
+
+            for (var i = 0; i < 500 && brokers.Sum(b => b.Published.Count) < 3 * MatchOutboxRelay.BatchSize; i++) await Task.Delay(20);
+            await Task.WhenAll(relays.Select(r => r.StopAsync(CancellationToken.None)));
+            foreach (var relay in relays) relay.Dispose();
+
+            var sent = brokers.SelectMany(b => b.Published).Select(m => JsonSerializer.Deserialize<MatchCompletedEvent>(m, MatchEventJson.Options)!.MatchId).ToList();
+            Assert.Equal(3 * MatchOutboxRelay.BatchSize, sent.Count);
+            Assert.Equal(sent.Count, sent.Distinct().Count());
+            using var check = services.CreateScope();
+            Assert.Empty(await check.ServiceProvider.GetRequiredService<AppDbContext>().OutboxMessages.ToListAsync());
+        }
+        finally
+        {
+            await services.DisposeAsync();
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task AClaimedRow_IsLeftToItsRelay_UntilTheClaimRunsOut()
+    {
+        using var factory = new GameApiFactory();
+        var matchEvent = NewEvent();
+        await SaveAsync(factory, matchEvent);
+        using (var scope = factory.Services.CreateScope())
+        {
+            // Another replica claimed the row and then stopped before sending it.
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.OutboxMessages.SingleAsync()).Claim(factory.Clock.GetUtcNow().UtcDateTime + MatchOutboxRelay.ClaimFor);
+            await db.SaveChangesAsync();
+        }
+        var broker = new FakeBroker();
+
+        await RunRelayUntilAsync(factory, broker, () => Task.FromResult(broker.ConnectionAttempts >= 1));
+        Assert.Empty(broker.Published);
+
+        factory.Clock.Advance(MatchOutboxRelay.ClaimFor);
+        await RunRelayUntilAsync(factory, broker, () => Task.FromResult(broker.Published.Count == 1));
+    }
+
     [Theory]
     [InlineData(0, 1)]
     [InlineData(3, 8)]
@@ -143,6 +213,7 @@ public class MatchOutboxTests
             factory.Services.GetRequiredService<IServiceScopeFactory>(),
             broker.Factory,
             factory.Services.GetRequiredService<TelemetryBrokerStatus>(),
+            factory.Services.GetRequiredService<TimeProvider>(),
             NullLogger<MatchOutboxRelay>.Instance);
 
         await relay.StartAsync(CancellationToken.None);
