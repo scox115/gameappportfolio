@@ -17,3 +17,6 @@ rabbit_data/
 *.suo
 TestResults/
 loadtest/results/
+
+# Python bytecode from the deploy script tests
+__pycache__/

@@ -65,6 +65,9 @@ param alertEmail string = ''
 @description('Set to true to keep feature flags in Azure App Configuration (free tier), so they can be flipped without a deploy.')
 param appConfiguration string = ''
 
+@description('The API revision serving players now. A deploy keeps all traffic on it, so the new revision starts with none until infra/blue-green.sh has tested it. Leave empty on the very first deploy.')
+param liveRevision string = ''
+
 var suffix = uniqueString(resourceGroup().id)
 var tags = { app: 'kings-of-the-card-arena' }
 var databaseName = 'GameDb'
@@ -314,12 +317,19 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
   properties: {
     managedEnvironmentId: environment.id
     configuration: {
-      activeRevisionsMode: 'Single'
+      // Blue-green: each deploy adds a revision beside the live one. Traffic stays pinned to the live
+      // revision by name until the new one passes its smoke test (see docs/adr/0016-blue-green-deploys.md).
+      activeRevisionsMode: 'Multiple'
       ingress: {
         external: true
         targetPort: 8080
         transport: 'auto' // HTTP/1.1 and WebSockets, for the SignalR hubs
         allowInsecure: false
+        traffic: empty(liveRevision) ? [
+          { latestRevision: true, weight: 100 }
+        ] : [
+          { revisionName: liveRevision, weight: 100 }
+        ]
       }
       secrets: concat([
         {
@@ -409,7 +419,8 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
         // Scale to zero when nobody is playing, so an idle game costs nothing. The first visit after
         // a quiet spell waits for the container (and the database) to start.
         minReplicas: 0
-        // The PvP lobby is kept in memory, so there must never be two replicas.
+        // The PvP lobby is kept in memory, so there must never be two replicas of a revision. During a
+        // release the new revision runs beside the live one, but players only ever reach one of them.
         maxReplicas: 1
         rules: [
           {
