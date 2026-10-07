@@ -1,0 +1,255 @@
+@page "/admin"
+@using System.Net
+@inject HttpClient Http
+@inject GameState State
+
+<PageTitle>Admin tools · Kings of the Card Arena</PageTitle>
+
+@* Admin tools: find a player, suspend or reinstate them, correct their gold, and read the audit log.
+   The API enforces the Admin role; this page only hides itself from everyone else. *@
+<div class="admin-shell">
+<div class="admin-page">
+    <header class="admin-header">
+        <a href="" class="admin-home">⚔️ Back to town</a>
+        <h1>🛡️ Admin tools</h1>
+    </header>
+
+    @if (!State.IsAdmin)
+    {
+        <p>These tools are for admins. Sign in with an admin account from the <a href="">town</a> first.</p>
+    }
+    else
+    {
+        <section aria-labelledby="find-title">
+            <h2 id="find-title">Find a player</h2>
+            <form class="admin-row" @onsubmit="SearchAsync">
+                <label for="admin-search" class="visually-hidden">Part of a hero's name</label>
+                <input id="admin-search" type="search" placeholder="Part of a hero's name" @bind="search" @bind:event="oninput" />
+                <button type="submit" class="admin-button">Search</button>
+            </form>
+
+            @if (players is not null)
+            {
+                @if (players.Count == 0)
+                {
+                    <p class="admin-muted">No heroes match.</p>
+                }
+                else
+                {
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr><th scope="col">Hero</th><th scope="col">Class</th><th scope="col">Level</th><th scope="col">Gold</th><th scope="col">Rating</th><th scope="col">Account</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in players)
+                                {
+                                    <tr class="@(selected?.id == p.id ? "admin-selected" : null)">
+                                        <td><button class="admin-link" @onclick="() => SelectAsync(p.id)">@p.username</button></td>
+                                        <td>@(p.@class)</td>
+                                        <td>@p.level</td>
+                                        <td>@p.gold.ToString("N0")</td>
+                                        <td>@p.rating</td>
+                                        <td>@AccountState(p.isAdmin, p.suspension)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+        </section>
+
+        @if (selected is not null)
+        {
+            <section class="admin-card" aria-labelledby="player-title">
+                <h2 id="player-title">@selected.username</h2>
+                <p class="admin-muted">
+                    Level @selected.level @(selected.@class) · @selected.gold.ToString("N0") gold · rating @selected.rating ·
+                    @selected.pvpWins duel wins, @selected.pvpLosses losses
+                    @if (selected.isAdmin) { <span> · admin</span> }
+                    @if (selected.lockedOutUntil is { } locked) { <span> · locked out after failed sign-ins until @AdminFormat.When(locked)</span> }
+                </p>
+
+                @if (selected.suspension is { } s)
+                {
+                    <p class="admin-warning">Suspended @(s.until is { } until ? $"until {AdminFormat.When(until)}" : "until reinstated"). Reason: @s.reason</p>
+                }
+
+                <div class="admin-actions">
+                    <form @onsubmit="SuspendOrReinstateAsync">
+                        <h3>@(selected.suspension is null ? "Suspend" : "Reinstate")</h3>
+                        @if (selected.suspension is null)
+                        {
+                            <label for="suspend-days">How long</label>
+                            <select id="suspend-days" @bind="suspendDays">
+                                <option value="1">1 day</option>
+                                <option value="7">7 days</option>
+                                <option value="30">30 days</option>
+                                <option value="0">Until reinstated</option>
+                            </select>
+                        }
+                        <label for="suspend-reason">Reason (the player sees it)</label>
+                        <textarea id="suspend-reason" rows="2" maxlength="500" @bind="suspendReason" @bind:event="oninput"></textarea>
+                        <button type="submit" class="admin-button @(selected.suspension is null ? "admin-danger" : null)"
+                                disabled="@(busy || string.IsNullOrWhiteSpace(suspendReason) || selected.isAdmin)">
+                            @(selected.suspension is null ? "Suspend" : "Reinstate")
+                        </button>
+                    </form>
+
+                    <form @onsubmit="CorrectGoldAsync">
+                        <h3>Correct gold</h3>
+                        <label for="gold-change">Gold to add (use a minus sign to take away)</label>
+                        <input id="gold-change" type="number" step="1" @bind="goldChange" />
+                        <label for="gold-reason">Reason</label>
+                        <textarea id="gold-reason" rows="2" maxlength="500" @bind="goldReason" @bind:event="oninput"></textarea>
+                        <button type="submit" class="admin-button" disabled="@(busy || goldChange == 0 || string.IsNullOrWhiteSpace(goldReason))">Apply</button>
+                    </form>
+                </div>
+
+                @if (selected.history.Count > 0)
+                {
+                    <h3>History</h3>
+                    <AuditList Entries="selected.history" />
+                }
+            </section>
+        }
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <p class="@(failed ? "admin-error" : "admin-ok")" role="@(failed ? "alert" : "status")">@message</p>
+        }
+
+        <section aria-labelledby="audit-title">
+            <h2 id="audit-title">Audit log</h2>
+            <p class="admin-muted">Everything admins have done, newest first. Entries are kept for a year.</p>
+            @if (audit.Count == 0)
+            {
+                <p class="admin-muted">Nothing yet.</p>
+            }
+            else
+            {
+                <AuditList Entries="audit" />
+                @if (moreAudit)
+                {
+                    <button class="admin-button admin-quiet" @onclick="LoadOlderAuditAsync">Show older</button>
+                }
+            }
+        </section>
+    }
+</div>
+</div>
+
+@code {
+    private const int AuditPage = 25;
+
+    private string search = string.Empty;
+    private List<AdminPlayerDto>? players;
+    private AdminPlayerDetailDto? selected;
+    private List<AuditEntryDto> audit = [];
+    private bool moreAudit;
+
+    private int suspendDays = 7;
+    private string suspendReason = string.Empty;
+    private int goldChange;
+    private string goldReason = string.Empty;
+
+    private bool busy;
+    private bool failed;
+    private string message = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!State.IsAdmin) return;
+        await LoadAuditAsync();
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        players = await Http.GetFromJsonAsync<List<AdminPlayerDto>>($"/api/v1/admin/players?search={Uri.EscapeDataString(search.Trim())}");
+    }
+
+    private async Task SelectAsync(Guid id)
+    {
+        message = string.Empty;
+        suspendReason = string.Empty;
+        goldReason = string.Empty;
+        goldChange = 0;
+        selected = await Http.GetFromJsonAsync<AdminPlayerDetailDto>($"/api/v1/admin/players/{id}");
+    }
+
+    private Task SuspendOrReinstateAsync() => selected!.suspension is null
+        ? ChangeAsync("suspend", new { Reason = suspendReason, Days = suspendDays == 0 ? (int?)null : suspendDays }, $"{selected.username} is suspended and was signed out.")
+        : ChangeAsync("reinstate", new { Reason = suspendReason }, $"{selected.username} can sign in again.");
+
+    private Task CorrectGoldAsync() =>
+        ChangeAsync("gold", new { Change = goldChange, Reason = goldReason }, $"{selected!.username}'s gold was corrected by {goldChange:+#,0;-#,0}.");
+
+    private async Task ChangeAsync(string action, object body, string done)
+    {
+        if (selected is null || busy) return;
+        busy = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"/api/v1/admin/players/{selected.id}/{action}", body);
+            if (response.IsSuccessStatusCode)
+            {
+                selected = await response.Content.ReadFromJsonAsync<AdminPlayerDetailDto>();
+                (failed, message) = (false, done);
+                suspendReason = goldReason = string.Empty;
+                goldChange = 0;
+                await LoadAuditAsync();
+                await SearchAsync();
+            }
+            else
+            {
+                var problem = response.StatusCode == HttpStatusCode.Forbidden ? null : await ReadDetailAsync(response);
+                (failed, message) = (true, problem ?? "That didn't work. Your admin role may have been removed; sign in again.");
+            }
+        }
+        catch (HttpRequestException)
+        {
+            (failed, message) = (true, "Can't reach the game server. Try again in a moment.");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task LoadAuditAsync()
+    {
+        audit = await Http.GetFromJsonAsync<List<AuditEntryDto>>($"/api/v1/admin/audit?take={AuditPage}") ?? [];
+        moreAudit = audit.Count == AuditPage;
+    }
+
+    private async Task LoadOlderAuditAsync()
+    {
+        var older = await Http.GetFromJsonAsync<List<AuditEntryDto>>($"/api/v1/admin/audit?take={AuditPage}&before={audit[^1].id}") ?? [];
+        audit.AddRange(older);
+        moreAudit = older.Count == AuditPage;
+    }
+
+    private static async Task<string?> ReadDetailAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            return (await response.Content.ReadFromJsonAsync<ProblemDto>())?.detail;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string AccountState(bool isAdmin, SuspensionDto? suspension) =>
+        isAdmin ? "Admin" : suspension is null ? "Active" : "Suspended";
+
+    private record SuspensionDto(DateTimeOffset? until, string reason);
+    private record AdminPlayerDto(Guid id, string username, string @class, int level, int gold, int rating, bool isAdmin, SuspensionDto? suspension);
+    private record AdminPlayerDetailDto(
+        Guid id, string username, string @class, int level, int experiencePoints, int gold, int rating, int pvpWins, int pvpLosses,
+        bool isAdmin, SuspensionDto? suspension, DateTimeOffset? lockedOutUntil, List<AuditEntryDto> history);
+    private record ProblemDto(string? detail);
+}

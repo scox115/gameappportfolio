@@ -19,9 +19,7 @@ public class AuthTokenHandler(GameState state, TokenRefresher refresher) : Deleg
 
         if (response.StatusCode == HttpStatusCode.Unauthorized && !string.IsNullOrEmpty(token))
         {
-            state.SignOut(response.Headers.Contains(GameState.SessionEndedHeader)
-                ? GameState.SignedInElsewhereMessage
-                : "Your session expired. Please sign in again.");
+            state.SignOut(GameState.EndedMessage(response));
         }
 
         return response;

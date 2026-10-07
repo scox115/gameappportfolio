@@ -119,6 +119,7 @@ jobs:
             ${{ vars.CUSTOM_DOMAIN }}
             ${{ vars.ALERT_EMAIL }}
             ${{ vars.APP_CONFIGURATION }}
+            ${{ vars.ADMIN_USERNAMES }}
             ${{ secrets.JWT_SIGNING_KEY }}
             ${{ secrets.RABBITMQ_PASSWORD }}
             ${{ secrets.GHCR_READ_TOKEN }}
@@ -141,6 +142,7 @@ jobs:
               customDomain="${{ vars.CUSTOM_DOMAIN }}" \
               alertEmail="${{ vars.ALERT_EMAIL }}" \
               appConfiguration="${{ vars.APP_CONFIGURATION }}" \
+              adminUsernames="${{ vars.ADMIN_USERNAMES }}" \
               jwtSigningKey="$JWT_SIGNING_KEY" \
               rabbitMqPassword="$RABBITMQ_PASSWORD" \
               registryUsername="$registry_user" \

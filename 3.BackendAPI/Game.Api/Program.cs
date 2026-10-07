@@ -11,6 +11,7 @@ using Game.Infrastructure.History;
 using RabbitMQ.Client;
 using Game.Api.Workers; // Add this using statement to register background workers
 using Game.Api.Options;
+using Game.Api.Admin;
 using Game.Api.Auth;
 using Game.Api.Battles;
 using Game.Api.Hubs;
@@ -141,8 +142,14 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
         options.Lockout.MaxFailedAccessAttempts = 5;
         options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
     })
+    .AddRoles<IdentityRole<Guid>>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddSignInManager();
+
+// Admins are the accounts named in Admin:Usernames; signing in grants or removes the Admin role to match.
+builder.Services.AddOptions<AdminOptions>().Bind(builder.Configuration.GetSection(AdminOptions.SectionName));
+builder.Services.AddScoped<AdminRoleSync>();
+builder.Services.AddScoped<AdminService>();
 
 builder.Services.AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
@@ -166,7 +173,8 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
             ValidateAudience = true,
             ValidateIssuerSigningKey = true,
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(30)
+            ClockSkew = TimeSpan.FromSeconds(30),
+            RoleClaimType = TokenService.RoleClaim
         };
 
         // Browsers can't set headers on WebSocket requests, so SignalR sends the token in the query string.
@@ -188,23 +196,27 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
                 var sessions = context.HttpContext.RequestServices.GetRequiredService<ActiveSessionValidator>();
                 if (!await sessions.IsCurrentAsync(context.Principal!, context.HttpContext.RequestAborted))
                 {
-                    context.HttpContext.Items[SessionClaims.EndedHeader] = true;
-                    context.Fail("The session was replaced by a newer sign-in.");
+                    var reason = await sessions.EndReasonAsync(context.Principal!, context.HttpContext.RequestAborted);
+                    context.HttpContext.Items[SessionClaims.EndedHeader] = reason;
+                    context.Fail(reason == SessionClaims.Suspended
+                        ? "The account was suspended."
+                        : "The session was replaced by a newer sign-in.");
                 }
             },
 
             OnChallenge = context =>
             {
-                if (context.HttpContext.Items.ContainsKey(SessionClaims.EndedHeader))
+                if (context.HttpContext.Items[SessionClaims.EndedHeader] is string reason)
                 {
-                    context.Response.Headers[SessionClaims.EndedHeader] = SessionClaims.SignedInElsewhere;
+                    context.Response.Headers[SessionClaims.EndedHeader] = reason;
                 }
                 return Task.CompletedTask;
             }
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(GameRoles.AdminPolicy, policy => policy.RequireAuthenticatedUser().RequireRole(GameRoles.Admin));
 builder.Services.AddSingleton(TimeProvider.System);
 
 // --- 🛡️ ANTI-CHEAT ---

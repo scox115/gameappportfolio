@@ -11,4 +11,31 @@ public class ApplicationUser : IdentityUser<Guid>
     /// an older session is refused, so an account is only signed in on one browser at a time.
     /// </summary>
     public Guid? CurrentSessionId { get; set; }
+
+    public const int SuspensionReasonMaxLength = 500;
+
+    /// <summary>
+    /// When an admin's suspension ends; <see cref="DateTimeOffset.MaxValue"/> means until an admin
+    /// reinstates the account. Kept apart from Identity's lockout, which is for failed sign-ins.
+    /// </summary>
+    public DateTimeOffset? SuspendedUntil { get; private set; }
+
+    /// <summary>Why the account was suspended, shown to the player when they try to sign in.</summary>
+    public string? SuspensionReason { get; private set; }
+
+    public bool IsSuspended(DateTimeOffset now) => SuspendedUntil is { } until && until > now;
+
+    /// <summary>Stops the account signing in, and ends the session it has now.</summary>
+    public void Suspend(DateTimeOffset until, string reason)
+    {
+        SuspendedUntil = until;
+        SuspensionReason = reason.Length <= SuspensionReasonMaxLength ? reason : reason[..SuspensionReasonMaxLength];
+        CurrentSessionId = null;
+    }
+
+    public void Reinstate()
+    {
+        SuspendedUntil = null;
+        SuspensionReason = null;
+    }
 }

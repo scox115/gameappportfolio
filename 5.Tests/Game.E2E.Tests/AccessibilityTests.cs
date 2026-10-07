@@ -148,6 +148,19 @@ public class AccessibilityTests(ArenaFixture arena) : BrowserTest(arena)
         await Assertions.Expect(dialog).ToBeHiddenAsync();
     });
 
+    [Fact]
+    public Task TheAdminTools_HaveNoViolations() => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var player = NewHeroName("Seen");
+        await CreateHeroAsync(player);
+        var page = await CreateHeroAsync(ApiHost.AdminNames[1]);
+
+        await page.GetByRole(AriaRole.Link, new() { Name = "Admin tools" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = player }).ClickAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = player })).ToBeVisibleAsync();
+        await AssertNoViolationsAsync(page, "admin tools");
+    });
+
     [Theory]
     [InlineData("terms", "Terms of Service")]
     [InlineData("privacy", "Privacy Policy")]

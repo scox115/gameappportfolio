@@ -59,14 +59,23 @@ public class AccountService(
             .OrderByDescending(b => b.StartedAt)
             .ToListAsync(cancellationToken);
 
+        var adminDecisions = await dbContext.AuditLog.AsNoTracking()
+            .Where(e => e.TargetId == playerId)
+            .OrderByDescending(e => e.At)
+            .Select(e => new AccountExport.AdminDecision(e.At, e.Action, e.Reason, e.Detail))
+            .ToListAsync(cancellationToken);
+
         return new AccountExport(
             ExportedAt: timeProvider.GetUtcNow(),
-            Account: new AccountExport.SignInAccount(user.Id, user.UserName ?? player.Username, user.LockoutEnd, user.AccessFailedCount),
+            Account: new AccountExport.SignInAccount(
+                user.Id, user.UserName ?? player.Username, user.LockoutEnd, user.AccessFailedCount,
+                user.SuspendedUntil, user.SuspensionReason),
             Profile: AccountExport.HeroProfile.From(player),
             SignInSessions: sessions,
             MatchHistory: history.Select(AccountExport.Match.From).ToList(),
             BossFights: bossFights,
-            Duels: duels.Select(d => AccountExport.Duel.From(d, playerId)).ToList());
+            Duels: duels.Select(d => AccountExport.Duel.From(d, playerId)).ToList(),
+            AdminDecisions: adminDecisions);
     }
 
     /// <summary>Deletes the account, the hero and everything recorded about them.</summary>

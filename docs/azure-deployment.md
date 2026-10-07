@@ -112,6 +112,14 @@ To flip them in Azure, the deploy can add a free-tier Azure App Configuration st
 
 The API checks the store for changes at most every two minutes while players are using it, so a change shows within a couple of minutes. Flags not in the store keep their `appsettings.json` defaults, and if the store can't be reached the API starts with those defaults. The store accepts Entra ID only (no access keys): the API reads it with its managed identity, and the SQL admins group can edit it.
 
+## Admins (optional)
+
+Add a repository variable `ADMIN_USERNAMES` with your hero's name (separate several with commas) and run
+**Deploy to Azure**. The next time that hero signs in, an **Admin tools** link appears in town: search players,
+suspend or reinstate them, correct gold, and read the audit log of every admin action. Take a name out of the
+variable and deploy again to remove that admin; it applies at their next sign-in. See
+[ADR 0021](adr/0021-admin-roles-and-audit-log.md).
+
 ## Email alerts (optional)
 
 Add a repository variable `ALERT_EMAIL` with your address and run **Deploy to Azure**. The deploy then adds:

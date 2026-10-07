@@ -1,0 +1,28 @@
+@* A list of admin audit log entries: when, who, what and why. *@
+<ol class="audit-list">
+    @foreach (var e in Entries)
+    {
+        <li>
+            <div class="audit-what">
+                <strong>@Describe(e.action)</strong> @e.targetName
+                @if (!string.IsNullOrEmpty(e.detail)) { <span class="audit-detail">@e.detail</span> }
+            </div>
+            <div class="audit-why">“@e.reason”</div>
+            <div class="audit-when">@e.actorName · <time datetime="@e.at.ToString("o")">@AdminFormat.When(e.at)</time></div>
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public List<AuditEntryDto> Entries { get; set; } = [];
+
+    private static string Describe(string action) => action switch
+    {
+        "Suspend" => "Suspended",
+        "Reinstate" => "Reinstated",
+        "AdjustGold" => "Corrected gold of",
+        "GrantAdmin" => "Made admin:",
+        "RevokeAdmin" => "Removed admin:",
+        _ => action,
+    };
+}

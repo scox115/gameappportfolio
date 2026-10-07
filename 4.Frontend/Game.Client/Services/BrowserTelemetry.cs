@@ -44,6 +44,7 @@ public sealed class BrowserTelemetry(IJSRuntime js, GameState state, NavigationM
             "status" => "Status",
             "terms" => "Terms",
             "privacy" => "Privacy",
+            "admin" => "Admin",
             _ => "Not found",
         };
 

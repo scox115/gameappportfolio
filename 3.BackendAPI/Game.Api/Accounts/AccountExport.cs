@@ -1,3 +1,4 @@
+using Game.Core.Admin;
 using Game.Core.Battles;
 using Game.Core.Bounties;
 using Game.Core.Entities;
@@ -18,9 +19,16 @@ public record AccountExport(
     List<AccountExport.SignInSession> SignInSessions,
     List<AccountExport.Match> MatchHistory,
     List<AccountExport.BossFight> BossFights,
-    List<AccountExport.Duel> Duels)
+    List<AccountExport.Duel> Duels,
+    List<AccountExport.AdminDecision> AdminDecisions)
 {
-    public record SignInAccount(Guid Id, string Username, DateTimeOffset? LockedOutUntil, int FailedSignInAttempts);
+    /// <param name="SuspendedUntil">Set while an admin has suspended the account; the year 9999 means until reinstated.</param>
+    public record SignInAccount(
+        Guid Id, string Username, DateTimeOffset? LockedOutUntil, int FailedSignInAttempts,
+        DateTimeOffset? SuspendedUntil, string? SuspensionReason);
+
+    /// <summary>Something an admin did to the account. Which admin did it is left out.</summary>
+    public record AdminDecision(DateTime At, AdminAction Action, string Reason, string? Detail);
 
     public record SignInSession(DateTime StartedAt, DateTime ExpiresAt, DateTime? EndedAt);
 

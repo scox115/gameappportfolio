@@ -1,0 +1,27 @@
+.audit-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.audit-list li {
+    border-bottom: 1px solid #334155;
+    padding: 10px 0;
+    font-size: 0.9rem;
+}
+
+.audit-detail {
+    color: #cbd5e1;
+    margin-left: 6px;
+}
+
+.audit-why {
+    color: #e2e8f0;
+    margin-top: 2px;
+}
+
+.audit-when {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    margin-top: 2px;
+}

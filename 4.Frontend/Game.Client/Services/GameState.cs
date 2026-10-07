@@ -17,8 +17,17 @@ public class GameState
     /// <summary>Shown when signing in on another browser ended this one's session.</summary>
     public const string SignedInElsewhereMessage = "You signed in on another browser, so you were signed out here.";
 
-    // Set by the API on a 401 when the token was retired by a newer sign-in.
+    /// <summary>Shown when an admin suspended the account while it was signed in.</summary>
+    public const string SuspendedMessage = "Your hero was suspended by an admin. Sign in again to see why.";
+
+    // Set by the API on a 401 when the token was retired by a newer sign-in or a suspension.
     public const string SessionEndedHeader = "X-Session-Ended";
+
+    /// <summary>Why the API refused the session, for the sign-in screen.</summary>
+    public static string EndedMessage(HttpResponseMessage response) =>
+        response.Headers.TryGetValues(SessionEndedHeader, out var values)
+            ? values.FirstOrDefault() == "suspended" ? SuspendedMessage : SignedInElsewhereMessage
+            : "Your session expired. Please sign in again.";
 
     public GameScreen CurrentScreen { get; private set; } = GameScreen.LoginMenu;
     public Guid PlayerId { get; private set; }
@@ -27,6 +36,9 @@ public class GameState
     public DateTimeOffset AccessTokenExpiresAt { get; private set; }
     public string? RefreshToken { get; private set; }
     public string? SignOutReason { get; private set; }
+
+    /// <summary>True when the account has the Admin role, which shows the admin tools.</summary>
+    public bool IsAdmin { get; private set; }
     public string Username { get; private set; } = string.Empty;
     public int Gold { get; private set; }
     public int Level { get; private set; }
@@ -63,6 +75,13 @@ public class GameState
         AccessToken = tokens.AccessToken;
         AccessTokenExpiresAt = tokens.ExpiresAt;
         RefreshToken = tokens.RefreshToken;
+    }
+
+    /// <summary>The account's roles, from the sign-in response.</summary>
+    public void UpdateRoles(IEnumerable<string>? roles)
+    {
+        IsAdmin = roles?.Contains("Admin") == true;
+        NotifyStateChanged();
     }
 
     public void UpdateRewards(int newGold, int newLevel)
@@ -105,6 +124,7 @@ public class GameState
         AccessToken = null;
         RefreshToken = null;
         SignOutReason = reason;
+        IsAdmin = false;
         PlayerId = Guid.Empty;
         Username = string.Empty;
         Gold = 0;
@@ -118,3 +138,4 @@ public class GameState
 
     private void NotifyStateChanged() => OnStateChanged?.Invoke();
 }
+

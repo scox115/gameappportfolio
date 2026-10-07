@@ -32,6 +32,13 @@ public class CleanupOptions
     [Range(2, 3650)]
     public int FinishedBattleRetentionDays { get; set; } = 30;
 
+    /// <summary>
+    /// Days an admin audit log entry is kept: long enough to look back on a decision or an appeal,
+    /// not forever, since entries name players. The privacy policy promises one year.
+    /// </summary>
+    [Range(30, 3650)]
+    public int AuditLogRetentionDays { get; set; } = 365;
+
     /// <summary>Rows deleted per statement, so a big backlog never holds long locks.</summary>
     [Range(1, 100_000)]
     public int BatchSize { get; set; } = 1_000;

@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Game.Api.Hubs;
 
-/// <summary>Tells a player's other browsers that a newer sign-in has replaced them.</summary>
+/// <summary>Tells a player's browsers that their session has ended: a newer sign-in replaced it, or an admin suspended them.</summary>
 public class SessionNotifier(
     IHubContext<SessionHub, ISessionClient> sessionHub,
     PvpMatchmaker matchmaker,
@@ -25,6 +25,21 @@ public class SessionNotifier(
         {
             // The old tokens are already refused; this push only makes the old browser notice sooner.
             logger.LogWarning(ex, "Could not notify earlier sessions of user {UserId}.", userId);
+        }
+    }
+
+    /// <summary>Call this after a suspension is saved, so every open browser of the player signs out.</summary>
+    public async Task SuspendedAsync(Guid userId)
+    {
+        matchmaker.Leave(userId);
+
+        try
+        {
+            await sessionHub.Clients.User(userId.ToString()).Suspended();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not tell suspended user {UserId}'s browsers.", userId);
         }
     }
 }
