@@ -8,7 +8,7 @@
 
       - the resource group
       - the API's user-assigned managed identity
-      - an Entra ID group that administers the SQL server, containing you and the API's identity
+      - an Entra ID group that administers the SQL server, containing you, the API's identity and the deploy app
       - an app registration GitHub Actions signs in as, using OIDC (no password or key)
       - role assignments that let that app deploy into the resource group only
       - a JWT signing key and a RabbitMQ password
@@ -93,6 +93,13 @@ if (-not $appId) {
 $spId = Invoke-Az ad sp list --display-name $DeployAppName --query "[0].id" --output tsv
 if (-not $spId) {
     $spId = Invoke-Az ad sp create --id $appId --query id --output tsv
+}
+
+# The monthly restore drill signs in to the database as this app to compare the restored copy with
+# the live one, so it joins the SQL admin group too. (It can already change the server as Contributor.)
+$isMember = Invoke-Az ad group member check --group $sqlGroupId --member-id $spId --query value --output tsv
+if ($isMember -ne 'true') {
+    Invoke-Az ad group member add --group $sqlGroupId --member-id $spId | Out-Null
 }
 
 # Only the workflow's "production" environment in this repository can sign in as the app.

@@ -1,0 +1,60 @@
+name: Restore drill
+
+# Proves the database backups work: restores the live database as it was a few minutes ago into a
+# temporary copy, checks the copy against the live one, reports how long it took, and deletes it.
+# Runs on the 1st of every month and by hand from the Actions tab. A failed drill fails the run, and
+# GitHub emails you about a failed scheduled run. See docs/disaster-recovery.md.
+on:
+  schedule:
+    - cron: '17 6 1 * *'
+  workflow_dispatch:
+    inputs:
+      minutes_ago:
+        description: How many minutes back to restore to
+        type: number
+        default: 10
+      keep:
+        description: Keep the restored copy to look at (delete it yourself afterwards)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write   # sign in to Azure with OIDC
+
+concurrency:
+  group: restore-drill
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+
+jobs:
+  drill:
+    if: vars.AZURE_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Sign in to Azure
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Restore the database and check the copy
+        run: |
+          args=(--resource-group "$RESOURCE_GROUP" --minutes-ago "$MINUTES_AGO")
+          if [ "$KEEP" = "true" ]; then args+=(--keep); fi
+          python3 infra/restore-drill/restore_drill.py "${args[@]}"
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          MINUTES_AGO: ${{ inputs.minutes_ago || 10 }}
+          KEEP: ${{ inputs.keep || false }}
