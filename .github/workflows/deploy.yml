@@ -229,7 +229,12 @@ jobs:
             echo "Waiting for the API to start (attempt $attempt)..."
             sleep 10
           done
-          curl --fail --silent --show-error "$api/health/ready" > /dev/null
+          curl --fail --silent --show-error "$api/health/ready" > ready.json
+          # Degraded still answers 200, so say which optional service is down instead of letting it pass silently.
+          status=$(jq -r .status ready.json)
+          if [ "$status" != "Healthy" ]; then
+            jq -r '.checks | to_entries[] | select(.value.status != "Healthy") | "::warning::\(.key) is \(.value.status): \(.value.description)"' ready.json
+          fi
           curl --fail --silent --show-error --output /dev/null "$client"
           curl --fail --silent --show-error --dump-header - --output /dev/null "$client" | grep -i "^content-security-policy: default-src 'self'" \
             || { echo "::error::The client is served without its Content Security Policy."; exit 1; }
@@ -238,7 +243,7 @@ jobs:
             echo "### 🃏 Kings of the Card Arena is live"
             echo ""
             echo "- Game: ${{ steps.infra.outputs.game }}"
-            echo "- API health: $api/health/ready"
+            echo "- API health: $status ($api/health/ready)"
             echo "- API revision: ${{ steps.release.outputs.revision }} (standby for rollback: ${{ steps.live.outputs.revision || 'none' }})"
           } >> "$GITHUB_STEP_SUMMARY"
 
