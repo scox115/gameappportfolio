@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Game.Api.Models;
+using Game.Core.Moderation;
 using Microsoft.AspNetCore.Hosting;
 
 namespace Game.Api.Tests;
@@ -66,16 +67,74 @@ public class AvatarUploadTests : IClassFixture<GameApiFactory>
     }
 
     [Fact]
-    public async Task FilesOver5Mb_AreRejected()
+    public async Task FilesOver4Mb_AreRejected()
     {
         var (client, _) = await SignedInPlayerAsync(_factory);
-        var tooBig = new byte[5 * 1024 * 1024 + 1];
+        var tooBig = new byte[4 * 1024 * 1024 + 1];
         PngBytes.CopyTo(tooBig, 0);
 
         var response = await UploadAsync(client, tooBig, "huge.png", "image/png");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("5 MB", await response.Content.ReadAsStringAsync());
+        Assert.Contains("4 MB", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task APortraitTheScreenBlocks_IsNeverStored_AndThePlayerIsToldWhy()
+    {
+        var (client, playerId) = await SignedInPlayerAsync(_factory);
+        (await UploadAsync(client, PngBytes, "fine.png", "image/png")).EnsureSuccessStatusCode();
+        var before = await PortraitAsync(client, playerId);
+        byte[] offensive = [.. JpegBytes, 1, 2, 3];
+        _factory.Portraits.Judge(offensive, new PortraitScreening(PortraitVerdict.Blocked, PortraitHarm.Sexual));
+        var uploadsBefore = _factory.Storage.Uploaded.Count;
+
+        var response = await UploadAsync(client, offensive, "bad.jpg", "image/jpeg");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("sexual content", await response.Content.ReadAsStringAsync());
+        Assert.Equal(uploadsBefore, _factory.Storage.Uploaded.Count);
+        Assert.Equal(before, await PortraitAsync(client, playerId));
+    }
+
+    [Fact]
+    public async Task AnImageTheScreenCantRead_IsTurnedAway()
+    {
+        var (client, _) = await SignedInPlayerAsync(_factory);
+        byte[] tiny = [.. PngBytes, 9, 9];
+        _factory.Portraits.Judge(tiny, PortraitScreening.Unreadable);
+
+        var response = await UploadAsync(client, tiny, "tiny.png", "image/png");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("50 × 50 pixels", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task WhenTheScreenIsDown_NoPortraitGoesUpUnchecked()
+    {
+        var (client, playerId) = await SignedInPlayerAsync(_factory);
+        byte[] unchecked_ = [.. PngBytes, 7, 7, 7];
+        _factory.Portraits.Judge(unchecked_, PortraitScreening.Unavailable);
+        var uploadsBefore = _factory.Storage.Uploaded.Count;
+
+        var response = await UploadAsync(client, unchecked_, "me.png", "image/png");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Contains("try again", await response.Content.ReadAsStringAsync());
+        Assert.Equal(uploadsBefore, _factory.Storage.Uploaded.Count);
+        Assert.Null(await PortraitAsync(client, playerId));
+    }
+
+    [Fact]
+    public async Task FilesThatArentImages_AreTurnedAwayBeforeTheyreScreened()
+    {
+        var (client, _) = await SignedInPlayerAsync(_factory);
+        var screened = _factory.Portraits.Screened;
+
+        await UploadAsync(client, System.Text.Encoding.UTF8.GetBytes("<script>alert(1)</script>"), "evil.png", "image/png");
+
+        Assert.Equal(screened, _factory.Portraits.Screened);
     }
 
     [Fact]
@@ -109,6 +168,9 @@ public class AvatarUploadTests : IClassFixture<GameApiFactory>
         // The limit is per player, so someone else on the same network can still upload.
         Assert.Equal(HttpStatusCode.OK, (await UploadAsync(otherClient, PngBytes, "me.png", "image/png")).StatusCode);
     }
+
+    private static async Task<string?> PortraitAsync(HttpClient client, Guid playerId) =>
+        (await client.GetFromJsonAsync<JsonElement>($"/api/v1/players/{playerId}", Json)).GetProperty("avatarUrl").GetString();
 
     private static async Task<HttpResponseMessage> UploadAsync(HttpClient client, byte[] bytes, string fileName, string contentType)
     {

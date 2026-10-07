@@ -130,6 +130,7 @@ jobs:
             ${{ inputs.environment == 'production' && vars.APP_CONFIGURATION || '' }}
             ${{ vars.ADMIN_USERNAMES }}
             ${{ inputs.environment == 'production' && vars.EMAIL_RECOVERY || '' }}
+            ${{ inputs.environment == 'production' && vars.CONTENT_SAFETY || '' }}
             ${{ vars.API_MAX_REPLICAS }}
             ${{ secrets.JWT_SIGNING_KEY }}
             ${{ secrets.RABBITMQ_PASSWORD }}
@@ -156,6 +157,7 @@ jobs:
               appConfiguration="${{ inputs.environment == 'production' && vars.APP_CONFIGURATION || '' }}" \
               adminUsernames="${{ vars.ADMIN_USERNAMES }}" \
               emailRecovery="${{ inputs.environment == 'production' && vars.EMAIL_RECOVERY || '' }}" \
+              contentSafety="${{ inputs.environment == 'production' && vars.CONTENT_SAFETY || '' }}" \
               jwtSigningKey="$JWT_SIGNING_KEY" \
               rabbitMqPassword="$RABBITMQ_PASSWORD" \
               registryUsername="$registry_user" \

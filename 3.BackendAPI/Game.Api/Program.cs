@@ -16,6 +16,8 @@ using Game.Api.Auth;
 using Game.Api.Recovery;
 using Game.Infrastructure.Email;
 using Azure.Communication.Email;
+using Azure.AI.ContentSafety;
+using Game.Infrastructure.Moderation;
 using Game.Api.Battles;
 using Game.Api.Hubs;
 using Game.Api.Versioning;
@@ -173,6 +175,23 @@ builder.Services.AddSingleton<IEmailSender>(sp =>
         : new LogEmailSender(sp.GetRequiredService<ILogger<LogEmailSender>>());
 });
 builder.Services.AddScoped<AccountRecoveryService>();
+
+// --- 🖼️ PORTRAIT SCREENING ---
+// Azure AI Content Safety checks each portrait before it's shown, when an endpoint is set
+// (see docs/adr/0029-portrait-screening.md).
+builder.Services.AddOptions<ContentSafetyOptions>().Bind(builder.Configuration.GetSection(ContentSafetyOptions.SectionName));
+builder.Services.AddSingleton<IPortraitScreen>(sp =>
+{
+    var contentSafety = sp.GetRequiredService<IOptions<ContentSafetyOptions>>().Value;
+    if (!contentSafety.Enabled) return new UncheckedPortraitScreen();
+
+    // A player waits on this, so give up quickly and ask them to try again rather than hang.
+    var clientOptions = new ContentSafetyClientOptions();
+    clientOptions.Retry.MaxRetries = 2;
+    clientOptions.Retry.NetworkTimeout = TimeSpan.FromSeconds(10);
+    var client = new ContentSafetyClient(new Uri(contentSafety.Endpoint!), new DefaultAzureCredential(), clientOptions);
+    return new ContentSafetyPortraitScreen(client, sp.GetRequiredService<ILogger<ContentSafetyPortraitScreen>>());
+});
 
 // Two-factor sign-in with an authenticator app (see docs/adr/0025-two-factor-sign-in.md).
 builder.Services.AddScoped<Game.Api.TwoFactor.TwoFactorService>();

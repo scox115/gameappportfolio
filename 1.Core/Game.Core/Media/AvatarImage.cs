@@ -9,7 +9,8 @@ public sealed record AvatarImageFormat(string ContentType, string Extension);
 /// </summary>
 public static class AvatarImage
 {
-    public const long MaxBytes = 5 * 1024 * 1024;
+    /// <summary>4 MB, the most Azure AI Content Safety will screen.</summary>
+    public const long MaxBytes = 4 * 1024 * 1024;
 
     public static readonly AvatarImageFormat Png = new("image/png", ".png");
     public static readonly AvatarImageFormat Jpeg = new("image/jpeg", ".jpg");

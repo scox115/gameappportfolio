@@ -6,6 +6,7 @@ using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Core.Interfaces;
 using Game.Core.Media;
+using Game.Core.Moderation;
 using Game.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
@@ -68,7 +69,9 @@ public static class PlayerEndpoints
             [FromForm] AvatarUploadModel model, 
             AppDbContext dbContext,
             IStorageService storageService,
-            ILoggerFactory loggerFactory) =>
+            IPortraitScreen portraitScreen,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
         {
             // Check if the player exists in the SQL database first
             var player = await dbContext.Players.FindAsync(user.GetPlayerId());
@@ -84,10 +87,10 @@ public static class PlayerEndpoints
 
             if (model.File.Length > AvatarImage.MaxBytes)
             {
-                return AvatarProblem("Portraits must be 5 MB or smaller.");
+                return AvatarProblem("Portraits must be 4 MB or smaller.");
             }
 
-            // Read the upload (at most 5 MB) and decide its type from the bytes themselves. The file
+            // Read the upload (at most 4 MB) and decide its type from the bytes themselves. The file
             // name and the browser's Content-Type are both up to the client, so neither is trusted.
             using var content = new MemoryStream((int)model.File.Length);
             await model.File.CopyToAsync(content);
@@ -95,6 +98,20 @@ public static class PlayerEndpoints
             if (format is null)
             {
                 return AvatarProblem("Portraits must be PNG or JPG images.");
+            }
+
+            // Checked before it's stored, so nobody else ever sees a portrait that fails.
+            var screening = await portraitScreen.ScreenAsync(content.GetBuffer().AsMemory(0, (int)content.Length), cancellationToken);
+            switch (screening.Verdict)
+            {
+                case PortraitVerdict.Blocked:
+                    loggerFactory.CreateLogger("Game.Api.Avatars")
+                        .LogWarning("Turned away a portrait from player {PlayerId} for {Harm}.", player.Id, screening.Harm);
+                    return AvatarProblem(screening.Explanation!);
+                case PortraitVerdict.Unreadable:
+                    return AvatarProblem(screening.Explanation!);
+                case PortraitVerdict.Unavailable:
+                    return Results.Problem(screening.Explanation, statusCode: StatusCodes.Status503ServiceUnavailable);
             }
 
             content.Position = 0;

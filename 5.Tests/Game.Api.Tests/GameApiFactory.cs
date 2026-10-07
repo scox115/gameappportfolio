@@ -3,6 +3,7 @@ using Game.Api.Messaging;
 using Game.Api.Workers;
 using Game.Core.Battles;
 using Game.Core.Interfaces;
+using Game.Core.Moderation;
 using Game.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -59,6 +60,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
 
     /// <summary>Stands in for Azure Communication Services and keeps every email "sent".</summary>
     public FakeEmailSender Email { get; } = new();
+
+    /// <summary>Stands in for Azure AI Content Safety: allows every portrait unless a test says otherwise.</summary>
+    public FakePortraitScreen Portraits { get; } = new();
 
     /// <summary>Tops up a player's gold, for tests that need more than a new hero starts with.</summary>
     public async Task GiveGoldAsync(Guid playerId, int amount)
@@ -118,6 +122,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(Email);
+
+            services.RemoveAll<IPortraitScreen>();
+            services.AddSingleton<IPortraitScreen>(Portraits);
         });
     }
 }
@@ -186,5 +193,22 @@ internal static class ServiceCollectionExtensions
         {
             services.Remove(descriptor);
         }
+    }
+}
+
+public class FakePortraitScreen : IPortraitScreen
+{
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, PortraitScreening> _verdicts = new();
+
+    /// <summary>How many images were screened.</summary>
+    public int Screened;
+
+    /// <summary>Makes this exact image get this verdict; any other image is allowed.</summary>
+    public void Judge(byte[] image, PortraitScreening screening) => _verdicts[Convert.ToBase64String(image)] = screening;
+
+    public Task<PortraitScreening> ScreenAsync(ReadOnlyMemory<byte> image, CancellationToken cancellationToken = default)
+    {
+        Interlocked.Increment(ref Screened);
+        return Task.FromResult(_verdicts.GetValueOrDefault(Convert.ToBase64String(image.Span), PortraitScreening.Allowed));
     }
 }

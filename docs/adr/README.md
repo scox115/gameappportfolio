@@ -32,5 +32,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0026](0026-staging-and-previews.md) | A staging copy every commit reaches first, and previews for pull requests | Accepted |
 | [0027](0027-scale-out.md) | More than one API replica, with shared state in SQL | Accepted |
 | [0028](0028-sql-server-in-ci.md) | Concurrency and migration tests run against SQL Server in CI | Accepted |
+| [0029](0029-portrait-screening.md) | Screen portraits with Azure AI Content Safety before they're shown | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.
