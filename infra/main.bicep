@@ -199,6 +199,17 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   }
 }
 
+// Deleted or overwritten portraits stay recoverable for 7 days (see docs/disaster-recovery.md).
+// A player's old portrait is deleted when they upload a new one, so this is the undo for that too.
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+  parent: storage
+  name: 'default'
+  properties: {
+    deleteRetentionPolicy: { enabled: true, days: 7 }
+    containerDeleteRetentionPolicy: { enabled: true, days: 7 }
+  }
+}
+
 var storageBlobDataContributor = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
 
 resource apiWritesBlobs 'Microsoft.Authorization/roleAssignments@2022-04-01' = {

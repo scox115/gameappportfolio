@@ -55,7 +55,7 @@ You need an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/
    ```
 
    It does the following:
-   - creates the resource group, the API's managed identity and the `card-arena-sql-admins` Entra group (with you and the API's identity in it);
+   - creates the resource group, the API's managed identity and the `card-arena-sql-admins` Entra group (with you, the API's identity and the deploy app in it; the deploy app needs it for the restore drill);
    - creates the deploy app with its GitHub OIDC trust and grants it rights on that resource group only;
    - saves the `AZURE_*` repository variables and generates the `JWT_SIGNING_KEY` and `RABBITMQ_PASSWORD` secrets.
 
@@ -75,6 +75,7 @@ You need an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/
 - **Blue-green releases:** every deploy creates a new API revision that gets no players at first. The workflow tests it on its own address (`/health/ready` and a real API call), then moves all traffic to it. If the test fails, the new revision is switched off, players stay on the old one, and the run fails. The revision it replaced stays active with no traffic, scaled to zero, so it costs nothing. See [ADR 0016](adr/0016-blue-green-deploys.md).
 - **Roll back:** in the Actions tab, run **Roll back the API**. Leave the revision empty to return to the one the last deploy replaced, or enter any revision name from the Container App's **Revisions and replicas** page. It is tested before players are moved. The game client is not rolled back, so this suits a bad API release; if the new client needs the new API, fix forward instead. The next merge to `main` deploys forward as usual.
 - **Database changes must work with the previous release.** The new revision applies EF Core migrations when it starts, while players are still on the old one, and a rollback runs old code against the new schema. Add columns and tables in one release and remove the old ones in a later release (expand, then contract), never in the same one.
+- **Backups and recovery:** Azure keeps 7 days of point-in-time database backups, and deleted portraits and secrets stay recoverable for 7 days. The **Restore drill** workflow restores the database into a temporary copy on the 1st of every month to prove it works. [disaster-recovery.md](disaster-recovery.md) has the runbooks.
 - **Logs and traces:** in the Azure portal, open the Application Insights resource and use Transaction search or Logs. Container logs are under the Container App's **Log stream**.
 - **Health:** open `https://<api>/health/ready`.
 - **Query the production database from SSMS:**
