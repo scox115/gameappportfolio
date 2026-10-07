@@ -5,7 +5,9 @@
 import datetime as dt
 import importlib.util
 import io
+import os
 import subprocess
+import tempfile
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -70,10 +72,25 @@ class RestoreDrillTests(unittest.TestCase):
             patch.start()
             self.addCleanup(patch.stop)
 
-    def run_drill(self, *args):
-        with redirect_stderr(io.StringIO()) as errors, mock.patch("sys.stdout", io.StringIO()) as output:
+    def run_drill(self, *args, summary_file=None):
+        # In CI the tests run inside a GitHub Actions step, so without this every fake report
+        # would land in that job's summary and read like a real drill result.
+        environment = {"GITHUB_STEP_SUMMARY": summary_file} if summary_file else {}
+        with redirect_stderr(io.StringIO()) as errors, mock.patch("sys.stdout", io.StringIO()) as output, \
+                mock.patch.dict(os.environ, environment):
+            if not summary_file:
+                os.environ.pop("GITHUB_STEP_SUMMARY", None)
             code = drill.main(["--resource-group", "rg", *args])
         return code, output.getvalue(), errors.getvalue()
+
+    def test_the_report_goes_to_the_job_summary(self):
+        with tempfile.TemporaryDirectory() as folder:
+            summary = os.path.join(folder, "summary.md")
+
+            self.run_drill(summary_file=summary)
+
+            with open(summary, encoding="utf-8") as handle:
+                self.assertIn("Restore drill passed", handle.read())
 
     def test_a_good_backup_passes_and_the_copy_is_deleted(self):
         code, report, _ = self.run_drill()
