@@ -101,6 +101,7 @@
                     Level @selected.level @(selected.@class) · @selected.gold.ToString("N0") gold · rating @selected.rating ·
                     @selected.pvpWins duel wins, @selected.pvpLosses losses
                     @if (selected.isAdmin) { <span> · admin</span> }
+                    @if (selected.twoFactorEnabled) { <span> · two-factor sign-in on</span> }
                     @if (selected.lockedOutUntil is { } locked) { <span> · locked out after failed sign-ins until @AdminFormat.When(locked)</span> }
                 </p>
 
@@ -155,6 +156,17 @@
                             @(selected.avatarUrl is null ? "No portrait" : "Remove portrait")
                         </button>
                     </form>
+
+                    @if (selected.twoFactorEnabled)
+                    {
+                        <form @onsubmit="TurnOffTwoFactorAsync">
+                            <h3>Turn off two-factor</h3>
+                            <p class="admin-muted" style="margin: 0 0 6px;">For a player who lost their phone and recovery codes. Check it's really them first, such as through their recovery email.</p>
+                            <label for="two-factor-reason">How you checked it's them</label>
+                            <textarea id="two-factor-reason" rows="2" maxlength="500" @bind="twoFactorReason" @bind:event="oninput"></textarea>
+                            <button type="submit" class="admin-button admin-danger" disabled="@(busy || string.IsNullOrWhiteSpace(twoFactorReason))">Turn off two-factor</button>
+                        </form>
+                    }
 
                     @if (OpenReports.Count > 0)
                     {
@@ -233,6 +245,7 @@
     private string newName = string.Empty;
     private string renameReason = string.Empty;
     private string portraitReason = string.Empty;
+    private string twoFactorReason = string.Empty;
     private string dismissKind = "Name";
     private string dismissReason = string.Empty;
 
@@ -265,7 +278,7 @@
 
     private void ClearForms()
     {
-        suspendReason = goldReason = renameReason = portraitReason = dismissReason = newName = string.Empty;
+        suspendReason = goldReason = renameReason = portraitReason = dismissReason = twoFactorReason = newName = string.Empty;
         goldChange = 0;
     }
 
@@ -278,6 +291,9 @@
 
     private Task RenameAsync() =>
         ChangeAsync("rename", new { NewName = newName.Trim(), Reason = renameReason }, $"{selected!.username} is now called {newName.Trim()}.");
+
+    private Task TurnOffTwoFactorAsync() =>
+        ChangeAsync("turn-off-two-factor", new { Reason = twoFactorReason }, $"{selected!.username} can sign in with their password alone now.");
 
     private Task RemovePortraitAsync() =>
         ChangeAsync("remove-portrait", new { Reason = portraitReason }, $"{selected!.username}'s portrait was taken down.");
@@ -356,7 +372,7 @@
     private record AdminPlayerDetailDto(
         Guid id, string username, string @class, int level, int experiencePoints, int gold, int rating, int pvpWins, int pvpLosses,
         bool isAdmin, SuspensionDto? suspension, DateTimeOffset? lockedOutUntil, List<AuditEntryDto> history,
-        string? avatarUrl, List<OpenReportDto>? openReports);
+        string? avatarUrl, List<OpenReportDto>? openReports, bool twoFactorEnabled);
     private record OpenReportDto(string reason, int reports);
     private record ReportQueueDto(Guid targetId, string targetName, string? avatarUrl, string reason, int reports,
         DateTime firstReportedAt, DateTime lastReportedAt, List<string> notes);

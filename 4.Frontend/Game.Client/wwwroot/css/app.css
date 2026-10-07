@@ -222,3 +222,13 @@ button:focus-visible, input:focus-visible, a:focus-visible, [tabindex]:focus-vis
 @media (max-width: 600px) {
     .report-hero-label { display: none; }
 }
+
+/* Two-factor sign-in, in the account dialog */
+.two-factor-label { display: block; color: #cbd5e1; font-size: 0.85rem; margin-bottom: 4px; }
+.two-factor-input { width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9; box-sizing: border-box; }
+.two-factor-primary { background: #4f46e5; color: white; padding: 9px 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+.two-factor-secondary { background: #334155; color: #e2e8f0; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; }
+.two-factor-primary:disabled, .two-factor-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.two-factor-qr { display: block; width: 180px; height: 180px; margin: 0 auto; border-radius: 6px; }
+.two-factor-key { color: #e2e8f0; background: #0f172a; padding: 2px 6px; border-radius: 4px; word-break: break-all; }
+.two-factor-codes { columns: 2; margin: 0 0 10px; padding-left: 1.6em; color: #e2e8f0; font-family: ui-monospace, Consolas, monospace; font-size: 0.9rem; line-height: 1.7; }

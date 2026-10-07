@@ -24,7 +24,10 @@ public enum AdminAction
     RemovePortrait,
 
     /// <summary>Reports about a hero were looked at and closed with nothing changed.</summary>
-    DismissReports
+    DismissReports,
+
+    /// <summary>Two-factor sign-in was turned off for a player who lost their phone and recovery codes.</summary>
+    TurnOffTwoFactor
 }
 
 /// <summary>

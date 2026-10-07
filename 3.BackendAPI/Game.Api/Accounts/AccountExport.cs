@@ -29,7 +29,8 @@ public record AccountExport(
     /// <param name="PreviousUsername">The name the hero had before an admin renamed it (in capitals, as stored); it still signs in.</param>
     public record SignInAccount(
         Guid Id, string Username, DateTimeOffset? LockedOutUntil, int FailedSignInAttempts,
-        DateTimeOffset? SuspendedUntil, string? SuspensionReason, string? RecoveryEmail, string? PreviousUsername = null);
+        DateTimeOffset? SuspendedUntil, string? SuspensionReason, string? RecoveryEmail, string? PreviousUsername = null,
+        bool TwoFactorEnabled = false);
 
     /// <summary>Something an admin did to the account. Which admin did it is left out.</summary>
     public record AdminDecision(DateTime At, AdminAction Action, string Reason, string? Detail);

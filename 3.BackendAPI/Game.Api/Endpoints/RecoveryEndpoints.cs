@@ -45,9 +45,8 @@ public static class RecoveryEndpoints
             AccountRecoveryService recovery,
             CancellationToken cancellationToken) =>
         {
-            if (await CheckPasswordAsync(user, request.Password, userManager, signInManager) is not { } account)
-                return WrongPassword(nameof(RecoveryEmailRequest.Password));
-            if (account is ApplicationUserLockedOut) return LockedOut();
+            var check = await PasswordConfirmation.CheckAsync(user, request.Password, userManager, signInManager);
+            if (check is not PasswordConfirmation.Confirmed account) return check.Refusal(nameof(RecoveryEmailRequest.Password));
 
             return await recovery.RequestEmailAsync(account.User, request.Email, cancellationToken) switch
             {
@@ -65,9 +64,8 @@ public static class RecoveryEndpoints
             AccountRecoveryService recovery,
             CancellationToken cancellationToken) =>
         {
-            if (await CheckPasswordAsync(user, request.Password, userManager, signInManager) is not { } account)
-                return WrongPassword(nameof(PasswordRequest.Password));
-            if (account is ApplicationUserLockedOut) return LockedOut();
+            var check = await PasswordConfirmation.CheckAsync(user, request.Password, userManager, signInManager);
+            if (check is not PasswordConfirmation.Confirmed account) return check.Refusal(nameof(PasswordRequest.Password));
 
             await recovery.RemoveEmailAsync(account.User, cancellationToken);
             return Results.NoContent();
@@ -107,25 +105,6 @@ public static class RecoveryEndpoints
         context.HttpContext.RequestServices.GetRequiredService<IOptions<EmailOptions>>().Value.Enabled
             ? await next(context)
             : Results.Problem("Account recovery by email isn't available here.", statusCode: StatusCodes.Status503ServiceUnavailable);
-
-    private record ApplicationUserChecked(ApplicationUser User);
-    private sealed record ApplicationUserLockedOut(ApplicationUser User) : ApplicationUserChecked(User);
-
-    // Counts toward the lockout like a sign-in, so a stolen session can't guess its way to changing the address.
-    private static async Task<ApplicationUserChecked?> CheckPasswordAsync(
-        ClaimsPrincipal user, string? password, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager)
-    {
-        if (await userManager.FindByIdAsync(user.GetPlayerId().ToString()) is not { } account) return null;
-        var check = await signInManager.CheckPasswordSignInAsync(account, password ?? string.Empty, lockoutOnFailure: true);
-        if (check.IsLockedOut) return new ApplicationUserLockedOut(account);
-        return check.Succeeded ? new ApplicationUserChecked(account) : null;
-    }
-
-    private static IResult WrongPassword(string field) =>
-        Results.ValidationProblem(new Dictionary<string, string[]> { [field] = ["That password isn't right."] });
-
-    private static IResult LockedOut() =>
-        Results.Problem("Too many failed attempts. Try again later.", statusCode: StatusCodes.Status423Locked);
 
     private static IResult InvalidLink() =>
         Results.Problem("This link has expired or was already used. Ask for a new one.", statusCode: StatusCodes.Status400BadRequest);

@@ -71,6 +71,18 @@
                                    style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
                         </div>
 
+                    @if (askForTwoFactorCode && !creatingHero)
+                    {
+                        <!-- HEROES WITH TWO-FACTOR SIGN-IN ON: THE PASSWORD WAS RIGHT, NOW THE CODE FROM THEIR APP -->
+                        <div style="margin-bottom: 20px;">
+                            <label for="sign-in-code"
+                                   style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Code from your authenticator app:</label>
+                            <input id="sign-in-code" @ref="twoFactorInput" @bind="inputTwoFactorCode" @bind:event="oninput" autocomplete="one-time-code" aria-describedby="sign-in-code-hint"
+                                   style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box; letter-spacing: 0.1em;" />
+                            <p id="sign-in-code-hint" style="color: #94a3b8; font-size: 0.8rem; margin: 6px 0 0;">Lost your phone? Enter one of your recovery codes instead.</p>
+                        </div>
+                    }
+
                     @if (creatingHero)
                     {
                         <!-- ONLY NEW HEROES PICK A CLASS; RETURNING HEROES KEEP THEIRS -->
@@ -406,6 +418,11 @@
     private string chosenClass = "Sorcerer";
     private bool creatingHero; // The sign-in screen is creating a new hero rather than signing in
 
+    private string inputTwoFactorCode = string.Empty;
+    private bool askForTwoFactorCode; // The password was right and the hero has two-factor sign-in on
+    private bool focusTwoFactorInput;
+    private ElementReference twoFactorInput;
+
     private void ToggleCreatingHero()
     {
         creatingHero = !creatingHero;
@@ -473,6 +490,11 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender) await Sounds.LoadAsync();
+        if (focusTwoFactorInput)
+        {
+            focusTwoFactorInput = false;
+            await twoFactorInput.FocusAsync();
+        }
         if (focusPortraitPopup)
         {
             focusPortraitPopup = false;
@@ -490,10 +512,22 @@
         if (string.IsNullOrWhiteSpace(inputUsername) || string.IsNullOrEmpty(inputPassword)) return;
         try
         {
-            var res = await Http.PostAsJsonAsync("/api/v1/auth/login", new { Username = inputUsername, Password = inputPassword });
+            var res = await Http.PostAsJsonAsync("/api/v1/auth/login", new
+            {
+                Username = inputUsername,
+                Password = inputPassword,
+                TwoFactorCode = askForTwoFactorCode ? inputTwoFactorCode : null
+            });
             if (res.IsSuccessStatusCode)
             {
                 await StartSession(res);
+            }
+            else if (res.StatusCode == HttpStatusCode.Unauthorized && await ReadProblem(res) is { twoFactorRequired: true } problem)
+            {
+                // Show the code box; only say something's wrong if a code was already tried.
+                statusMsg = askForTwoFactorCode ? problem.detail ?? "That code isn't right." : string.Empty;
+                askForTwoFactorCode = focusTwoFactorInput = true;
+                inputTwoFactorCode = string.Empty;
             }
             else if (res.StatusCode == HttpStatusCode.Forbidden)
             {
@@ -533,7 +567,8 @@
         if (auth?.player is null) return;
 
         statusMsg = string.Empty;
-        inputPassword = string.Empty;
+        inputPassword = inputTwoFactorCode = string.Empty;
+        askForTwoFactorCode = false;
         creatingHero = false;
         State.UpdateClass(auth.player.@class);
         State.SetPlayerSession(new SessionTokens(auth.accessToken, auth.expiresAt, auth.refreshToken), auth.player.id, auth.player.username, auth.player.gold, auth.player.level, auth.player.avatarUrl);
@@ -541,13 +576,16 @@
         State.UpdateRoles(auth.roles);
     }
 
-    private static async Task<string?> ReadProblemDetail(HttpResponseMessage res)
+    private static async Task<string?> ReadProblemDetail(HttpResponseMessage res) => (await ReadProblem(res))?.detail;
+
+    private static async Task<ProblemDto?> ReadProblem(HttpResponseMessage res)
     {
         try
         {
-            return (await res.Content.ReadFromJsonAsync<ProblemDto>())?.detail;
+            return await res.Content.ReadFromJsonAsync<ProblemDto>();
         }
         catch (System.Text.Json.JsonException) { return null; }
+        catch (NotSupportedException) { return null; } // an empty or non-JSON body
     }
 
     // Turns an ASP.NET Core validation problem (e.g. password rules) into one readable line.
@@ -971,6 +1009,7 @@
     public class ProblemDto
     {
         public string? detail { get; set; }
+        public bool twoFactorRequired { get; set; }
     }
 
     public class ValidationProblemDto

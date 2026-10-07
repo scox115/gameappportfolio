@@ -147,7 +147,10 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     })
     .AddRoles<IdentityRole<Guid>>()
     .AddEntityFrameworkStores<AppDbContext>()
-    .AddSignInManager();
+    .AddSignInManager()
+    // Registered so Identity knows two-factor is really on for a hero with an app set up: only then does a right
+    // password leave the failed-attempt count alone, so guessing the second-step code still ends in a lockout.
+    .AddTokenProvider<AuthenticatorTokenProvider<ApplicationUser>>(TokenOptions.DefaultAuthenticatorProvider);
 
 // Admins are the accounts named in Admin:Usernames; signing in grants or removes the Admin role to match.
 builder.Services.AddOptions<AdminOptions>().Bind(builder.Configuration.GetSection(AdminOptions.SectionName));
@@ -168,6 +171,9 @@ builder.Services.AddSingleton<IEmailSender>(sp =>
         : new LogEmailSender(sp.GetRequiredService<ILogger<LogEmailSender>>());
 });
 builder.Services.AddScoped<AccountRecoveryService>();
+
+// Two-factor sign-in with an authenticator app (see docs/adr/0025-two-factor-sign-in.md).
+builder.Services.AddScoped<Game.Api.TwoFactor.TwoFactorService>();
 
 builder.Services.AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))

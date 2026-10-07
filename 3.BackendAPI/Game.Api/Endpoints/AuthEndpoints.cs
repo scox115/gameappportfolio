@@ -4,6 +4,7 @@ using Game.Api.Hubs;
 using Game.Api.Models;
 using Game.Api.Moderation;
 using Game.Api.Options;
+using Game.Api.TwoFactor;
 using Game.Core.Entities;
 using Game.Core.Moderation;
 using Game.Infrastructure.Data;
@@ -88,6 +89,7 @@ public static class AuthEndpoints
             RefreshTokenService refreshTokens,
             SessionNotifier notifier,
             AdminRoleSync roleSync,
+            TwoFactorService twoFactor,
             TimeProvider timeProvider) =>
         {
             var user = string.IsNullOrWhiteSpace(request.Username)
@@ -116,6 +118,26 @@ public static class AuthEndpoints
             if (!signIn.Succeeded)
             {
                 return Results.Unauthorized();
+            }
+
+            // The password was right; heroes with two-factor on also need a code. Identity leaves the
+            // failed-attempt count alone in that case, so guessing codes still ends in a lockout.
+            if (user.TwoFactorEnabled)
+            {
+                if (string.IsNullOrWhiteSpace(request.TwoFactorCode))
+                {
+                    return TwoFactorNeeded("Enter the 6-digit code from your authenticator app.");
+                }
+
+                if (!await twoFactor.VerifyAsync(user, request.TwoFactorCode))
+                {
+                    await userManager.AccessFailedAsync(user);
+                    return await userManager.IsLockedOutAsync(user)
+                        ? Results.Problem("Too many failed sign-in attempts. Try again later.", statusCode: StatusCodes.Status423Locked)
+                        : TwoFactorNeeded("That code isn't right. Try the newest one, or a recovery code.");
+                }
+
+                await userManager.ResetAccessFailedCountAsync(user);
             }
 
             // Only said once the password is right, so the reason isn't shown to anyone who knows the name.
@@ -177,6 +199,11 @@ public static class AuthEndpoints
             return Results.NoContent();
         });
     }
+
+    // 401 like a wrong password, but marked so the browser asks for the code instead.
+    private static IResult TwoFactorNeeded(string detail) =>
+        Results.Problem(detail, statusCode: StatusCodes.Status401Unauthorized, title: "Two-factor code needed",
+            extensions: new Dictionary<string, object?> { ["twoFactorRequired"] = true });
 
     private static async Task<AuthResponse> StartSessionAsync(
         ApplicationUser user,

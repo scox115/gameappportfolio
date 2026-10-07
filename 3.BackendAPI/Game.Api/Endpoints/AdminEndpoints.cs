@@ -34,6 +34,9 @@ public static class AdminEndpoints
         group.MapPost("/players/{id:guid}/gold", async (Guid id, GoldCorrectionRequest request, ClaimsPrincipal user, AdminService admin, CancellationToken cancellationToken) =>
             ToResult(await admin.CorrectGoldAsync(Actor(user), id, request, cancellationToken)));
 
+        group.MapPost("/players/{id:guid}/turn-off-two-factor", async (Guid id, TurnOffTwoFactorForPlayerRequest request, ClaimsPrincipal user, AdminService admin, CancellationToken cancellationToken) =>
+            ToResult(await admin.TurnOffTwoFactorAsync(Actor(user), id, request, cancellationToken)));
+
         group.MapPost("/players/{id:guid}/rename", async (Guid id, RenameRequest request, ClaimsPrincipal user, ModerationService moderation, CancellationToken cancellationToken) =>
             ToResult(await moderation.RenameAsync(Actor(user), id, request, cancellationToken)));
 

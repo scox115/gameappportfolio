@@ -19,6 +19,10 @@
         <li><b>Your games:</b> boss fights, duels, match history and the daily arena totals they add to (which don't identify anyone).</li>
         <li><b>Sign-in sessions:</b> when each session started and ends. Only a hash of each session token is kept.</li>
         <li>
+            <b>Two-factor sign-in, if you turn it on:</b> the secret key your authenticator app shares with the game, the
+            time of the last code you used (so it can't be used again), and a hash of each recovery code (never the codes themselves).
+        </li>
+        <li>
             <b>Admin decisions:</b> if an admin suspends your account, corrects your gold, renames your hero or removes your
             portrait, the game records what was done, when, by which admin and why. A suspension's reason is shown to you
             when you try to sign in. After a rename, your old name is kept so you can still sign in with it.
@@ -49,7 +53,7 @@
 
     <h2>How long we keep it</h2>
     <ul>
-        <li>Your account, hero, recovery email and match history: until you delete your hero (or remove the email).</li>
+        <li>Your account, hero, recovery email, two-factor key and match history: until you delete your hero (or remove the email, or turn two-factor off).</li>
         <li>Finished battles: 30 days. Expired sign-in sessions: 7 days after they end.</li>
         <li>Diagnostics and logs: 30 days.</li>
         <li>Admin decisions about your account: one year, even if you delete your hero, so a decision can be checked if it's questioned.</li>

@@ -42,6 +42,7 @@ public class AdminService(
     AppDbContext dbContext,
     RefreshTokenService refreshTokens,
     SessionNotifier notifier,
+    TwoFactor.TwoFactorService twoFactor,
     TimeProvider timeProvider,
     ILogger<AdminService> logger)
 {
@@ -135,6 +136,26 @@ public class AdminService(
         return Done(await DetailAsync(player, user, cancellationToken));
     }
 
+    /// <summary>
+    /// Turns off two-factor sign-in for a player locked out of it (lost phone and recovery codes), so the
+    /// password alone works again. Admins should check it's really them first, such as by their recovery email.
+    /// </summary>
+    public async Task<AdminChange> TurnOffTwoFactorAsync(AdminActor actor, Guid playerId, TurnOffTwoFactorForPlayerRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!TryReason(request.Reason, out var reason, out var problem)) return problem;
+
+        var (player, user) = await LoadAsync(playerId, cancellationToken);
+        if (player is null || user is null) return AdminChange.NotFound;
+        if (!user.TwoFactorEnabled) return AdminChange.Conflict($"{player.Username} doesn't use two-factor sign-in.");
+
+        await twoFactor.TurnOffAsync(user, cancellationToken);
+        Record(actor, AdminAction.TurnOffTwoFactor, player, reason);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.LogWarning("Admin {Admin} turned off two-factor sign-in for player {PlayerId}.", actor.Name, playerId);
+        return Done(await DetailAsync(player, user, cancellationToken));
+    }
+
     /// <summary>Adds or takes away gold, such as to make good a bug or undo an exploit.</summary>
     public async Task<AdminChange> CorrectGoldAsync(AdminActor actor, Guid playerId, GoldCorrectionRequest request, CancellationToken cancellationToken = default)
     {
@@ -195,7 +216,8 @@ public class AdminService(
         return new AdminPlayerDetail(
             p.Id, p.Username, p.Class, p.Level, p.ExperiencePoints, p.Gold, p.Rating, p.PvpWins, p.PvpLosses,
             await IsAdminAsync(p.Id, cancellationToken), SuspensionOf(user), lockedOut,
-            history.Select(AuditEntryResponse.From).ToList(), p.AvatarUrl, openReports.OrderBy(r => r.Reason).ToList());
+            history.Select(AuditEntryResponse.From).ToList(), p.AvatarUrl, openReports.OrderBy(r => r.Reason).ToList(),
+            user.TwoFactorEnabled);
     }
 
     private SuspensionResponse? SuspensionOf(ApplicationUser user) =>
