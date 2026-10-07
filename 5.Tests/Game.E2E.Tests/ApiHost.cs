@@ -68,7 +68,7 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
                 .AddOutputCacheEviction(sp));
 
             services.Remove(services.Single(d => d.ImplementationType == typeof(MatchConsumerWorker)));
-            services.Remove(services.Single(d => d.ImplementationType == typeof(MatchTelemetrySender)));
+            services.Remove(services.Single(d => d.ImplementationType == typeof(MatchOutboxRelay)));
 
             // Every roll is the minimum: cards always land and the boss always uses a plain Slash,
             // so a hero who keeps casting Fireball wins and every duel ends in a few turns.

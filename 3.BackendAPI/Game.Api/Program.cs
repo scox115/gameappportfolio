@@ -299,7 +299,7 @@ builder.Services.AddScoped<SessionNotifier>();
 
 // --- ⚔️ SERVER-AUTHORITATIVE BATTLES ---
 builder.Services.AddSingleton<IBattleRandom, SystemBattleRandom>();
-builder.Services.AddSingleton<MatchTelemetryPublisher>();
+builder.Services.AddSingleton<MatchOutbox>();
 builder.Services.AddSingleton<TelemetryBrokerStatus>();
 
 // --- 🆚 REAL-TIME PVP ARENA (SignalR) ---
@@ -317,7 +317,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // --- ⚙️ REGISTER NATIVE WORKER RUNTIME LOOPS ---
-builder.Services.AddHostedService<MatchTelemetrySender>();
+builder.Services.AddHostedService<MatchOutboxRelay>();
 builder.Services.AddHostedService<MatchConsumerWorker>();
 
 // Deletes expired refresh tokens and old finished battles soon after startup, then every few hours.

@@ -94,7 +94,7 @@ When a battle ends, the API saves the rewards, then publishes a `MatchCompletedE
 - `MatchHistory`: one row per hero per match. A unique index on (match, hero) means a message RabbitMQ delivers twice is only counted once.
 - `DailyArenaStats`: one row per UTC day, with a concurrency token so two API instances can't overwrite each other's counts.
 
-Both are written in one `SaveChanges`, and the message is acknowledged only afterwards. If the database is unavailable, the event is requeued and retried up to five times. The consumer never changes gold, XP or ratings. If RabbitMQ is down, battles still work: events wait in the API's memory and appear in history once the broker is back. Open http://localhost:15672 (guest/guest) to watch the queue.
+Both are written in one `SaveChanges`, and the message is acknowledged only afterwards. If the database is unavailable, the event is requeued and retried up to five times. The consumer never changes gold, XP or ratings. The API never sends an event straight to RabbitMQ: it saves it to the `OutboxMessages` table in the same `SaveChanges` as the match, and `MatchOutboxRelay` sends it and deletes the row once the broker confirms it ([ADR 0023](adr/0023-transactional-outbox.md)). If RabbitMQ is down, battles still work: events wait in the table, survive API restarts, and appear in history once the broker is back. Open http://localhost:15672 (guest/guest) to watch the queue.
 
 ### Health checks and monitoring
 

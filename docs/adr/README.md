@@ -6,7 +6,7 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | --- | --- | --- |
 | [0001](0001-clean-architecture.md) | Clean Architecture with a framework-free domain | Accepted |
 | [0002](0002-server-authoritative-battles.md) | The server plays every battle; the client only picks cards | Accepted |
-| [0003](0003-rewards-synchronous-messaging-for-read-models.md) | Pay rewards in the request, use RabbitMQ only for read models | Accepted |
+| [0003](0003-rewards-synchronous-messaging-for-read-models.md) | Pay rewards in the request, use RabbitMQ only for read models | Accepted, partly superseded by 0023 |
 | [0004](0004-optimistic-concurrency.md) | Optimistic concurrency on players and battles | Accepted |
 | [0005](0005-identity-jwt-refresh-tokens.md) | ASP.NET Core Identity with short JWTs and rotating refresh tokens | Accepted |
 | [0006](0006-single-replica-signalr.md) | Real-time duels on SignalR with an in-memory lobby, one replica | Accepted |
@@ -26,5 +26,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0020](0020-account-export-and-deletion.md) | Players can download their data and delete their account | Accepted |
 | [0021](0021-admin-roles-and-audit-log.md) | Admin roles from configuration, with an audit log of every admin action | Accepted |
 | [0022](0022-account-recovery-by-email.md) | Account recovery by email with Azure Communication Services | Accepted |
+| [0023](0023-transactional-outbox.md) | Match events go through a transactional outbox | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.

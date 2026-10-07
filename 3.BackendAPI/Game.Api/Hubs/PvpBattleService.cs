@@ -22,7 +22,7 @@ public class PvpBattleService(
     PvpMatchmaker matchmaker,
     IBattleRandom random,
     TimeProvider timeProvider,
-    MatchTelemetryPublisher telemetry,
+    MatchOutbox outbox,
     IHubContext<ArenaHub, IArenaClient> hub,
     IOptions<AntiCheatOptions> antiCheat,
     ILogger<PvpBattleService> logger)
@@ -212,7 +212,8 @@ public class PvpBattleService(
         return battle;
     }
 
-    // Saves the move and, if it ended the battle, the rewards, in one SaveChanges; then tells both players.
+    // Saves the move and, if it ended the battle, the rewards and the match event, in one SaveChanges;
+    // then tells both players.
     private async Task SaveAndBroadcastAsync(PvpBattle battle, PvpTurnResult? lastTurn)
     {
         Dictionary<Guid, BattleRewardResponse>? rewards = null;
@@ -220,6 +221,7 @@ public class PvpBattleService(
         if (battle.IsFinished)
         {
             (completed, rewards) = await SettleAsync(battle);
+            if (completed is not null) outbox.Add(dbContext, completed);
         }
 
         try
@@ -240,13 +242,13 @@ public class PvpBattleService(
         if (completed is not null)
         {
             var winnerId = completed.WinnerId;
-            await telemetry.PublishAsync(completed);
+            outbox.Notify();
             GameTelemetry.BattleCompleted("pvp", battle.EndReason?.ToString() ?? "Unknown");
             logger.LogInformation("PvP battle {BattleId} won by {WinnerId} ({Reason})", battle.Id, winnerId, battle.EndReason);
         }
     }
 
-    // Returns the event to publish once the rewards are saved, or null for a duel that didn't count.
+    // Returns the event to save with the rewards, or null for a duel that didn't count.
     private async Task<(MatchCompletedEvent? Completed, Dictionary<Guid, BattleRewardResponse> Rewards)> SettleAsync(PvpBattle battle)
     {
         var winnerId = battle.WinnerId!.Value;

@@ -9,6 +9,7 @@ using Game.Core.Battles;
 using Game.Core.Events;
 using Game.Infrastructure.Data;
 using Game.Infrastructure.History;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Game.Api.Tests;
@@ -24,14 +25,14 @@ public class MatchHistoryTests
     };
 
     [Fact]
-    public async Task WinningABossFight_PublishesTheDetailsThatBecomeHistoryAndStats()
+    public async Task WinningABossFight_SavesTheDetailsThatBecomeHistoryAndStats()
     {
         using var factory = new GameApiFactory();
         var (client, playerId, username) = await SignedInAsync(factory);
 
         var final = await WinBossFightAsync(client);
 
-        var published = DrainPublished(factory).Single();
+        var published = (await DrainOutboxAsync(factory)).Single();
         Assert.Equal(MatchKind.Boss, published.Kind);
         Assert.Equal(BossDifficulty.Normal, published.Difficulty);
         Assert.Equal(playerId, published.WinnerId);
@@ -156,12 +157,15 @@ public class MatchHistoryTests
             ]
         };
 
-    private static List<MatchCompletedEvent> DrainPublished(GameApiFactory factory)
+    // Takes the saved events out of the outbox, as the relay would, and reads them as the consumer does.
+    private static async Task<List<MatchCompletedEvent>> DrainOutboxAsync(GameApiFactory factory)
     {
-        var publisher = factory.Services.GetRequiredService<MatchTelemetryPublisher>();
-        var events = new List<MatchCompletedEvent>();
-        while (publisher.Pending.TryRead(out var e)) events.Add(e);
-        return events;
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var messages = await dbContext.OutboxMessages.OrderBy(m => m.CreatedAt).ToListAsync();
+        dbContext.OutboxMessages.RemoveRange(messages);
+        await dbContext.SaveChangesAsync();
+        return messages.Select(m => JsonSerializer.Deserialize<MatchCompletedEvent>(m.Payload, MatchEventJson.Options)!).ToList();
     }
 
     private static async Task<ProjectionResult> ProjectAsync(GameApiFactory factory, MatchCompletedEvent match)

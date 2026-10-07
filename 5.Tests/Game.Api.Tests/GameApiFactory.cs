@@ -64,9 +64,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
                 .UseInMemoryDatabase(_databaseName)
                 .AddOutputCacheEviction(sp));
 
-            // The telemetry sender and consumer need a live broker; they aren't part of what these tests cover.
+            // The outbox relay and the consumer need a live broker; they aren't part of what these tests cover.
             services.Remove(services.Single(d => d.ImplementationType == typeof(MatchConsumerWorker)));
-            services.Remove(services.Single(d => d.ImplementationType == typeof(MatchTelemetrySender)));
+            services.Remove(services.Single(d => d.ImplementationType == typeof(MatchOutboxRelay)));
 
             // Every roll is the minimum, which always favours the player: cards always land and
             // the boss always uses a plain Slash, so battle outcomes are predictable.

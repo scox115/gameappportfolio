@@ -21,9 +21,6 @@ public static class GameTelemetry
     private static readonly Counter<long> TelemetrySent = Meter.CreateCounter<long>(
         "game.telemetry.sent", unit: "{message}", description: "Match events delivered to RabbitMQ.");
 
-    private static readonly Counter<long> TelemetryDropped = Meter.CreateCounter<long>(
-        "game.telemetry.dropped", unit: "{message}", description: "Match events dropped because the backlog was full.");
-
     private static readonly Counter<long> CleanupDeleted = Meter.CreateCounter<long>(
         "game.cleanup.deleted", unit: "{row}", description: "Rows the scheduled data cleanup deleted.");
 
@@ -36,8 +33,6 @@ public static class GameTelemetry
             new KeyValuePair<string, object?>("game.boss.difficulty", difficulty));
 
     public static void TelemetryMessageSent() => TelemetrySent.Add(1);
-
-    public static void TelemetryMessageDropped() => TelemetryDropped.Add(1);
 
     /// <param name="kind">"refresh_token", "boss_fight" or "duel".</param>
     public static void RowsCleanedUp(string kind, int count) =>

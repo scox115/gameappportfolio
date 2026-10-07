@@ -88,7 +88,7 @@ public static class BattleEndpoints
             AppDbContext dbContext,
             IBattleRandom random,
             TimeProvider timeProvider,
-            MatchTelemetryPublisher telemetry) =>
+            MatchOutbox outbox) =>
         {
             var playerId = user.GetPlayerId();
 
@@ -133,7 +133,7 @@ public static class BattleEndpoints
                     return Results.NotFound("Player profile not found.");
                 }
 
-                // Rewards are settled in the same SaveChanges as the final turn.
+                // Rewards and the match event are saved in the same SaveChanges as the final turn.
                 var won = battle.Status == BattleStatus.Won;
                 match = GameMatch.CreatePve(player.Id);
                 dbContext.Matches.Add(match);
@@ -147,6 +147,7 @@ public static class BattleEndpoints
                     Turns = battle.Turn,
                     Participants = [new MatchParticipant(player.Id, player.Username, battle.Class, won, earned.Gold, earned.Experience)]
                 };
+                outbox.Add(dbContext, completed);
 
                 var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
                 reward = BattleRewardResponse.From(earned, player, isDuel: false,
@@ -164,7 +165,7 @@ public static class BattleEndpoints
 
             if (completed is not null)
             {
-                await telemetry.PublishAsync(completed);
+                outbox.Notify();
                 GameTelemetry.BattleCompleted("pve", completed.WinnerId == playerId ? "victory" : "defeat", battle.Difficulty.ToString());
             }
 
