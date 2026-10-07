@@ -1,6 +1,6 @@
 # 0012. A test pyramid that runs on every pull request
 
-- **Status:** Accepted
+- **Status:** Accepted; the SQL Server checks are superseded by [0028](0028-sql-server-in-ci.md)
 - **Date:** 2026-10-05
 
 ## Context

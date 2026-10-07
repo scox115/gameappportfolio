@@ -112,22 +112,21 @@ public class MatchOutboxTests
         Assert.Contains("1 match event(s) waiting in the outbox", check.GetProperty("description").GetString());
     }
 
-    [Fact]
-    public async Task TwoReplicasRelayingTheSameOutbox_SendEachEventOnce()
+    [Theory, MemberData(nameof(TestDatabase.Engines), MemberType = typeof(TestDatabase))]
+    public async Task TwoReplicasRelayingTheSameOutbox_SendEachEventOnce(string engine)
     {
-        // A SQLite file stands in for the shared database: like SQL Server, it saves each claim in one transaction.
-        var file = Path.Combine(Path.GetTempPath(), $"outbox-{Guid.NewGuid()}.db");
+        // A real database, which saves each claim in one transaction (the in-memory provider doesn't).
+        using var database = TestDatabase.Create(engine);
         var services = new ServiceCollection()
             .AddLogging()
             .AddSingleton(TimeProvider.System)
-            .AddDbContext<AppDbContext>(options => options.UseSqlite($"Data Source={file};Default Timeout=30;Pooling=False"))
+            .AddDbContext<AppDbContext>(database.Configure)
             .BuildServiceProvider();
         try
         {
             using (var scope = services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                db.Database.EnsureCreated();
                 var outbox = new MatchOutbox(TimeProvider.System);
                 for (var i = 0; i < 3 * MatchOutboxRelay.BatchSize; i++) outbox.Add(db, NewEvent(DateTime.UtcNow.AddSeconds(i)));
                 await db.SaveChangesAsync();
@@ -156,7 +155,6 @@ public class MatchOutboxTests
         finally
         {
             await services.DisposeAsync();
-            File.Delete(file);
         }
     }
 

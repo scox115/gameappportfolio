@@ -6,24 +6,19 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Game.Api.Tests;
 
-// The lobby is a table shared by every API replica. These tests run it on a SQLite file, which (like
-// SQL Server) saves each SaveChanges in a transaction and reports a delete of a row that's already gone.
+// The lobby is a table shared by every API replica. Every test runs on SQLite and, when TEST_SQLSERVER is set,
+// on SQL Server: both save each SaveChanges in a transaction and report a delete of a row that's already gone,
+// which the pairing relies on and the in-memory provider doesn't do.
 public sealed class MatchmakerTests : IDisposable
 {
-    private readonly string _databaseFile = Path.Combine(Path.GetTempPath(), $"lobby-{Guid.NewGuid()}.db");
     private readonly List<ServiceProvider> _replicas = [];
     private readonly TestClock _clock = new();
+    private TestDatabase? _database;
 
-    public MatchmakerTests()
+    [Theory, MemberData(nameof(TestDatabase.Engines), MemberType = typeof(TestDatabase))]
+    public async Task PlayersOnTheSameNetwork_ArePairedForAFriendlyDuel_ButFlagged(string engine)
     {
-        using var db = NewDbContext();
-        db.Database.EnsureCreated();
-    }
-
-    [Fact]
-    public async Task PlayersOnTheSameNetwork_ArePairedForAFriendlyDuel_ButFlagged()
-    {
-        var matchmaker = Replica();
+        var matchmaker = Replica(engine);
         var alice = Guid.NewGuid();
 
         Assert.Null(await matchmaker.JoinOrPairAsync(alice, 0, "203.0.113.7"));
@@ -32,10 +27,10 @@ public sealed class MatchmakerTests : IDisposable
         Assert.Equal(new PvpPairing(alice, SameNetwork: true), pairing);
     }
 
-    [Fact]
-    public async Task WagerDuels_SkipOpponentsOnTheSameNetwork()
+    [Theory, MemberData(nameof(TestDatabase.Engines), MemberType = typeof(TestDatabase))]
+    public async Task WagerDuels_SkipOpponentsOnTheSameNetwork(string engine)
     {
-        var matchmaker = Replica();
+        var matchmaker = Replica(engine);
         var alice = Guid.NewGuid();
         var carol = Guid.NewGuid();
         await matchmaker.JoinOrPairAsync(alice, 100, "203.0.113.7", avoidSameNetwork: true);
@@ -46,29 +41,29 @@ public sealed class MatchmakerTests : IDisposable
         Assert.Equal(new PvpPairing(alice, SameNetwork: false), pairing);
     }
 
-    [Fact]
-    public async Task UnknownAddresses_NeverCountAsTheSameNetwork()
+    [Theory, MemberData(nameof(TestDatabase.Engines), MemberType = typeof(TestDatabase))]
+    public async Task UnknownAddresses_NeverCountAsTheSameNetwork(string engine)
     {
-        var matchmaker = Replica();
+        var matchmaker = Replica(engine);
         await matchmaker.JoinOrPairAsync(Guid.NewGuid(), 0, network: null);
 
         Assert.False((await matchmaker.JoinOrPairAsync(Guid.NewGuid(), 0, network: null))!.SameNetwork);
     }
 
-    [Fact]
-    public async Task OnlyPlayersWithTheSameWager_ArePaired()
+    [Theory, MemberData(nameof(TestDatabase.Engines), MemberType = typeof(TestDatabase))]
+    public async Task OnlyPlayersWithTheSameWager_ArePaired(string engine)
     {
-        var matchmaker = Replica();
+        var matchmaker = Replica(engine);
         await matchmaker.JoinOrPairAsync(Guid.NewGuid(), 50);
 
         Assert.Null(await matchmaker.JoinOrPairAsync(Guid.NewGuid(), 100));
     }
 
-    [Fact]
-    public async Task APlayerWaitingOnOneReplica_IsPairedFromAnother()
+    [Theory, MemberData(nameof(TestDatabase.Engines), MemberType = typeof(TestDatabase))]
+    public async Task APlayerWaitingOnOneReplica_IsPairedFromAnother(string engine)
     {
-        var east = Replica();
-        var west = Replica();
+        var east = Replica(engine);
+        var west = Replica(engine);
         var alice = Guid.NewGuid();
 
         Assert.Null(await east.JoinOrPairAsync(alice));
@@ -78,11 +73,11 @@ public sealed class MatchmakerTests : IDisposable
         Assert.False(await east.IsWaitingAsync(alice));
     }
 
-    [Fact]
-    public async Task LeavingOnAnyReplica_TakesThePlayerOutOfTheLobby()
+    [Theory, MemberData(nameof(TestDatabase.Engines), MemberType = typeof(TestDatabase))]
+    public async Task LeavingOnAnyReplica_TakesThePlayerOutOfTheLobby(string engine)
     {
-        var east = Replica();
-        var west = Replica();
+        var east = Replica(engine);
+        var west = Replica(engine);
         var alice = Guid.NewGuid();
         await east.JoinOrPairAsync(alice);
 
@@ -91,23 +86,23 @@ public sealed class MatchmakerTests : IDisposable
         Assert.Null(await west.JoinOrPairAsync(Guid.NewGuid()));
     }
 
-    [Fact]
-    public async Task AnEntryNobodyVouchesFor_StopsPairing()
+    [Theory, MemberData(nameof(TestDatabase.Engines), MemberType = typeof(TestDatabase))]
+    public async Task AnEntryNobodyVouchesFor_StopsPairing(string engine)
     {
         // The replica holding Alice's connection crashed, so nothing refreshes her entry.
-        var crashed = Replica();
-        var live = Replica();
+        var crashed = Replica(engine);
+        var live = Replica(engine);
         await crashed.JoinOrPairAsync(Guid.NewGuid());
         _clock.Advance(PvpLobbyEntry.StaleAfter + TimeSpan.FromSeconds(1));
 
         Assert.Null(await live.JoinOrPairAsync(Guid.NewGuid()));
     }
 
-    [Fact]
-    public async Task TheHeartbeat_KeepsWaitingPlayersInTheLobby()
+    [Theory, MemberData(nameof(TestDatabase.Engines), MemberType = typeof(TestDatabase))]
+    public async Task TheHeartbeat_KeepsWaitingPlayersInTheLobby(string engine)
     {
-        var east = Replica();
-        var west = Replica();
+        var east = Replica(engine);
+        var west = Replica(engine);
         var alice = Guid.NewGuid();
         await east.JoinOrPairAsync(alice);
 
@@ -120,10 +115,10 @@ public sealed class MatchmakerTests : IDisposable
         Assert.Equal(alice, (await west.JoinOrPairAsync(Guid.NewGuid()))!.OpponentId);
     }
 
-    [Fact]
-    public async Task ManyPlayersJoiningAtOnceOnTwoReplicas_AreEachPairedExactlyOnce()
+    [Theory, MemberData(nameof(TestDatabase.Engines), MemberType = typeof(TestDatabase))]
+    public async Task ManyPlayersJoiningAtOnceOnTwoReplicas_AreEachPairedExactlyOnce(string engine)
     {
-        var replicas = new[] { Replica(), Replica() };
+        var replicas = new[] { Replica(engine), Replica(engine) };
         var players = Enumerable.Range(0, 40).Select(_ => Guid.NewGuid()).ToList();
 
         var results = await Task.WhenAll(players.Select((player, i) =>
@@ -135,31 +130,28 @@ public sealed class MatchmakerTests : IDisposable
         Assert.Equal(everyonePaired.Count, everyonePaired.Distinct().Count());
 
         // Nobody is stranded: with an even number of players, all of them are paired.
-        using var db = NewDbContext();
+        using var db = _database!.NewContext();
         Assert.Empty(await db.PvpLobby.ToListAsync());
         Assert.Equal(20, pairs.Count);
     }
 
-    private PvpMatchmaker Replica()
+    // An API replica's matchmaker. All of a test's replicas share one database.
+    private PvpMatchmaker Replica(string engine)
     {
+        _database ??= TestDatabase.Create(engine);
         var services = new ServiceCollection()
             .AddLogging()
             .AddSingleton<TimeProvider>(_clock)
-            .AddDbContext<AppDbContext>(options => options.UseSqlite(ConnectionString))
+            .AddDbContext<AppDbContext>(_database.Configure)
             .AddSingleton<PvpMatchmaker>()
             .BuildServiceProvider();
         _replicas.Add(services);
         return services.GetRequiredService<PvpMatchmaker>();
     }
 
-    // Writers wait their turn for up to 30 seconds rather than failing straight away.
-    private string ConnectionString => $"Data Source={_databaseFile};Default Timeout=30;Pooling=False";
-
-    private AppDbContext NewDbContext() => new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(ConnectionString).Options);
-
     public void Dispose()
     {
         foreach (var replica in _replicas) replica.Dispose();
-        File.Delete(_databaseFile);
+        _database?.Dispose();
     }
 }

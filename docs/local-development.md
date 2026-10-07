@@ -122,7 +122,7 @@ The leaderboards, the player count, the arena stats and the class list are the s
 
 A cached response stays fresh because saving a change evicts it: an EF Core interceptor notices when a save touches `Players` or `DailyArenaStats` and evicts the responses tagged with them, so a new rating shows on the leaderboard straight away. Each entry also expires after a minute (an hour for the class list), which covers changes made outside the API, such as an edit in SSMS. When lots of players miss at once, one request queries SQL and the rest wait for its answer. A response served from the cache carries an `Age` header.
 
-The cache lives in the API's memory, which is enough for one instance. To share it between several instances, run Redis (`docker run -d -p 6379:6379 redis:8-alpine`) and set `ConnectionStrings:Redis` (for example `localhost:6379`). Azure doesn't use Redis yet, because it has no free tier and the API runs as one instance.
+The cache lives in the API's memory, which is enough for one instance. To share it between several instances, run Redis (`docker run -d -p 6379:6379 redis:8-alpine`) and set `ConnectionStrings:Redis` (for example `localhost:6379`). Azure doesn't use Redis, because it has no free tier; with several replicas each keeps its own cache, so a leaderboard can be up to a minute old on another replica ([ADR 0027](adr/0027-scale-out.md)).
 
 ## 4. Test
 
@@ -134,6 +134,15 @@ dotnet test 5.Tests/Game.E2E.Tests                                      # browse
 The browser tests (`5.Tests/Game.E2E.Tests`) play the game in Chromium with [Playwright](https://playwright.dev/dotnet/): they create heroes, sign in again, beat the boss, fight a friendly duel between two browsers, and check that signing in on a second browser signs the first one out. `AccessibilityTests` scans every screen with [axe-core](https://github.com/dequelabs/axe-core) against WCAG 2.1 AA (contrast, labels, alt text, ARIA) and plays a whole boss fight with the keyboard alone, so a new problem fails the build. They need no Docker services: the tests publish the Blazor client, serve it on a free port, and start the real API on another with an in-memory database, fake blob storage, no RabbitMQ and dice that always favour the player. The first run downloads Chromium (about 150 MB). To watch it play, set `HEADED=1` first (`$env:HEADED = "1"` in PowerShell). When a test fails, a screenshot of each browser is saved to `bin/<configuration>/net10.0/screenshots`. In Visual Studio they show in Test Explorer under the `Browser` trait.
 
 CI runs them on every pull request in the `browser-tests` job, and uploads the screenshots with the results when something fails.
+
+### Against SQL Server
+
+The in-memory database has no transactions and no concurrency checks, so the tests that depend on them (the duel lobby, the outbox relay, two API replicas sharing a database, and the migrations) also run against a real SQL Server when `TEST_SQLSERVER` holds a connection string. Each test makes its own database with the migrations and drops it afterwards. Without the variable those cases are left out, or show as skipped. CI always sets it ([ADR 0028](adr/0028-sql-server-in-ci.md)). The SQL Server from the Docker stack works:
+
+```powershell
+$env:TEST_SQLSERVER = "Server=localhost,1433;User Id=sa;Password=<MSSQL_SA_PASSWORD from .env>;TrustServerCertificate=True"
+dotnet test 5.Tests/Game.Api.Tests
+```
 
 ## Where settings live
 

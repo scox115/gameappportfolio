@@ -17,6 +17,21 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # A real SQL Server, the engine the game runs on in Azure. Tests marked for it (the lobby, the outbox,
+    # two API replicas and the migrations) run against it; the rest use the in-memory provider.
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: CI-only-Passw0rd
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P CI-only-Passw0rd -Q 'SELECT 1' -b"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v7
 
@@ -43,6 +58,8 @@ jobs:
 
       # The browser tests run in their own job below.
       - name: Test
+        env:
+          TEST_SQLSERVER: Server=localhost,1433;User Id=sa;Password=CI-only-Passw0rd;TrustServerCertificate=True
         run: >
           dotnet test GamePortfolioSolution.slnx --no-build --configuration Release
           --filter "Category!=Browser"

@@ -15,7 +15,7 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0009](0009-url-segment-api-versioning.md) | Version the API in the URL | Accepted |
 | [0010](0010-output-caching-with-tag-eviction.md) | Output caching evicted by EF Core saves, not Redis | Accepted |
 | [0011](0011-feature-flags.md) | Feature flags in configuration, with optional Azure App Configuration | Accepted |
-| [0012](0012-testing-strategy.md) | A test pyramid that runs on every pull request | Accepted |
+| [0012](0012-testing-strategy.md) | A test pyramid that runs on every pull request | Accepted, partly superseded by 0028 |
 | [0013](0013-aspire-for-local-orchestration.md) | .NET Aspire for local runs, Docker Compose kept | Accepted |
 | [0014](0014-simulation-driven-balance.md) | Tune game balance with simulations, not guesses | Accepted |
 | [0015](0015-security-headers.md) | A strict Content Security Policy and security headers on every response | Accepted |
@@ -31,5 +31,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0025](0025-two-factor-sign-in.md) | Two-factor sign-in with an authenticator app and recovery codes | Accepted |
 | [0026](0026-staging-and-previews.md) | A staging copy every commit reaches first, and previews for pull requests | Accepted |
 | [0027](0027-scale-out.md) | More than one API replica, with shared state in SQL | Accepted |
+| [0028](0028-sql-server-in-ci.md) | Concurrency and migration tests run against SQL Server in CI | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.
