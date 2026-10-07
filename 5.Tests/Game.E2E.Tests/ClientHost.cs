@@ -17,7 +17,7 @@ namespace Game.E2E.Tests;
 // Serves the published Blazor client the way Azure Static Web Apps does: static files, with
 // index.html for any other path, and every response carrying the globalHeaders from
 // staticwebapp.config.json, Content Security Policy included. Its appsettings.json points the
-// game at the test API.
+// game at the test API, and index.html turns on browser telemetry, sent to the test's TelemetrySink.
 public sealed class ClientHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
@@ -36,7 +36,7 @@ public sealed class ClientHost : IAsyncDisposable
     /// <summary>The headers every response carries, as Static Web Apps would send them.</summary>
     public IReadOnlyDictionary<string, string> Headers { get; private init; } = new Dictionary<string, string>();
 
-    public static async Task<ClientHost> StartAsync(string wwwroot, int port, string apiBaseUrl)
+    public static async Task<ClientHost> StartAsync(string wwwroot, int port, string apiBaseUrl, TelemetrySink telemetry)
     {
         var baseUrl = $"http://127.0.0.1:{port}";
         var builder = WebApplication.CreateSlimBuilder();
@@ -48,7 +48,18 @@ public sealed class ClientHost : IAsyncDisposable
         settings["ApiBaseUrl"] = apiBaseUrl;
         var settingsJson = settings.ToJsonString();
 
-        var headers = await GlobalHeadersAsync(wwwroot, apiBaseUrl);
+        var headers = await GlobalHeadersAsync(wwwroot, apiBaseUrl, telemetry.BaseUrl);
+
+        // The meta tags infra/configure-client.py fills in at deploy time.
+        var index = (await File.ReadAllTextAsync(Path.Combine(wwwroot, "index.html")))
+            .Replace("<meta name=\"telemetry-connection-string\" content=\"\" />",
+                $"<meta name=\"telemetry-connection-string\" content=\"{telemetry.ConnectionString}\" />")
+            .Replace("<meta name=\"telemetry-api-origin\" content=\"\" />",
+                $"<meta name=\"telemetry-api-origin\" content=\"{new Uri(apiBaseUrl).GetLeftPart(UriPartial.Authority)}\" />");
+        if (!index.Contains(telemetry.ConnectionString))
+        {
+            throw new InvalidOperationException("index.html has no empty telemetry-connection-string meta tag to fill in.");
+        }
         app.Use((context, next) =>
         {
             foreach (var (name, value) in headers)
@@ -59,22 +70,24 @@ public sealed class ClientHost : IAsyncDisposable
         });
 
         app.MapGet("/appsettings.json", () => Results.Text(settingsJson, "application/json"));
+        app.Use((context, next) => context.Request.Path == "/index.html"
+            ? Results.Content(index, "text/html").ExecuteAsync(context)
+            : next(context));
         var files = new PhysicalFileProvider(wwwroot);
-        app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
         app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = files,
             ServeUnknownFileTypes = true,
             DefaultContentType = "application/octet-stream",
         });
-        app.MapFallbackToFile("index.html", new StaticFileOptions { FileProvider = files });
+        app.MapFallback(() => Results.Content(index, "text/html"));
 
         await app.StartAsync();
         return new ClientHost(app, baseUrl) { Headers = headers };
     }
 
-    // Fills in the policy's deploy-time placeholders the same way infra/set-client-csp.py does.
-    private static async Task<Dictionary<string, string>> GlobalHeadersAsync(string wwwroot, string apiBaseUrl)
+    // Fills in the policy's deploy-time placeholders the same way infra/configure-client.py does.
+    private static async Task<Dictionary<string, string>> GlobalHeadersAsync(string wwwroot, string apiBaseUrl, string telemetryOrigin)
     {
         var config = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(wwwroot, "staticwebapp.config.json")))!;
         var headers = config["globalHeaders"]!.AsObject().ToDictionary(h => h.Key, h => h.Value!.GetValue<string>());
@@ -87,6 +100,7 @@ public sealed class ClientHost : IAsyncDisposable
             .Replace("__API_ORIGIN__", api)
             .Replace("__API_WS_ORIGIN__", "ws" + api["http".Length..])
             .Replace("__AVATAR_ORIGIN__", AvatarOrigin)
+            .Replace("__TELEMETRY_ORIGIN__", telemetryOrigin)
             .Replace("__IMPORTMAP_HASH__", $"'sha256-{Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(importMap)))}'");
         return headers;
     }

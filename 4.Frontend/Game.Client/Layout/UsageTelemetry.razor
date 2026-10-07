@@ -1,0 +1,9 @@
+@using Game.Client.Services
+@inject BrowserTelemetry Telemetry
+
+@* Starts reporting screens and pages to Application Insights; it shows nothing. *@
+
+@code {
+    protected override Task OnAfterRenderAsync(bool firstRender) =>
+        firstRender ? Telemetry.StartAsync() : Task.CompletedTask;
+}

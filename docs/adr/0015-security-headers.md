@@ -22,7 +22,7 @@ object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 
 - `'wasm-unsafe-eval'` lets the .NET runtime compile WebAssembly without allowing JavaScript `eval`.
 - `dotnet publish` writes one inline `<script type="importmap">` whose content changes with every build, so it is allowed by its SHA-256 hash rather than `'unsafe-inline'`.
-- The API and avatar addresses differ per environment. They are placeholders filled in at deploy time by `infra/set-client-csp.py`, and the deploy fails if the live site doesn't send the policy.
+- The API and avatar addresses differ per environment. They are placeholders filled in at deploy time by `infra/set-client-csp.py` (now `infra/configure-client.py`), and the deploy fails if the live site doesn't send the policy.
 - Plus HSTS for a year, `nosniff`, `X-Frame-Options: DENY`, a referrer policy, a permissions policy and `Cross-Origin-Opener-Policy: same-origin`.
 
 **The API** (`Game.Api/Security/SecurityHeaders.cs`) adds to every response, errors included: `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` (it only returns JSON), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and a permissions policy. Outside Development it sends HSTS for a year, after `UseForwardedHeaders` so requests that reached Azure over HTTPS count. Kestrel no longer sends a `Server` header.

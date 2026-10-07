@@ -186,6 +186,7 @@ jobs:
             echo "game=$(jq -r '(.gameUrl // .clientUrl).value' outputs.json)"
             echo "swa=$(jq -r .staticWebAppName.value outputs.json)"
             echo "avatars=https://$(jq -r .storageAccount.value outputs.json).blob.core.windows.net"
+            echo "telemetry=$(jq -r '.appInsightsConnectionString.value // ""' outputs.json)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Build the client against the deployed API
@@ -193,8 +194,9 @@ jobs:
           echo "{ \"ApiBaseUrl\": \"${{ steps.infra.outputs.api }}\" }" > 4.Frontend/Game.Client/wwwroot/appsettings.Production.json
           dotnet publish 4.Frontend/Game.Client/Game.Client.csproj -c Release -o out/client \
             -p:Version="1.0.${GITHUB_RUN_NUMBER}" -p:SourceRevisionId="$HEAD_SHA"
-          # Fill in the Content Security Policy: the API, the avatar storage and this build's import map hash.
-          python3 infra/set-client-csp.py out/client/wwwroot "${{ steps.infra.outputs.api }}" "${{ steps.infra.outputs.avatars }}"
+          # Fill in the Content Security Policy (the API, the avatar storage, Application Insights and this
+          # build's import map hash) and turn on browser telemetry.
+          python3 infra/configure-client.py out/client/wwwroot "${{ steps.infra.outputs.api }}" "${{ steps.infra.outputs.avatars }}" "${{ steps.infra.outputs.telemetry }}"
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
