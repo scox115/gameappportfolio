@@ -2,10 +2,12 @@
 @inject IJSRuntime JS
 
 @* While wwwroot/js/wake.js wakes the game server, say so, so a slow first visit doesn't look broken.
-   Nothing shows when the server answers within a couple of seconds. *@
-@if (shown)
-{
-    <div class="server-wake @(status)" role="status">
+   Nothing shows when the server answers within a couple of seconds. The live region is always on the
+   page so screen readers announce what appears in it; it isn't role="status", which belongs to each
+   page's own messages. *@
+<div class="@(shown ? $"server-wake {status}" : null)" aria-live="polite">
+    @if (shown)
+    {
         @switch (status)
         {
             case "waking":
@@ -18,8 +20,8 @@
                 <span>The game server isn't answering. <a href="status">Check its status</a> or <button type="button" @onclick="RetryAsync">try again</button>.</span>
                 break;
         }
-    </div>
-}
+    }
+</div>
 
 @code {
     // Shown once the server has taken this long, so a quick answer never flashes a message.

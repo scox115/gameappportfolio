@@ -17,10 +17,9 @@ public class ServerWakeTests(ArenaFixture arena) : BrowserTest(arena)
 
         await page.GotoAsync(Arena.ClientUrl);
 
-        var strip = page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Waking the game server" });
-        await Assertions.Expect(strip).ToBeVisibleAsync();
-        await Assertions.Expect(page.GetByRole(AriaRole.Status).Filter(new() { HasText = "The game server is awake." }))
-            .ToBeVisibleAsync(new() { Timeout = 15_000 });
+        var strip = page.Locator(".server-wake");
+        await Assertions.Expect(strip).ToContainTextAsync("Waking the game server");
+        await Assertions.Expect(strip).ToHaveTextAsync("✅ The game server is awake.", new() { Timeout = 15_000 });
         await Assertions.Expect(page.Locator(".server-wake")).ToHaveCountAsync(0, new() { Timeout = 10_000 });
     });
 
@@ -28,11 +27,13 @@ public class ServerWakeTests(ArenaFixture arena) : BrowserTest(arena)
     public Task AnAwakeServer_ShowsNothing() => WithScreenshotsOnFailureAsync(async () =>
     {
         var page = await NewBrowserAsync();
+        // Answered at once, as an awake server in Azure does. (The test API's own check is slow: it waits for
+        // blob storage these tests don't run.)
         var checks = 0;
         await page.RouteAsync("**/health/ready", route =>
         {
             checks++;
-            return route.ContinueAsync();
+            return route.FulfillAsync(new() { Status = 200, Body = "{\"status\":\"Healthy\"}" });
         });
 
         await page.GotoAsync(Arena.ClientUrl);
