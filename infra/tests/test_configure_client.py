@@ -85,3 +85,24 @@ class ConfigureClientTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClientSettingsTests(unittest.TestCase):
+    def setUp(self):
+        self.wwwroot = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.wwwroot)
+
+    def settings(self):
+        return json.loads((self.wwwroot / "appsettings.Production.json").read_text(encoding="utf-8"))
+
+    def test_production_gets_the_api_and_no_banner(self):
+        client.write_settings(self.wwwroot, API + "/")
+        self.assertEqual({"ApiBaseUrl": API}, self.settings())
+
+    def test_staging_gets_a_banner_label(self):
+        client.write_settings(self.wwwroot, API, "Staging")
+        self.assertEqual({"ApiBaseUrl": API, "EnvironmentLabel": "Staging"}, self.settings())
+
+    def test_a_relative_api_url_is_refused(self):
+        with self.assertRaises(SystemExit):
+            client.write_settings(self.wwwroot, "/api")

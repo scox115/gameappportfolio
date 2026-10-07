@@ -74,8 +74,13 @@ param adminUsernames string = ''
 @description('The API revision serving players now. A deploy keeps all traffic on it, so the new revision starts with none until infra/blue-green.sh has tested it. Leave empty on the very first deploy.')
 param liveRevision string = ''
 
+@description('Which copy of the game this is. Staging lives in its own resource group, so every resource gets its own name, and it also accepts calls from the Static Web App\'s pull request previews (see docs/adr/0026-staging-and-previews.md).')
+@allowed(['production', 'staging'])
+param environmentName string = 'production'
+
 var suffix = uniqueString(resourceGroup().id)
-var tags = { app: 'kings-of-the-card-arena' }
+var tags = { app: 'kings-of-the-card-arena', environment: environmentName }
+var isStaging = environmentName == 'staging'
 var databaseName = 'GameDb'
 var usePrivateRegistry = !empty(registryUsername)
 var featureFlagStoreEnabled = toLower(appConfiguration) == 'true'
@@ -449,6 +454,8 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'Cors__AllowedOrigins__1', value: 'https://${customDomain}' }
           ], featureFlagStoreEnabled ? [
             { name: 'AppConfig__Endpoint', value: flags!.properties.endpoint }
+          ] : [], isStaging ? [
+            { name: 'Cors__PreviewsOf', value: client.properties.defaultHostname }
           ] : [])
           probes: [
             {
@@ -595,6 +602,7 @@ resource restartsAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (alerts
   }
 }
 
+output environmentName string = environmentName
 output apiUrl string = 'https://${api.properties.configuration.ingress.fqdn}'
 output clientUrl string = 'https://${client.properties.defaultHostname}'
 output gameUrl string = gameUrl

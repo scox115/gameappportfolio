@@ -1,0 +1,275 @@
+name: Deploy one environment
+
+# The steps that deploy one copy of the game (staging or production), called by deploy.yml. Each
+# GitHub environment holds its own AZURE_RESOURCE_GROUP, AZURE_API_IDENTITY, ADMIN_USERNAMES and
+# secrets; anything not set on the environment falls back to the repository's value.
+# See docs/azure-deployment.md and docs/adr/0026-staging-and-previews.md.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: staging or production
+        type: string
+        required: true
+      full:
+        description: Redeploy the infrastructure even if nothing in it changed
+        type: boolean
+        default: false
+      build-image:
+        description: Build and push the API image (false when staging already pushed this commit's image)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write   # sign in to Azure with OIDC, so no Azure password is stored in GitHub
+  packages: write   # push the API image to GitHub Container Registry
+
+env:
+  DOTNET_NOLOGO: true
+  HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Shared with the Rollback workflow, so a rollback never runs in the middle of a deploy.
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.urls.outputs.client }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.HEAD_SHA }}
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Sign in to GitHub Container Registry
+        if: inputs.build-image
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The .NET SDK builds the image itself (no Dockerfile): a chiseled Ubuntu base with no shell
+      # or package manager, running as a non-root user. "-extra" adds ICU, which SqlClient needs.
+      - name: Build and push the API image
+        id: image
+        run: |
+          repository="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')/card-arena-api"
+          tag="${HEAD_SHA::12}"
+          echo "name=ghcr.io/$repository:$tag" >> "$GITHUB_OUTPUT"
+          if [ "$BUILD_IMAGE" != "true" ]; then
+            echo "Using ghcr.io/$repository:$tag, which staging built and tested."
+            exit 0
+          fi
+          dotnet publish 3.BackendAPI/Game.Api/Game.Api.csproj -c Release \
+            -t:PublishContainer \
+            -p:ContainerRegistry=ghcr.io \
+            -p:ContainerRepository="$repository" \
+            -p:ContainerImageTags="\"$tag;latest\"" \
+            -p:ContainerFamily=noble-chiseled-extra \
+            -p:Version="1.0.${GITHUB_RUN_NUMBER}" -p:SourceRevisionId="$HEAD_SHA"
+        env:
+          BUILD_IMAGE: ${{ inputs.build-image }}
+
+      - name: Sign in to Azure
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Blue-green: players stay on this revision until the new one has passed its smoke test.
+      - name: Find the API revision players are on
+        id: live
+        run: |
+          app=$(az containerapp list --resource-group "$RESOURCE_GROUP" \
+            --query "[?ends_with(name, '-api')].name | [0]" --output tsv)
+          revision=""
+          if [ -n "$app" ]; then revision=$(bash infra/blue-green.sh live "$RESOURCE_GROUP" "$app"); fi
+          echo "Live API revision: ${revision:-none (first deploy)}"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+      # Re-applying the Bicep template takes about 3 minutes even when nothing changed. Its inputs
+      # (the template, the settings and the secrets) are fingerprinted, and the fingerprint is part of
+      # the deployment's name, so a run whose fingerprint matches the last successful deployment only
+      # swaps the API image. Rotating a secret or changing a variable changes the fingerprint too.
+      - name: Check whether the infrastructure changed
+        id: plan
+        run: |
+          fingerprint=$( { cat infra/main.bicep; printf '%s\n' "$INFRA_INPUTS"; } | sha256sum | cut -c1-12)
+          last=$(az deployment group list --resource-group "$RESOURCE_GROUP" \
+            --query "sort_by([?starts_with(name, 'card-arena-') && properties.provisioningState == 'Succeeded'], &properties.timestamp)[-1].name" \
+            --output tsv)
+          full=true
+          if [ "$FORCE_FULL" != "true" ] && [[ "$last" == *"-$fingerprint" ]]; then full=false; fi
+          echo "Infrastructure fingerprint $fingerprint, last deployment '${last:-none}', full deploy: $full"
+          {
+            echo "fingerprint=$fingerprint"
+            echo "last=$last"
+            echo "full=$full"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          FORCE_FULL: ${{ inputs.full }}
+          INFRA_INPUTS: |
+            ${{ vars.AZURE_API_IDENTITY }}
+            ${{ vars.AZURE_SQL_ADMIN_GROUP }}
+            ${{ vars.AZURE_SQL_ADMIN_GROUP_ID }}
+            ${{ vars.AZURE_SQL_LOCATION }}
+            ${{ inputs.environment == 'production' && vars.CUSTOM_DOMAIN || '' }}
+            ${{ inputs.environment == 'production' && vars.ALERT_EMAIL || '' }}
+            ${{ inputs.environment == 'production' && vars.APP_CONFIGURATION || '' }}
+            ${{ vars.ADMIN_USERNAMES }}
+            ${{ inputs.environment == 'production' && vars.EMAIL_RECOVERY || '' }}
+            ${{ secrets.JWT_SIGNING_KEY }}
+            ${{ secrets.RABBITMQ_PASSWORD }}
+            ${{ secrets.GHCR_READ_TOKEN }}
+            ${{ inputs.environment }}
+
+      - name: Deploy infrastructure and the API
+        if: steps.plan.outputs.full == 'true'
+        run: |
+          registry_user=""
+          if [ -n "$REGISTRY_PASSWORD" ]; then registry_user="$GITHUB_REPOSITORY_OWNER"; fi
+          az deployment group create \
+            --name "card-arena-${GITHUB_RUN_NUMBER}-${{ steps.plan.outputs.fingerprint }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --template-file infra/main.bicep \
+            --parameters \
+              apiImage="${{ steps.image.outputs.name }}" \
+              apiIdentityName="${{ vars.AZURE_API_IDENTITY }}" \
+              sqlAdminGroupName="${{ vars.AZURE_SQL_ADMIN_GROUP }}" \
+              sqlAdminGroupObjectId="${{ vars.AZURE_SQL_ADMIN_GROUP_ID }}" \
+              sqlLocation="${{ vars.AZURE_SQL_LOCATION || 'centralus' }}" \
+              customDomain="${{ inputs.environment == 'production' && vars.CUSTOM_DOMAIN || '' }}" \
+              alertEmail="${{ inputs.environment == 'production' && vars.ALERT_EMAIL || '' }}" \
+              appConfiguration="${{ inputs.environment == 'production' && vars.APP_CONFIGURATION || '' }}" \
+              adminUsernames="${{ vars.ADMIN_USERNAMES }}" \
+              emailRecovery="${{ inputs.environment == 'production' && vars.EMAIL_RECOVERY || '' }}" \
+              jwtSigningKey="$JWT_SIGNING_KEY" \
+              rabbitMqPassword="$RABBITMQ_PASSWORD" \
+              registryUsername="$registry_user" \
+              registryPassword="$REGISTRY_PASSWORD" \
+              liveRevision="${{ steps.live.outputs.revision }}" \
+              environmentName="${{ inputs.environment }}" \
+            --query properties.outputs --output json > outputs.json
+        env:
+          JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
+          RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+          REGISTRY_PASSWORD: ${{ secrets.GHCR_READ_TOKEN }}
+
+      - name: Update the API image only
+        if: steps.plan.outputs.full == 'false'
+        run: |
+          az deployment group show --resource-group "$RESOURCE_GROUP" --name "${{ steps.plan.outputs.last }}" \
+            --query properties.outputs --output json > outputs.json
+          az containerapp update --resource-group "$RESOURCE_GROUP" \
+            --name "$(jq -r .apiContainerAppName.value outputs.json)" \
+            --container-name api --image "${{ steps.image.outputs.name }}" --output none
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+      # The new revision has no traffic yet. Test it on its own address, then move players to it;
+      # if it fails, it is deactivated and players never see it. The previous revision stays on
+      # standby for the Rollback workflow.
+      - name: Release the new API revision
+        id: release
+        run: |
+          app=$(jq -r .apiContainerAppName.value outputs.json)
+          new=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$app" \
+            --query properties.latestRevisionName --output tsv)
+          bash infra/blue-green.sh release "$RESOURCE_GROUP" "$app" "$new" "${{ steps.live.outputs.revision }}"
+          echo "revision=$new" >> "$GITHUB_OUTPUT"
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+      - name: Read the deployed addresses
+        id: infra
+        run: |
+          {
+            echo "api=$(jq -r .apiUrl.value outputs.json)"
+            echo "client=$(jq -r .clientUrl.value outputs.json)"
+            echo "game=$(jq -r '(.gameUrl // .clientUrl).value' outputs.json)"
+            echo "swa=$(jq -r .staticWebAppName.value outputs.json)"
+            echo "avatars=https://$(jq -r .storageAccount.value outputs.json).blob.core.windows.net"
+            echo "telemetry=$(jq -r '.appInsightsConnectionString.value // ""' outputs.json)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build the client against the deployed API
+        run: |
+          python3 infra/configure-client.py settings 4.Frontend/Game.Client/wwwroot "${{ steps.infra.outputs.api }}" "$ENVIRONMENT_LABEL"
+          dotnet publish 4.Frontend/Game.Client/Game.Client.csproj -c Release -o out/client \
+            -p:Version="1.0.${GITHUB_RUN_NUMBER}" -p:SourceRevisionId="$HEAD_SHA"
+          # Fill in the Content Security Policy (the API, the avatar storage, Application Insights and this
+          # build's import map hash) and turn on browser telemetry.
+          python3 infra/configure-client.py out/client/wwwroot "${{ steps.infra.outputs.api }}" "${{ steps.infra.outputs.avatars }}" "${{ steps.infra.outputs.telemetry }}"
+        env:
+          ENVIRONMENT_LABEL: ${{ inputs.environment == 'staging' && 'Staging' || '' }}
+
+      - name: Get the Static Web App deployment token
+        id: swa
+        run: |
+          token=$(az staticwebapp secrets list --name "${{ steps.infra.outputs.swa }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" --query properties.apiKey --output tsv)
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy the client
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa.outputs.token }}
+          action: upload
+          app_location: out/client/wwwroot
+          skip_app_build: true
+          skip_api_build: true
+
+      # The API scales to zero and the database pauses, so the first request can take a couple of minutes.
+      - name: Smoke test
+        id: urls
+        run: |
+          api="${{ steps.infra.outputs.api }}"
+          client="${{ steps.infra.outputs.client }}"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --max-time 20 "$api/health/ready" > ready.json; then
+              cat ready.json; echo
+              curl --fail --silent --output /dev/null "$client" && break
+            fi
+            echo "Waiting for the API to start (attempt $attempt)..."
+            sleep 10
+          done
+          curl --fail --silent --show-error "$api/health/ready" > ready.json
+          # Degraded still answers 200, so say which optional service is down instead of letting it pass silently.
+          status=$(jq -r .status ready.json)
+          if [ "$status" != "Healthy" ]; then
+            jq -r '.checks | to_entries[] | select(.value.status != "Healthy") | "::warning::\(.key) is \(.value.status): \(.value.description)"' ready.json
+          fi
+          curl --fail --silent --show-error --output /dev/null "$client"
+          curl --fail --silent --show-error --dump-header - --output /dev/null "$client" | grep -i "^content-security-policy: default-src 'self'" \
+            || { echo "::error::The client is served without its Content Security Policy."; exit 1; }
+          echo "client=${{ steps.infra.outputs.game }}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### 🃏 Kings of the Card Arena is live in ${{ inputs.environment }}"
+            echo ""
+            echo "- Game: ${{ steps.infra.outputs.game }}"
+            echo "- API health: $status ($api/health/ready)"
+            echo "- API revision: ${{ steps.release.outputs.revision }} (standby for rollback: ${{ steps.live.outputs.revision || 'none' }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Keep GitHub Container Registry tidy (and inside the free storage allowance).
+      - name: Delete old API images
+        if: inputs.environment == 'production'
+        uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: card-arena-api
+          package-type: container
+          min-versions-to-keep: 5

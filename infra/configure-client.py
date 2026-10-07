@@ -17,7 +17,12 @@ same as every site using the Application Insights JavaScript SDK.
 
 The browser tests do the same in 5.Tests/Game.E2E.Tests/ClientHost.cs.
 
+Before publishing, the "settings" form writes the client's appsettings.Production.json: the API it
+calls, and for staging and pull request previews a label shown in a strip across the top of every
+page (Layout/EnvironmentBanner.razor).
+
 Usage: configure-client.py <published wwwroot> <api url> <avatar origin> [<app insights connection string>]
+       configure-client.py settings <source wwwroot> <api url> [<environment label>]
 """
 import base64
 import hashlib
@@ -97,7 +102,21 @@ def configure(wwwroot: Path, api_url: str, avatar_url: str, connection_string: s
     return policy
 
 
+def write_settings(wwwroot: Path, api_url: str, label: str = "") -> dict:
+    settings = {"ApiBaseUrl": origin(api_url)}
+    if label.strip():
+        settings["EnvironmentLabel"] = label.strip()
+    (wwwroot / "appsettings.Production.json").write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+    return settings
+
+
 def main() -> None:
+    if len(sys.argv) >= 2 and sys.argv[1] == "settings":
+        if len(sys.argv) not in (4, 5):
+            sys.exit(__doc__)
+        settings = write_settings(Path(sys.argv[2]), sys.argv[3], sys.argv[4] if len(sys.argv) == 5 else "")
+        print(f"appsettings.Production.json: {json.dumps(settings)}")
+        return
     if len(sys.argv) not in (4, 5):
         sys.exit(__doc__)
     policy = configure(Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) == 5 else "")

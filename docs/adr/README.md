@@ -29,5 +29,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0023](0023-transactional-outbox.md) | Match events go through a transactional outbox | Accepted |
 | [0024](0024-moderation-and-reports.md) | Name rules, player reports and admin moderation of names and portraits | Accepted |
 | [0025](0025-two-factor-sign-in.md) | Two-factor sign-in with an authenticator app and recovery codes | Accepted |
+| [0026](0026-staging-and-previews.md) | A staging copy every commit reaches first, and previews for pull requests | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.

@@ -13,17 +13,28 @@
       - role assignments that let that app deploy into the resource group only
       - a JWT signing key and a RabbitMQ password
 
+    Run it once for production, and again with -Environment staging to add a staging copy that every
+    commit reaches first, plus pull request previews (see docs/adr/0026-staging-and-previews.md).
+    Staging gets its own resource group and identity; its settings go on the "staging" environment
+    in GitHub, so they override the repository's values only there.
+
     Safe to run again: anything that already exists is reused, and existing secrets are kept.
     Works in Windows PowerShell 5.1 and PowerShell 7. Needs the Azure CLI (az), signed in with
     "az login", and optionally the GitHub CLI (gh), signed in with "gh auth login".
 
 .EXAMPLE
     .\infra\setup.ps1 -SubscriptionId 00000000-0000-0000-0000-000000000000
+
+.EXAMPLE
+    .\infra\setup.ps1 -SubscriptionId 00000000-0000-0000-0000-000000000000 -Environment staging
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string] $SubscriptionId,
+
+    [ValidateSet('production', 'staging')]
+    [string] $Environment = 'production',
 
     [string] $ResourceGroup = 'rg-card-arena',
     [string] $Location = 'eastus2',
@@ -34,6 +45,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Staging gets its own resource group and API identity unless they were named.
+if ($Environment -eq 'staging') {
+    if (-not $PSBoundParameters.ContainsKey('ResourceGroup')) { $ResourceGroup = 'rg-card-arena-staging' }
+    if (-not $PSBoundParameters.ContainsKey('IdentityName')) { $IdentityName = 'id-card-arena-api-staging' }
+}
 
 # Runs an az command and stops the script if it fails (az doesn't throw on its own).
 function Invoke-Az {
@@ -102,16 +119,16 @@ if ($isMember -ne 'true') {
     Invoke-Az ad group member add --group $sqlGroupId --member-id $spId | Out-Null
 }
 
-# Only the workflow's "production" environment in this repository can sign in as the app.
+# Only the workflow's environments in this repository ("production", and "staging" once set up) can sign in as the app.
 # GitHub names the repository in its sign-in token either as "owner/repo" or, for newer
 # repositories, with their numeric IDs ("owner@123/repo@456"), so trust both forms.
-$credentials = [ordered]@{ 'github-production' = "repo:${GitHubRepo}:environment:production" }
+$credentials = [ordered]@{ "github-$Environment" = "repo:${GitHubRepo}:environment:$Environment" }
 $hasGh = $null -ne (Get-Command gh -ErrorAction SilentlyContinue)
 if ($hasGh) {
     $ids = @(& gh api "repos/$GitHubRepo" --jq '.owner.id, .id')
     if ($LASTEXITCODE -ne 0 -or $ids.Count -ne 2) { throw "gh api repos/$GitHubRepo failed." }
     $owner, $repo = $GitHubRepo.Split('/')
-    $credentials['github-production-ids'] = "repo:${owner}@$($ids[0])/${repo}@$($ids[1]):environment:production"
+    $credentials["github-$Environment-ids"] = "repo:${owner}@$($ids[0])/${repo}@$($ids[1]):environment:$Environment"
 }
 else {
     Write-Host '  GitHub CLI not found, so only the owner/repo sign-in name is trusted.' -ForegroundColor Yellow
@@ -151,32 +168,51 @@ $variables = [ordered]@{
     AZURE_SQL_ADMIN_GROUP    = $SqlAdminGroupName
     AZURE_SQL_ADMIN_GROUP_ID = $sqlGroupId
 }
+# Staging shares the sign-in and SQL admin settings with production; only these differ.
+$scope = @('--repo', $GitHubRepo)
+if ($Environment -eq 'staging') {
+    $variables = [ordered]@{ AZURE_RESOURCE_GROUP = $ResourceGroup; AZURE_API_IDENTITY = $IdentityName }
+    $scope = @('--repo', $GitHubRepo, '--env', 'staging')
+}
 
 if ($hasGh) {
-    Write-Host "Saving settings to GitHub ($GitHubRepo)" -ForegroundColor Cyan
+    Write-Host "Saving settings to GitHub ($GitHubRepo, $Environment)" -ForegroundColor Cyan
+    if ($Environment -eq 'staging') {
+        & gh api --method PUT "repos/$GitHubRepo/environments/staging" --silent
+        if ($LASTEXITCODE -ne 0) { throw "Creating the staging environment in GitHub failed." }
+    }
     foreach ($name in $variables.Keys) {
-        & gh variable set $name --body $variables[$name] --repo $GitHubRepo
+        & gh variable set $name --body $variables[$name] @scope
         if ($LASTEXITCODE -ne 0) { throw "gh variable set $name failed." }
     }
 
-    # Keep existing secrets: a new JWT key would sign everyone out.
-    $existingSecrets = (& gh secret list --repo $GitHubRepo --json name --jq '.[].name') -split "`n"
+    # Keep existing secrets: a new JWT key would sign everyone out. Staging gets keys of its own,
+    # so a token from one copy of the game is never accepted by the other.
+    $existingSecrets = (& gh secret list @scope --json name --jq '.[].name') -split "`n"
     $secrets = @{ JWT_SIGNING_KEY = 48; RABBITMQ_PASSWORD = 24 }
     foreach ($name in $secrets.Keys) {
         if ($existingSecrets -notcontains $name) {
-            & gh secret set $name --body (New-RandomSecret $secrets[$name]) --repo $GitHubRepo
+            & gh secret set $name --body (New-RandomSecret $secrets[$name]) @scope
             if ($LASTEXITCODE -ne 0) { throw "gh secret set $name failed." }
         }
     }
+
+    if ($Environment -eq 'staging') {
+        # Turns on the staging step of "Deploy to Azure" and the pull request previews.
+        & gh variable set STAGING_ENABLED --body 'true' --repo $GitHubRepo
+        if ($LASTEXITCODE -ne 0) { throw "gh variable set STAGING_ENABLED failed." }
+    }
 }
 else {
+    $where = if ($Environment -eq 'staging') { 'Settings > Environments > staging (create it)' } else { 'Settings > Secrets and variables > Actions' }
     Write-Host ''
-    Write-Host 'GitHub CLI not found. Add these in GitHub: Settings > Secrets and variables > Actions.' -ForegroundColor Yellow
+    Write-Host "GitHub CLI not found. Add these in GitHub: $where." -ForegroundColor Yellow
     Write-Host 'Variables:' -ForegroundColor Yellow
     foreach ($name in $variables.Keys) { Write-Host "  $name = $($variables[$name])" }
     Write-Host 'Secrets (new random values; copy them now):' -ForegroundColor Yellow
     Write-Host "  JWT_SIGNING_KEY = $(New-RandomSecret 48)"
     Write-Host "  RABBITMQ_PASSWORD = $(New-RandomSecret 24)"
+    if ($Environment -eq 'staging') { Write-Host 'Then add the repository variable STAGING_ENABLED = true.' -ForegroundColor Yellow }
 }
 
 Write-Host ''
@@ -184,3 +220,8 @@ Write-Host 'Done. One manual step remains if the repository is private:' -Foregr
 Write-Host '  Create a classic GitHub token with only the read:packages scope and save it as the'
 Write-Host '  GHCR_READ_TOKEN repository secret, so Azure can pull the API image.'
 Write-Host 'Then run the "Deploy to Azure" workflow from the Actions tab.'
+if ($Environment -eq 'staging') {
+    Write-Host 'From now on each commit deploys to staging first, and production only if staging works.'
+    Write-Host 'To approve each production release by hand, add yourself as a required reviewer on the'
+    Write-Host '"production" environment (Settings > Environments > production).'
+}

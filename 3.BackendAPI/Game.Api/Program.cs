@@ -67,13 +67,14 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // --- 🛡️ REGISTER CORS SECURITY POLICY ---
-// Allowed origins come from the "Cors:AllowedOrigins" setting for each environment.
+// Allowed origins come from the "Cors:AllowedOrigins" setting for each environment; staging also lets
+// its pull request previews in ("Cors:PreviewsOf").
 var corsSettings = builder.Configuration.GetSection(CorsSettings.SectionName).Get<CorsSettings>() ?? new CorsSettings();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("BlazorFrontendPolicy", policy =>
     {
-        policy.WithOrigins(corsSettings.AllowedOrigins)
+        policy.SetIsOriginAllowed(corsSettings.IsAllowed)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials() // Essential if you handle secure cookies later
