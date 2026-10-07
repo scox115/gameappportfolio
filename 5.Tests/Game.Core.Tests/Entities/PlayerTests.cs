@@ -84,4 +84,35 @@ public class PlayerTests
 
         Assert.Equal(0, player.ExperiencePoints);
     }
+
+    [Fact]
+    public void AGuest_IsMarkedAsOne_UntilItsKept()
+    {
+        var started = new DateTime(2026, 10, 7, 12, 0, 0, DateTimeKind.Utc);
+        var guest = Player.StartAsGuest(Guid.NewGuid(), "Guest123456", 500, started);
+
+        Assert.True(guest.IsGuest);
+        Assert.Equal(started, guest.GuestSince);
+
+        guest.KeepAs("Keeper");
+
+        Assert.False(guest.IsGuest);
+        Assert.Equal("Keeper", guest.Username);
+        Assert.Equal(500, guest.Gold);
+    }
+
+    [Fact]
+    public void OnlyAGuest_CanBeKept()
+    {
+        var hero = new Player("hero", 500);
+
+        Assert.False(hero.IsGuest);
+        Assert.Throws<InvalidOperationException>(() => hero.KeepAs("another"));
+    }
+
+    [Fact]
+    public void AGuest_IsStartedInUtc()
+    {
+        Assert.Throws<ArgumentException>(() => Player.StartAsGuest(Guid.NewGuid(), "Guest123456", 500, new DateTime(2026, 10, 7)));
+    }
 }

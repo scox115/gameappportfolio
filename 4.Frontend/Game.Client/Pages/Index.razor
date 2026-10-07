@@ -110,6 +110,19 @@
                         </button>
                     </p>
 
+                    <!-- ONE CLICK TO TRY THE GAME: A GUEST HERO, KEPT LATER WITH A NAME AND PASSWORD IF THE PLAYER LIKES IT -->
+                    <div aria-hidden="true" style="display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: #94a3b8; font-size: 0.8rem;">
+                        <span style="flex: 1; height: 1px; background: #334155;"></span>or<span style="flex: 1; height: 1px; background: #334155;"></span>
+                    </div>
+                    <button @onclick="PlayAsGuest" disabled="@startingGuest"
+                            style="width: 100%; background: transparent; color: #e2e8f0; border: 1px solid #475569; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">
+                        @(startingGuest ? "Starting..." : "⚡ Play as a guest")
+                    </button>
+                    <p style="text-align: center; color: #94a3b8; font-size: 0.8rem; margin: 8px 0 0;">
+                        No sign-up. Keep your hero later if you like it. By playing you agree to the
+                        <a href="terms" style="color: #a5b4fc;">Terms</a> and <a href="privacy" style="color: #a5b4fc;">Privacy Policy</a>.
+                    </p>
+
                             @if (!string.IsNullOrEmpty(statusMsg) || !string.IsNullOrEmpty(State.SignOutReason))
                             {
                                 <div
@@ -130,6 +143,10 @@
                                     <img src="@Avatars.For(State.AvatarUrl, State.Username)" alt="@($"{State.Username}'s portrait")"
                                          style="width: 160px; height: 160px; border-radius: 50%; @CosmeticStyles.Frame(State.Frame, 5, "4px solid #6366f1") object-fit: cover; background: #0f172a; margin-bottom: 15px;" />
                                     <h2 style="margin: 0; color: #f1f5f9;">@State.Username</h2>
+                                    @if (State.IsGuest)
+                                    {
+                                        <KeepGuestHero />
+                                    }
                                     <button @onclick="OpenPortraitPopup"
                                             style="background: none; border: 1px solid #475569; color: #94a3b8; border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; cursor: pointer; margin-top: 8px;">
                                         🖼️ Change portrait
@@ -165,7 +182,11 @@
                                     {
                                         <p style="color: #f87171; margin: 15px 0 0;">@statusMsg</p>
                                     }
-                                    <AccountSettings />
+                                    @if (!State.IsGuest)
+                                    {
+                                        <!-- A GUEST HAS NO PASSWORD TO CONFIRM CHANGES WITH; KEEPING THE HERO COMES FIRST -->
+                                        <AccountSettings />
+                                    }
                                     @if (State.IsAdmin)
                                     {
                                         <a href="admin" style="display: block; color: #fbbf24; font-size: 0.8rem; margin-top: 10px;">🛡️ Admin tools</a>
@@ -417,6 +438,7 @@
     private string inputPassword = string.Empty;
     private string chosenClass = "Sorcerer";
     private bool creatingHero; // The sign-in screen is creating a new hero rather than signing in
+    private bool startingGuest;
 
     private string inputTwoFactorCode = string.Empty;
     private bool askForTwoFactorCode; // The password was right and the hero has two-factor sign-in on
@@ -561,6 +583,21 @@
         catch { statusMsg = "API Network Link Offline."; }
     }
 
+    private async Task PlayAsGuest()
+    {
+        startingGuest = true;
+        try
+        {
+            var res = await Http.PostAsJsonAsync("/api/v1/auth/guest", new { Class = chosenClass });
+            if (res.IsSuccessStatusCode) await StartSession(res);
+            else statusMsg = res.StatusCode == HttpStatusCode.TooManyRequests
+                ? "Lots of guests have started from your network this hour. Create a hero instead, or try again later."
+                : "Couldn't start a guest hero. Please try again.";
+        }
+        catch { statusMsg = "API Network Link Offline."; }
+        finally { startingGuest = false; }
+    }
+
     private async Task StartSession(HttpResponseMessage res)
     {
         var auth = await res.Content.ReadFromJsonAsync<AuthResponseDto>();
@@ -573,6 +610,7 @@
         State.UpdateClass(auth.player.@class);
         State.SetPlayerSession(new SessionTokens(auth.accessToken, auth.expiresAt, auth.refreshToken), auth.player.id, auth.player.username, auth.player.gold, auth.player.level, auth.player.avatarUrl);
         State.UpdateCosmetics(auth.player.frame, auth.player.cardSkin);
+        State.UpdateGuest(auth.player.isGuest);
         State.UpdateRoles(auth.roles);
     }
 
@@ -586,13 +624,6 @@
         }
         catch (System.Text.Json.JsonException) { return null; }
         catch (NotSupportedException) { return null; } // an empty or non-JSON body
-    }
-
-    // The first validation message, or the problem's detail, or null when the body isn't a problem.
-    private static async Task<string?> ProblemMessageAsync(HttpResponseMessage res)
-    {
-        var problem = await ReadProblem(res);
-        return problem?.errors?.SelectMany(e => e.Value).FirstOrDefault() ?? problem?.detail;
     }
 
     // Turns an ASP.NET Core validation problem (e.g. password rules) into one readable line.
@@ -638,7 +669,7 @@
             else uploadError = res.StatusCode switch
             {
                 // The server says why: not a PNG or JPG, too big, or turned away by the content check.
-                HttpStatusCode.BadRequest or HttpStatusCode.ServiceUnavailable => await ProblemMessageAsync(res)
+                HttpStatusCode.BadRequest or HttpStatusCode.ServiceUnavailable => await ProblemText.ReadAsync(res)
                     ?? "That file couldn't be used. Pick a PNG or JPG under 4 MB.",
                 HttpStatusCode.RequestEntityTooLarge => "That file couldn't be used. Pick a PNG or JPG under 4 MB.",
                 HttpStatusCode.TooManyRequests => "You've changed your portrait a lot recently. Please try again later.",
@@ -934,6 +965,7 @@
         public int pvpLosses { get; set; }
         public string? frame { get; set; }
         public string? cardSkin { get; set; }
+        public bool isGuest { get; set; }
     }
 
     public class UploadResponse { public string avatarUrl { get; set; } = ""; }
@@ -1020,7 +1052,6 @@
     {
         public string? detail { get; set; }
         public bool twoFactorRequired { get; set; }
-        public Dictionary<string, string[]>? errors { get; set; }
     }
 
     public class ValidationProblemDto

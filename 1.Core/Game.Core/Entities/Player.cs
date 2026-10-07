@@ -94,8 +94,31 @@ public class Player
     /// </summary>
     public Guid Version { get; private set; } = Guid.NewGuid();
 
+    /// <summary>
+    /// When the hero was started as a guest, in UTC: no name of the player's choosing and no password.
+    /// Null for a hero that was signed up for, or a guest the player kept. See docs/adr/0030-guest-play.md.
+    /// </summary>
+    public DateTime? GuestSince { get; private set; }
+
+    public bool IsGuest => GuestSince is not null;
+
     // Parameterless constructor required by Entity Framework Core
     private Player() { }
+
+    /// <summary>A hero to try the game with, under a made-up name, kept only if the player saves it.</summary>
+    public static Player StartAsGuest(Guid id, string username, int startingGold, DateTime now)
+    {
+        if (now.Kind != DateTimeKind.Utc) throw new ArgumentException("Times are kept in UTC.", nameof(now));
+        return new Player(id, username, startingGold) { GuestSince = now };
+    }
+
+    /// <summary>Makes a guest a hero of its own, under the name the player chose.</summary>
+    public void KeepAs(string username)
+    {
+        if (!IsGuest) throw new InvalidOperationException("This hero is already saved.");
+        Rename(username);
+        GuestSince = null;
+    }
 
     public Player(string username, int startingGold)
         : this(Guid.NewGuid(), username, startingGold)

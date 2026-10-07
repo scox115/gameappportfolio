@@ -33,5 +33,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0027](0027-scale-out.md) | More than one API replica, with shared state in SQL | Accepted |
 | [0028](0028-sql-server-in-ci.md) | Concurrency and migration tests run against SQL Server in CI | Accepted |
 | [0029](0029-portrait-screening.md) | Screen portraits with Azure AI Content Safety before they're shown | Accepted |
+| [0030](0030-guest-play.md) | Let people play as a guest, and keep the hero later | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.

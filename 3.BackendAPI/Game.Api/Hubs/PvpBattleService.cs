@@ -72,6 +72,12 @@ public class PvpBattleService(
         var player = await dbContext.Players.FindAsync(playerId)
             ?? throw new HubException("Player profile not found.");
 
+        // A guest is one click away from another guest, so gold can't be funnelled to a real hero through wagers.
+        if (wager > 0 && player.IsGuest)
+        {
+            throw new HubException("Save your hero to duel for gold.");
+        }
+
         // Coming back to an unfinished battle resumes it rather than starting another.
         var existing = await GetActiveBattleAsync(playerId);
         if (existing is not null)

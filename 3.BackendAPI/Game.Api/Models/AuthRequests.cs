@@ -7,3 +7,9 @@ public record RegisterRequest(string Username, string Password, Game.Core.Battle
 public record LoginRequest(string Username, string Password, string? TwoFactorCode = null);
 
 public record RefreshRequest(string RefreshToken);
+
+/// <param name="Class">The guest hero's class; Sorcerer when left out.</param>
+public record GuestRequest(Game.Core.Battles.HeroClass? Class = null);
+
+/// <summary>The name and password a guest keeps their hero under.</summary>
+public record KeepGuestRequest(string Username, string Password);

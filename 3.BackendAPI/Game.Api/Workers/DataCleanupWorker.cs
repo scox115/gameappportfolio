@@ -48,11 +48,12 @@ public class DataCleanupWorker(
         {
             using var scope = scopeFactory.CreateScope();
             var result = await scope.ServiceProvider.GetRequiredService<DataCleanupService>().RunAsync(stoppingToken);
+            var guests = await scope.ServiceProvider.GetRequiredService<GuestCleanupService>().RunAsync(stoppingToken);
 
-            activity?.SetTag("game.cleanup.deleted", result.Total);
+            activity?.SetTag("game.cleanup.deleted", result.Total + guests);
             logger.LogInformation(
-                "Data cleanup deleted {RefreshTokens} expired refresh tokens, {EmailLinks} expired email links, {BossFights} old boss fights, {Duels} old duels, {Reports} closed reports and {AuditEntries} old audit log entries.",
-                result.ExpiredRefreshTokens, result.ExpiredEmailLinks, result.FinishedBossFights, result.FinishedDuels, result.ClosedReports, result.OldAuditEntries);
+                "Data cleanup deleted {RefreshTokens} expired refresh tokens, {EmailLinks} expired email links, {BossFights} old boss fights, {Duels} old duels, {Reports} closed reports, {AuditEntries} old audit log entries and {Guests} abandoned guest heroes.",
+                result.ExpiredRefreshTokens, result.ExpiredEmailLinks, result.FinishedBossFights, result.FinishedDuels, result.ClosedReports, result.OldAuditEntries, guests);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

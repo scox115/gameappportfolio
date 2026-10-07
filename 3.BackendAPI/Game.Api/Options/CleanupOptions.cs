@@ -46,6 +46,13 @@ public class CleanupOptions
     [Range(1, 3650)]
     public int ResolvedReportRetentionDays { get; set; } = 90;
 
+    /// <summary>
+    /// Days after a guest hero starts before it may be deleted, if nobody kept it and nobody can still sign
+    /// in to it (see GuestCleanupService). The privacy policy says about a week after the guest was last played.
+    /// </summary>
+    [Range(0, 30)]
+    public int GuestRetentionDays { get; set; } = 1;
+
     /// <summary>Rows deleted per statement, so a big backlog never holds long locks.</summary>
     [Range(1, 100_000)]
     public int BatchSize { get; set; } = 1_000;

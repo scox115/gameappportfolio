@@ -17,6 +17,13 @@ public class AntiCheatOptions
     [Range(1, int.MaxValue)]
     public int RegistrationsPerHour { get; set; } = 3;
 
+    /// <summary>
+    /// Guest heroes allowed per IP address per hour. More than sign-ups, since a whole office may try the
+    /// game from one address; a guest can't wager, so a pile of them is worth little.
+    /// </summary>
+    [Range(1, int.MaxValue)]
+    public int GuestsPerHour { get; set; } = 20;
+
     /// <summary>Sign-in attempts allowed per IP address per minute.</summary>
     [Range(1, int.MaxValue)]
     public int SignInsPerMinute { get; set; } = 10;

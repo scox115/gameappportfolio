@@ -205,6 +205,21 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
     }
 
     [Fact]
+    public async Task AGuest_CanDuelForFun_ButNotForGold()
+    {
+        var http = _factory.CreateClient();
+        var response = await http.PostAsJsonAsync("/api/v1/auth/guest", new { });
+        response.EnsureSuccessStatusCode();
+        var auth = (await response.Content.ReadFromJsonAsync<AuthResponse>(Json))!;
+        await using var guest = await ConnectAsync(http, auth.AccessToken, auth.Player.Username);
+
+        var wager = await Assert.ThrowsAnyAsync<Exception>(() => guest.FindWageredOpponentAsync(50));
+        Assert.Contains("Save your hero to duel for gold", wager.Message);
+        Assert.True(await guest.FindOpponentAsync()); // waiting for a friendly duel is fine
+        await guest.Connection.InvokeAsync(nameof(ArenaHub.CancelSearch));
+    }
+
+    [Fact]
     public async Task Winning_MovesRatingPointsFromTheLoserToTheWinner()
     {
         var (alice, bob, battleId) = await StartBattleAsync();

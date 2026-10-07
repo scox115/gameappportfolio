@@ -163,6 +163,7 @@ public static class PlayerEndpoints
 
                 // Top 10 duelists as this class, by wins then fewest losses; rating breaks ties.
                 var classLeaders = await dbContext.Players
+                    .Where(p => p.GuestSince == null) // guests try the game; leaderboards are for heroes people kept
                     .SelectMany(p => p.ClassRecords
                         .Where(r => r.Class == heroClass && r.Wins + r.Losses > 0)
                         .Select(r => new { Player = p, r.Wins, r.Losses }))
@@ -185,6 +186,7 @@ public static class PlayerEndpoints
 
             // Top 10 by PvP rating; level and experience break ties (such as players who haven't dueled yet)
             var topPlayers = await dbContext.Players
+                .Where(p => p.GuestSince == null)
                 .OrderByDescending(p => p.Rating)
                 .ThenByDescending(p => p.Level)
                 .ThenByDescending(p => p.ExperiencePoints)
