@@ -93,6 +93,13 @@ if (-not $sqlGroupId) {
     $sqlGroupId = Invoke-Az ad group create --display-name $SqlAdminGroupName --mail-nickname $SqlAdminGroupName --query id --output tsv
 }
 $myObjectId = Invoke-Az ad signed-in-user show --query id --output tsv
+# A managed identity created a moment ago can take a minute or two to appear in Entra ID,
+# and group commands fail until it does. A filtered list returns empty rather than an error.
+for ($attempt = 1; -not (Invoke-Az ad sp list --filter "id eq '$identityPrincipalId'" --query '[0].id' --output tsv); $attempt++) {
+    if ($attempt -gt 36) { throw "Managed identity $IdentityName still isn't visible in Entra ID. Run the script again in a few minutes." }
+    Write-Host '  Waiting for the new identity to appear in Entra ID...'
+    Start-Sleep -Seconds 5
+}
 foreach ($member in $myObjectId, $identityPrincipalId) {
     $isMember = Invoke-Az ad group member check --group $sqlGroupId --member-id $member --query value --output tsv
     if ($isMember -ne 'true') {
