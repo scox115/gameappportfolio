@@ -51,8 +51,8 @@ public class DataCleanupWorker(
 
             activity?.SetTag("game.cleanup.deleted", result.Total);
             logger.LogInformation(
-                "Data cleanup deleted {RefreshTokens} expired refresh tokens, {BossFights} old boss fights, {Duels} old duels and {AuditEntries} old audit log entries.",
-                result.ExpiredRefreshTokens, result.FinishedBossFights, result.FinishedDuels, result.OldAuditEntries);
+                "Data cleanup deleted {RefreshTokens} expired refresh tokens, {EmailLinks} expired email links, {BossFights} old boss fights, {Duels} old duels and {AuditEntries} old audit log entries.",
+                result.ExpiredRefreshTokens, result.ExpiredEmailLinks, result.FinishedBossFights, result.FinishedDuels, result.OldAuditEntries);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

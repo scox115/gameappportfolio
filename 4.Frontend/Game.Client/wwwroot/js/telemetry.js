@@ -42,7 +42,20 @@ window.gameTelemetry = (() => {
         return off; // a malformed connection string must not break the game
     }
 
+    // Recovery links carry a one-time token in the query string; addresses are sent without it.
+    const withoutQuery = url => {
+        try {
+            const parsed = new URL(url, location.href);
+            return parsed.origin + parsed.pathname;
+        } catch {
+            return url;
+        }
+    };
+
     appInsights.addTelemetryInitializer(item => {
+        for (const field of ["uri", "refUri", "url"]) {
+            if (typeof item.baseData?.[field] === "string") item.baseData[field] = withoutQuery(item.baseData[field]);
+        }
         item.tags = item.tags ?? {};
         // Shows the browser as its own node, calling the API, on the Application Map.
         item.tags["ai.cloud.role"] = "card-arena-client";
@@ -57,7 +70,7 @@ window.gameTelemetry = (() => {
         },
         /** A page view; the first one also carries how long the page took to load. */
         trackView(name) {
-            appInsights.trackPageView({ name, uri: location.href });
+            appInsights.trackPageView({ name, uri: withoutQuery(location.href) });
         },
         /** Ties telemetry to a player (their id, never their name), or clears it on sign-out. */
         setPlayer(playerId) {

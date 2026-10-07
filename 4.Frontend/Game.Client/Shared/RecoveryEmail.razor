@@ -1,0 +1,136 @@
+@using System.Net
+@inject HttpClient Http
+
+@* "Recovery email" in the account dialog: add, change or remove the address password reset links go to. *@
+<h5 style="margin: 22px 0 6px; font-size: 0.95rem; color: #c7d2fe;">Recovery email</h5>
+@if (current is null)
+{
+    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0;">Loading…</p>
+}
+else
+{
+    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 10px;">
+        @if (current.email is { } email)
+        {
+            <span>Reset links go to <b style="color: #e2e8f0;">@email</b>.</span>
+        }
+        else
+        {
+            <span>Add an email address so you can reset your password if you forget it. It's used for nothing else.</span>
+        }
+        @if (current.pending is { } pending)
+        {
+            <span> We sent a confirmation link to <b style="color: #e2e8f0;">@pending</b>; click it to finish.</span>
+        }
+    </p>
+    <label for="recovery-email" style="display: block; color: #cbd5e1; font-size: 0.85rem; margin-bottom: 4px;">@(current.email is null ? "Email address" : "New email address")</label>
+    <input id="recovery-email" type="email" autocomplete="email" @bind="address" @bind:event="oninput"
+           style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9;" />
+    <label for="recovery-password" style="display: block; color: #cbd5e1; font-size: 0.85rem; margin: 8px 0 4px;">Your password</label>
+    <input id="recovery-password" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput"
+           style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9;" />
+    <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <button @onclick="SaveAsync" disabled="@(busy || string.IsNullOrWhiteSpace(address) || string.IsNullOrEmpty(password))"
+                style="flex: 1; background: #4f46e5; color: white; padding: 9px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; opacity: @(busy || string.IsNullOrWhiteSpace(address) || string.IsNullOrEmpty(password) ? "0.5" : "1");">
+            Send confirmation link
+        </button>
+        @if (current.email is not null || current.pending is not null)
+        {
+            <button @onclick="RemoveAsync" disabled="@(busy || string.IsNullOrEmpty(password))"
+                    style="background: #334155; color: #e2e8f0; padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; opacity: @(busy || string.IsNullOrEmpty(password) ? "0.5" : "1");">
+                Remove
+            </button>
+        }
+    </div>
+}
+@if (!string.IsNullOrEmpty(message))
+{
+    <p role="@(failed ? "alert" : "status")" style="color: @(failed ? "#f87171" : "#86efac"); font-size: 0.85rem; margin: 8px 0 0;">@message</p>
+}
+
+@code {
+    private Current? current;
+    private string address = string.Empty;
+    private string password = string.Empty;
+    private bool busy;
+    private bool failed;
+    private string message = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            current = await Http.GetFromJsonAsync<Current>("/api/v1/players/me/recovery-email");
+        }
+        catch (HttpRequestException)
+        {
+            (failed, message) = (true, "Your recovery email couldn't be loaded.");
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync("/api/v1/players/me/recovery-email", new { Email = address.Trim(), Password = password });
+            if (response.IsSuccessStatusCode)
+            {
+                current = await response.Content.ReadFromJsonAsync<Current>();
+                (failed, message) = (false, $"Check {address.Trim()} for a confirmation link.");
+                address = password = string.Empty;
+            }
+            else
+            {
+                (failed, message) = (true, Explain(response.StatusCode, await ProblemText.ReadAsync(response)));
+            }
+        }
+        catch (HttpRequestException)
+        {
+            (failed, message) = (true, "The game server couldn't be reached. Please try again.");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task RemoveAsync()
+    {
+        busy = true;
+        try
+        {
+            var response = await Http.SendAsync(new HttpRequestMessage(HttpMethod.Delete, "/api/v1/players/me/recovery-email")
+            {
+                Content = JsonContent.Create(new { Password = password })
+            });
+            if (response.IsSuccessStatusCode)
+            {
+                current = new Current(null, null);
+                (failed, message) = (false, "Your recovery email was removed.");
+                password = string.Empty;
+            }
+            else
+            {
+                (failed, message) = (true, Explain(response.StatusCode, await ProblemText.ReadAsync(response)));
+            }
+        }
+        catch (HttpRequestException)
+        {
+            (failed, message) = (true, "The game server couldn't be reached. Please try again.");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static string Explain(HttpStatusCode status, string? problem) => status switch
+    {
+        HttpStatusCode.Locked => "Too many wrong passwords. Please try again later.",
+        HttpStatusCode.TooManyRequests => problem ?? "Too many attempts. Please wait a few minutes and try again.",
+        _ => problem ?? "That didn't work. Please try again.",
+    };
+
+    private sealed record Current(string? email, string? pending);
+}

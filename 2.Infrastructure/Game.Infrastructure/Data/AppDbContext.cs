@@ -23,6 +23,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<PveBattle> PveBattles => Set<PveBattle>();
     public DbSet<PvpBattle> PvpBattles => Set<PvpBattle>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<AccountToken> AccountTokens => Set<AccountToken>();
     public DbSet<MatchHistoryEntry> MatchHistory => Set<MatchHistoryEntry>();
     public DbSet<DailyArenaStats> DailyArenaStats => Set<DailyArenaStats>();
     public DbSet<OperationsEvent> OperationsEvents => Set<OperationsEvent>();

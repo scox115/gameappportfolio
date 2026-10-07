@@ -102,6 +102,5 @@ public class RefreshTokenService(
         return await dbContext.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == hash);
     }
 
-    private static string Hash(string token) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+    private static string Hash(string token) => SecureTokens.Hash(token);
 }

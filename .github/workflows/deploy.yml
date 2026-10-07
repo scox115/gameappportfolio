@@ -120,6 +120,7 @@ jobs:
             ${{ vars.ALERT_EMAIL }}
             ${{ vars.APP_CONFIGURATION }}
             ${{ vars.ADMIN_USERNAMES }}
+            ${{ vars.EMAIL_RECOVERY }}
             ${{ secrets.JWT_SIGNING_KEY }}
             ${{ secrets.RABBITMQ_PASSWORD }}
             ${{ secrets.GHCR_READ_TOKEN }}
@@ -143,6 +144,7 @@ jobs:
               alertEmail="${{ vars.ALERT_EMAIL }}" \
               appConfiguration="${{ vars.APP_CONFIGURATION }}" \
               adminUsernames="${{ vars.ADMIN_USERNAMES }}" \
+              emailRecovery="${{ vars.EMAIL_RECOVERY }}" \
               jwtSigningKey="$JWT_SIGNING_KEY" \
               rabbitMqPassword="$RABBITMQ_PASSWORD" \
               registryUsername="$registry_user" \

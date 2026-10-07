@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using Game.Api.Options;
 using Azure.Identity;
 using Microsoft.FeatureManagement;
 
@@ -74,13 +76,16 @@ public static class GameFeatures
     /// <summary>GET /features: which switchable features are on, so the client can hide what's off.</summary>
     public static void MapFeatureEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/features", async (IFeatureManager features) => Results.Ok(new FeaturesResponse(
+        app.MapGet("/features", async (IFeatureManager features, IOptions<EmailOptions> email) => Results.Ok(new FeaturesResponse(
                 await features.IsEnabledAsync(Duels),
                 await features.IsEnabledAsync(HeroicBoss),
-                await features.IsEnabledAsync(GoldShop))))
+                await features.IsEnabledAsync(GoldShop),
+                email.Value.Enabled)))
             .WithTags("Features")
             .AllowAnonymous();
     }
 }
 
-public record FeaturesResponse(bool Duels, bool HeroicBoss, bool GoldShop);
+/// <param name="AccountRecovery">Whether players can add a recovery email and reset a forgotten password.
+/// Not a feature flag: it is on when the deployment has set up email.</param>
+public record FeaturesResponse(bool Duels, bool HeroicBoss, bool GoldShop, bool AccountRecovery);

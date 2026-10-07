@@ -24,7 +24,7 @@ public class FeatureFlagTests
 
         var features = await factory.CreateClient().GetFromJsonAsync<FeaturesResponse>("/api/v1/features", Json);
 
-        Assert.Equal(new FeaturesResponse(Duels: true, HeroicBoss: true, GoldShop: true), features);
+        Assert.Equal(new FeaturesResponse(Duels: true, HeroicBoss: true, GoldShop: true, AccountRecovery: true), features);
     }
 
     [Fact]

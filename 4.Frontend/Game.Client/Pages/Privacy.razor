@@ -11,6 +11,10 @@
     <h2>What we store</h2>
     <ul>
         <li><b>Your account:</b> your hero name and a hash of your password (never the password itself), plus failed sign-in counts used to lock out password guessing.</li>
+        <li>
+            <b>Your recovery email, if you add one:</b> used only to send you a link to confirm it and, if you ask, a link to
+            reset your password. Only a hash of each link is stored, and links expire within a day.
+        </li>
         <li><b>Your hero:</b> class, level, gold, rating, purchases, titles, cosmetics, bounties and your portrait if you upload one.</li>
         <li><b>Your games:</b> boss fights, duels, match history and the daily arena totals they add to (which don't identify anyone).</li>
         <li><b>Sign-in sessions:</b> when each session started and ends. Only a hash of each session token is kept.</li>
@@ -19,7 +23,7 @@
             when, by which admin and why. A suspension's reason is shown to you when you try to sign in.
         </li>
     </ul>
-    <p>We don't ask for your email address, real name, location or payment details, and we don't sell or share your data.</p>
+    <p>An email address is optional. We don't ask for your real name, location or payment details, and we don't sell or share your data.</p>
 
     <h2>Technical data</h2>
     <ul>
@@ -35,12 +39,12 @@
     <h2>Where it lives</h2>
     <p>
         Everything is stored in Microsoft Azure data centers in the United States. Microsoft processes it on our behalf
-        to host the game.
+        to host the game, and sends recovery emails through Azure Communication Services.
     </p>
 
     <h2>How long we keep it</h2>
     <ul>
-        <li>Your account, hero and match history: until you delete your hero.</li>
+        <li>Your account, hero, recovery email and match history: until you delete your hero (or remove the email).</li>
         <li>Finished battles: 30 days. Expired sign-in sessions: 7 days after they end.</li>
         <li>Diagnostics and logs: 30 days.</li>
         <li>Admin decisions about your account: one year, even if you delete your hero, so a decision can be checked if it's questioned.</li>

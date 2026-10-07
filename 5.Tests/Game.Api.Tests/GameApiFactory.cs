@@ -24,6 +24,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
     /// <summary>Stands in for blob storage and records what was uploaded and deleted.</summary>
     public FakeStorageService Storage { get; } = new();
 
+    /// <summary>Stands in for Azure Communication Services and keeps every email "sent".</summary>
+    public FakeEmailSender Email { get; } = new();
+
     /// <summary>Tops up a player's gold, for tests that need more than a new hero starts with.</summary>
     public async Task GiveGoldAsync(Guid playerId, int amount)
     {
@@ -49,6 +52,8 @@ public class GameApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("RabbitMq:UserName", "test");
         builder.UseSetting("RabbitMq:Password", "test");
         builder.UseSetting("Jwt:SigningKey", "integration-tests-signing-key-that-is-long-enough");
+        builder.UseSetting("Email:Provider", "Log");
+        builder.UseSetting("Email:ClientBaseUrl", FakeEmailSender.ClientBaseUrl);
 
         builder.ConfigureServices(services =>
         {
@@ -73,6 +78,9 @@ public class GameApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IStorageService>();
             services.AddSingleton<IStorageService>(Storage);
+
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender>(Email);
         });
     }
 }
@@ -103,6 +111,24 @@ public class FakeStorageService : IStorageService
     {
         lock (Deleted) Deleted.Add(fileUrl);
         return Task.CompletedTask;
+    }
+}
+
+public class FakeEmailSender : IEmailSender
+{
+    public const string ClientBaseUrl = "https://play.test";
+
+    public List<EmailMessage> Sent { get; } = [];
+
+    public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    {
+        lock (Sent) Sent.Add(message);
+        return Task.CompletedTask;
+    }
+
+    public List<EmailMessage> To(string address)
+    {
+        lock (Sent) return Sent.Where(m => m.To == address).ToList();
     }
 }
 

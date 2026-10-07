@@ -13,6 +13,9 @@ using Game.Api.Workers; // Add this using statement to register background worke
 using Game.Api.Options;
 using Game.Api.Admin;
 using Game.Api.Auth;
+using Game.Api.Recovery;
+using Game.Infrastructure.Email;
+using Azure.Communication.Email;
 using Game.Api.Battles;
 using Game.Api.Hubs;
 using Game.Api.Versioning;
@@ -151,6 +154,21 @@ builder.Services.AddOptions<AdminOptions>().Bind(builder.Configuration.GetSectio
 builder.Services.AddScoped<AdminRoleSync>();
 builder.Services.AddScoped<AdminService>();
 
+// --- ✉️ ACCOUNT RECOVERY BY EMAIL ---
+// Azure Communication Services in Azure, the log locally, or off (see docs/adr/0022-account-recovery-by-email.md).
+builder.Services.AddOptions<EmailOptions>()
+    .Bind(builder.Configuration.GetSection(EmailOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services.AddSingleton<IEmailSender>(sp =>
+{
+    var email = sp.GetRequiredService<IOptions<EmailOptions>>().Value;
+    return email.Provider == EmailProvider.AzureCommunicationServices
+        ? new AzureEmailSender(new EmailClient(new Uri(email.Endpoint!), new DefaultAzureCredential()), email.Sender!)
+        : new LogEmailSender(sp.GetRequiredService<ILogger<LogEmailSender>>());
+});
+builder.Services.AddScoped<AccountRecoveryService>();
+
 builder.Services.AddOptions<JwtOptions>()
     .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
     .ValidateDataAnnotations()
@@ -251,6 +269,7 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy(RateLimits.Registration, context => PerAddress(context, limits => limits.RegistrationsPerHour, TimeSpan.FromHours(1)));
     options.AddPolicy(RateLimits.SignIn, context => PerAddress(context, limits => limits.SignInsPerMinute, TimeSpan.FromMinutes(1)));
+    options.AddPolicy(RateLimits.Recovery, context => PerAddress(context, limits => limits.RecoveryRequestsPerHour, TimeSpan.FromHours(1)));
     options.AddPolicy(RateLimits.AvatarUpload, context => RateLimitPartition.GetFixedWindowLimiter(
         context.User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "anonymous",
         _ => new FixedWindowRateLimiterOptions

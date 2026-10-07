@@ -120,6 +120,19 @@ suspend or reinstate them, correct gold, and read the audit log of every admin a
 variable and deploy again to remove that admin; it applies at their next sign-in. See
 [ADR 0021](adr/0021-admin-roles-and-audit-log.md).
 
+## Password reset by email (optional)
+
+Players can add a recovery email and reset a forgotten password from the sign-in screen. Email goes out through
+Azure Communication Services with an Azure-managed sender address (`DoNotReply@<id>.azurecomm.net`): no domain or
+DNS to set up, no monthly fee, and about $0.00025 an email.
+
+1. Register its resource provider once (the deploy app isn't allowed to): `az provider register --namespace Microsoft.Communication`. Running `infra/setup.ps1` again does this too.
+2. Add a repository variable `EMAIL_RECOVERY` with the value `true`, then run **Deploy to Azure**.
+
+Until then the game hides "Forgot your password?" and the recovery email setting. The API sends with its managed
+identity, which the deploy grants **Communication and Email Service Owner** on the Communication Services resource.
+See [ADR 0022](adr/0022-account-recovery-by-email.md).
+
 ## Email alerts (optional)
 
 Add a repository variable `ALERT_EMAIL` with your address and run **Deploy to Azure**. The deploy then adds:
