@@ -21,6 +21,8 @@ public sealed class ArenaFixture : IAsyncLifetime
 
     public ApiHost.FeatureSwitches Features => _api!.Features;
 
+    public ApiHost.Mailbox Emails => _api!.Emails;
+
     /// <summary>What the browsers sent to "Application Insights".</summary>
     public TelemetrySink Telemetry => _telemetry!;
 

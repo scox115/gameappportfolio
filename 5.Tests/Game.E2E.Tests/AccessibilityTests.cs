@@ -164,7 +164,9 @@ public class AccessibilityTests(ArenaFixture arena) : BrowserTest(arena)
     [Theory]
     [InlineData("terms", "Terms of Service")]
     [InlineData("privacy", "Privacy Policy")]
-    public Task TheLegalPages_HaveNoViolations(string path, string heading) => WithScreenshotsOnFailureAsync(async () =>
+    [InlineData("forgot-password", "Forgot your password?")]
+    [InlineData("reset-password?user=00000000-0000-0000-0000-000000000001&token=abc", "Choose a new password")]
+    public Task TheInfoPages_HaveNoViolations(string path, string heading) => WithScreenshotsOnFailureAsync(async () =>
     {
         var page = await NewBrowserAsync();
         await page.GotoAsync($"{Arena.ClientUrl}/{path}");

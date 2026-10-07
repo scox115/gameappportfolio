@@ -32,6 +32,9 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
     /// <summary>Heroes created with these names are admins (one per test, since names are unique).</summary>
     public static readonly string[] AdminNames = ["RefereeFlow", "RefereeAxe"];
 
+    /// <summary>Every email the API "sent", in order; tests open the links in them.</summary>
+    public Mailbox Emails { get; } = new();
+
     /// <summary>Flips feature flags while the API runs, the way Azure App Configuration does.</summary>
     public FeatureSwitches Features { get; } = new();
 
@@ -52,6 +55,8 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
         builder.UseSetting("Jwt:SigningKey", "browser-tests-signing-key-that-is-long-enough");
         builder.UseSetting("Logging:LogLevel:Default", "Warning");
         builder.UseSetting("Admin:Usernames", string.Join(',', AdminNames));
+        builder.UseSetting("Email:Provider", "Log");
+        builder.UseSetting("Email:ClientBaseUrl", _clientOrigin);
         builder.ConfigureAppConfiguration(configuration => configuration.Add(Features));
 
         builder.ConfigureServices(services =>
@@ -72,6 +77,9 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
 
             RemoveAll<IStorageService>(services);
             services.AddSingleton<IStorageService>(new NoStorage());
+
+            RemoveAll<IEmailSender>(services);
+            services.AddSingleton<IEmailSender>(Emails);
         });
     }
 
@@ -91,6 +99,38 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
         {
             Data[$"FeatureManagement:{feature}"] = enabled.ToString();
             OnReload();
+        }
+    }
+
+    public sealed class Mailbox : IEmailSender
+    {
+        private readonly List<EmailMessage> _sent = [];
+
+        public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+        {
+            lock (_sent) _sent.Add(message);
+            return Task.CompletedTask;
+        }
+
+        /// <summary>The first link in the newest email to an address, waiting a little for it to arrive.</summary>
+        public async Task<string> LatestLinkToAsync(string address)
+        {
+            for (var attempt = 0; attempt < 50; attempt++)
+            {
+                EmailMessage? latest;
+                lock (_sent) latest = _sent.LastOrDefault(m => m.To == address);
+                if (latest is not null)
+                {
+                    return System.Text.RegularExpressions.Regex.Match(latest.PlainText, @"https?://\S+").Value;
+                }
+                await Task.Delay(100);
+            }
+            throw new TimeoutException($"No email reached {address}.");
+        }
+
+        public int CountTo(string address)
+        {
+            lock (_sent) return _sent.Count(m => m.To == address);
         }
     }
 

@@ -65,6 +65,9 @@ param alertEmail string = ''
 @description('Set to true to keep feature flags in Azure App Configuration (free tier), so they can be flipped without a deploy.')
 param appConfiguration string = ''
 
+@description('Set to true to send account recovery emails with Azure Communication Services (see docs/adr/0022-account-recovery-by-email.md). Needs the Microsoft.Communication resource provider registered first.')
+param emailRecovery string = ''
+
 @description('Usernames that are admins, separated by commas (see docs/adr/0021-admin-roles-and-audit-log.md). Leave empty for none.')
 param adminUsernames string = ''
 
@@ -76,6 +79,7 @@ var tags = { app: 'kings-of-the-card-arena' }
 var databaseName = 'GameDb'
 var usePrivateRegistry = !empty(registryUsername)
 var featureFlagStoreEnabled = toLower(appConfiguration) == 'true'
+var emailEnabled = toLower(emailRecovery) == 'true'
 
 resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: apiIdentityName
@@ -181,6 +185,50 @@ resource adminsEditFlags 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
     roleDefinitionId: appConfigDataOwner
     principalId: sqlAdminGroupObjectId
     principalType: 'Group'
+  }
+}
+
+// --- Account recovery email ---
+// Azure Communication Services with an Azure-managed sender domain (DoNotReply@<guid>.azurecomm.net):
+// no DNS to set up, no monthly fee, about $0.00025 an email. The API sends with its managed identity.
+
+resource emailService 'Microsoft.Communication/emailServices@2023-04-01' = if (emailEnabled) {
+  name: 'ecs-${appName}-${take(suffix, 8)}'
+  location: 'global'
+  tags: tags
+  properties: { dataLocation: 'United States' }
+}
+
+resource emailDomain 'Microsoft.Communication/emailServices/domains@2023-04-01' = if (emailEnabled) {
+  parent: emailService
+  name: 'AzureManagedDomain'
+  location: 'global'
+  tags: tags
+  properties: {
+    domainManagement: 'AzureManaged'
+    userEngagementTracking: 'Disabled' // no tracking pixels or rewritten links in recovery emails
+  }
+}
+
+resource communication 'Microsoft.Communication/communicationServices@2023-04-01' = if (emailEnabled) {
+  name: 'acs-${appName}-${take(suffix, 8)}'
+  location: 'global'
+  tags: tags
+  properties: {
+    dataLocation: 'United States'
+    linkedDomains: [emailDomain.id]
+  }
+}
+
+var communicationEmailServiceOwner = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '09976791-48a7-449e-bb21-39d1a415f350')
+
+resource apiSendsEmail 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (emailEnabled) {
+  name: guid(communication.id, apiIdentity.id, communicationEmailServiceOwner)
+  scope: communication
+  properties: {
+    roleDefinitionId: communicationEmailServiceOwner
+    principalId: apiIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
@@ -291,6 +339,9 @@ resource client 'Microsoft.Web/staticSites@2023-12-01' = {
   properties: {}
 }
 
+// Where players reach the game: the custom domain when there is one. Used for links in emails.
+var gameUrl = empty(customDomain) ? 'https://${client.properties.defaultHostname}' : 'https://${customDomain}'
+
 // Azure checks the CNAME record and then issues and renews a free certificate for the domain.
 resource clientDomain 'Microsoft.Web/staticSites/customDomains@2023-12-01' = if (!empty(customDomain)) {
   parent: client
@@ -389,7 +440,12 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
             { name: 'Cors__AllowedOrigins__0', value: 'https://${client.properties.defaultHostname}' }
             { name: 'Admin__Usernames', value: adminUsernames }
-          ], empty(customDomain) ? [] : [
+            { name: 'Email__ClientBaseUrl', value: gameUrl }
+          ], emailEnabled ? [
+            { name: 'Email__Provider', value: 'AzureCommunicationServices' }
+            { name: 'Email__Endpoint', value: 'https://${communication!.properties.hostName}' }
+            { name: 'Email__Sender', value: 'DoNotReply@${emailDomain!.properties.mailFromSenderDomain}' }
+          ] : [], empty(customDomain) ? [] : [
             { name: 'Cors__AllowedOrigins__1', value: 'https://${customDomain}' }
           ], featureFlagStoreEnabled ? [
             { name: 'AppConfig__Endpoint', value: flags!.properties.endpoint }
@@ -541,7 +597,7 @@ resource restartsAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (alerts
 
 output apiUrl string = 'https://${api.properties.configuration.ingress.fqdn}'
 output clientUrl string = 'https://${client.properties.defaultHostname}'
-output gameUrl string = empty(customDomain) ? 'https://${client.properties.defaultHostname}' : 'https://${customDomain}'
+output gameUrl string = gameUrl
 output staticWebAppName string = client.name
 output apiContainerAppName string = api.name
 output sqlServer string = sqlServer.properties.fullyQualifiedDomainName

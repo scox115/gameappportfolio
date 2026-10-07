@@ -12,6 +12,9 @@ public class FeatureFlags(HttpClient http)
     public const string HeroicBoss = "HeroicBoss";
     public const string GoldShop = "GoldShop";
 
+    /// <summary>Recovery email and password reset; on when the deployment has set up email.</summary>
+    public const string AccountRecovery = "AccountRecovery";
+
     private static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(30);
 
     private Snapshot? _current;
@@ -26,26 +29,28 @@ public class FeatureFlags(HttpClient http)
 
         try
         {
-            _current = await http.GetFromJsonAsync<Snapshot>("/api/v1/features") ?? Snapshot.AllOn;
+            _current = await http.GetFromJsonAsync<Snapshot>("/api/v1/features") ?? Snapshot.Fallback;
             _fetchedAt = DateTime.UtcNow;
         }
         catch (Exception)
         {
             // Can't tell right now: show everything and let the API say no if it must.
-            _current ??= Snapshot.AllOn;
+            _current ??= Snapshot.Fallback;
         }
         return _current;
     }
 
-    public record Snapshot(bool Duels, bool HeroicBoss, bool GoldShop)
+    public record Snapshot(bool Duels, bool HeroicBoss, bool GoldShop, bool AccountRecovery = false)
     {
-        public static readonly Snapshot AllOn = new(true, true, true);
+        // Recovery stays hidden until the API says email is set up, so nobody is offered a link that never comes.
+        public static readonly Snapshot Fallback = new(true, true, true);
 
         public bool IsOn(string feature) => feature switch
         {
             FeatureFlags.Duels => Duels,
             FeatureFlags.HeroicBoss => HeroicBoss,
             FeatureFlags.GoldShop => GoldShop,
+            FeatureFlags.AccountRecovery => AccountRecovery,
             _ => true
         };
     }

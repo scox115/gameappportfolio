@@ -69,7 +69,7 @@ public class AccountService(
             ExportedAt: timeProvider.GetUtcNow(),
             Account: new AccountExport.SignInAccount(
                 user.Id, user.UserName ?? player.Username, user.LockoutEnd, user.AccessFailedCount,
-                user.SuspendedUntil, user.SuspensionReason),
+                user.SuspendedUntil, user.SuspensionReason, user.EmailConfirmed ? user.Email : null),
             Profile: AccountExport.HeroProfile.From(player),
             SignInSessions: sessions,
             MatchHistory: history.Select(AccountExport.Match.From).ToList(),
@@ -96,6 +96,7 @@ public class AccountService(
         // Loaded and removed one by one rather than with ExecuteDelete, so everything goes in the one
         // SaveChanges that UserManager.DeleteAsync makes: the account is deleted completely or not at all.
         dbContext.RefreshTokens.RemoveRange(await dbContext.RefreshTokens.Where(t => t.UserId == playerId).ToListAsync(cancellationToken));
+        dbContext.AccountTokens.RemoveRange(await dbContext.AccountTokens.Where(t => t.UserId == playerId).ToListAsync(cancellationToken));
         dbContext.PveBattles.RemoveRange(await dbContext.PveBattles.Where(b => b.PlayerId == playerId).ToListAsync(cancellationToken));
         dbContext.PvpBattles.RemoveRange(await dbContext.PvpBattles
             .Where(b => b.PlayerOneId == playerId || b.PlayerTwoId == playerId).ToListAsync(cancellationToken));

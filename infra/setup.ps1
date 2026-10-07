@@ -58,7 +58,7 @@ $tenantId = Invoke-Az account show --query tenantId --output tsv
 Write-Host 'Registering resource providers (first time only)...' -ForegroundColor Cyan
 foreach ($namespace in 'Microsoft.App', 'Microsoft.OperationalInsights', 'Microsoft.Insights', 'Microsoft.Web',
                        'Microsoft.Sql', 'Microsoft.KeyVault', 'Microsoft.Storage', 'Microsoft.ManagedIdentity',
-                       'Microsoft.AppConfiguration') {
+                       'Microsoft.AppConfiguration', 'Microsoft.Communication') {
     Invoke-Az provider register --namespace $namespace | Out-Null
 }
 

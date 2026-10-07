@@ -1,0 +1,60 @@
+@page "/confirm-email"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Confirm your email · Kings of the Card Arena</PageTitle>
+
+<InfoPage Title="Confirm your email">
+    @if (email is not null)
+    {
+        <p class="recovery-ok" role="status">Thanks! @email is confirmed. If you ever forget your password, you can reset it from the sign-in screen.</p>
+        <p><a href="">Back to the game</a></p>
+    }
+    else if (error is not null)
+    {
+        <p class="recovery-error" role="alert">@error</p>
+        <p><a href="">Back to the game</a></p>
+    }
+    else
+    {
+        <p role="status">Confirming…</p>
+    }
+</InfoPage>
+
+@code {
+    [SupplyParameterFromQuery(Name = "user")] public Guid? UserId { get; set; }
+    [SupplyParameterFromQuery(Name = "token")] public string? Token { get; set; }
+
+    private string? email;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var (userId, token) = (UserId, Token);
+        if (token is not null) Navigation.NavigateTo("confirm-email", replace: true);
+        if (userId is null || string.IsNullOrEmpty(token))
+        {
+            error = "This link is incomplete. Open it straight from the email.";
+            return;
+        }
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/v1/auth/confirm-email", new { UserId = userId, Token = token });
+            if (response.IsSuccessStatusCode)
+            {
+                email = (await response.Content.ReadFromJsonAsync<Confirmed>())?.email ?? "Your email";
+            }
+            else
+            {
+                error = await ProblemText.ReadAsync(response) ?? "That link didn't work. Add the address again to get a new one.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            error = "The game server couldn't be reached. It may be waking up; reload this page in a minute.";
+        }
+    }
+
+    private record Confirmed(string email);
+}

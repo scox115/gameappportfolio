@@ -30,6 +30,10 @@
                 @(downloading ? "Preparing your file..." : "⬇️ Download my data")
             </button>
 
+            <FeatureGate Feature="@FeatureFlags.AccountRecovery">
+                <RecoveryEmail />
+            </FeatureGate>
+
             <h5 style="margin: 22px 0 6px; font-size: 0.95rem; color: #fca5a5;">Delete your hero</h5>
             <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 10px;">
                 This deletes @State.Username, your gold, upgrades and match history for good, and frees the name for someone else.

@@ -22,10 +22,11 @@ public record AccountExport(
     List<AccountExport.Duel> Duels,
     List<AccountExport.AdminDecision> AdminDecisions)
 {
+    /// <param name="RecoveryEmail">The confirmed address reset links go to, if the player added one.</param>
     /// <param name="SuspendedUntil">Set while an admin has suspended the account; the year 9999 means until reinstated.</param>
     public record SignInAccount(
         Guid Id, string Username, DateTimeOffset? LockedOutUntil, int FailedSignInAttempts,
-        DateTimeOffset? SuspendedUntil, string? SuspensionReason);
+        DateTimeOffset? SuspendedUntil, string? SuspensionReason, string? RecoveryEmail);
 
     /// <summary>Something an admin did to the account. Which admin did it is left out.</summary>
     public record AdminDecision(DateTime At, AdminAction Action, string Reason, string? Detail);

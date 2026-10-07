@@ -118,3 +118,47 @@ button:focus-visible, input:focus-visible, a:focus-visible, [tabindex]:focus-vis
     outline: 3px solid #fbbf24;
     outline-offset: 2px;
 }
+
+/* Account recovery forms (forgot password, reset password, recovery email). */
+.recovery-form label {
+    display: block;
+    color: #cbd5e1;
+    font-size: 0.9rem;
+    margin: 14px 0 6px;
+}
+
+.recovery-form input {
+    width: 100%;
+    max-width: 420px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #475569;
+    background: #0f172a;
+    color: #f1f5f9;
+    box-sizing: border-box;
+}
+
+.recovery-form button {
+    display: block;
+    margin-top: 16px;
+    background: #4f46e5;
+    color: #ffffff;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.recovery-form button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.recovery-ok {
+    color: #86efac;
+}
+
+.recovery-error {
+    color: #fca5a5;
+}

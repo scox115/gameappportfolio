@@ -45,6 +45,9 @@ public sealed class BrowserTelemetry(IJSRuntime js, GameState state, NavigationM
             "terms" => "Terms",
             "privacy" => "Privacy",
             "admin" => "Admin",
+            "forgot-password" => "Forgot password",
+            "reset-password" => "Reset password",
+            "confirm-email" => "Confirm email",
             _ => "Not found",
         };
 

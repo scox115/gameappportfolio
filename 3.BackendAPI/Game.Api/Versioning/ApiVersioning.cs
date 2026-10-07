@@ -90,6 +90,7 @@ public static class ApiVersioning
         group.MapPlayerEndpoints();
         group.MapAccountEndpoints();
         group.MapAdminEndpoints();
+        group.MapRecoveryEndpoints();
         group.MapBattleEndpoints();
         group.MapPvpEndpoints();
         group.MapShopEndpoints();

@@ -25,5 +25,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0019](0019-browser-telemetry.md) | Browser telemetry with the Application Insights JavaScript SDK | Accepted |
 | [0020](0020-account-export-and-deletion.md) | Players can download their data and delete their account | Accepted |
 | [0021](0021-admin-roles-and-audit-log.md) | Admin roles from configuration, with an audit log of every admin action | Accepted |
+| [0022](0022-account-recovery-by-email.md) | Account recovery by email with Azure Communication Services | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.

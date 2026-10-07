@@ -68,6 +68,20 @@ public sealed class DataCleanupTests : IDisposable
     }
 
     [Fact]
+    public async Task EmailLinks_AreDeletedOnceTheyAreLongExpired()
+    {
+        var old = new AccountToken(_userId, AccountTokenPurpose.ResetPassword, "old-hash", Now.AddDays(-10), TimeSpan.FromHours(1));
+        var recent = new AccountToken(_userId, AccountTokenPurpose.ConfirmEmail, "recent-hash", Now.AddDays(-2), TimeSpan.FromDays(1), "a@example.com");
+        await SaveAsync(old, recent);
+
+        var result = await RunCleanupAsync();
+
+        Assert.Equal(1, result.ExpiredEmailLinks);
+        await using var db = NewContext();
+        Assert.Equal([recent.Id], await db.AccountTokens.Select(t => t.Id).ToListAsync());
+    }
+
+    [Fact]
     public async Task AuditLogEntries_AreKeptForAYear()
     {
         var old = AuditEntry(daysAgo: 400);
