@@ -271,6 +271,34 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
     }
 
     [Fact]
+    public async Task ABotDuel_IsMeasuredAsAPracticeDuelAgainstTheBot()
+    {
+        var duels = new System.Collections.Concurrent.ConcurrentBag<Dictionary<string, object?>>();
+        using var listener = new System.Diagnostics.Metrics.MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (instrument.Meter.Name == Game.Api.Observability.GameTelemetry.Name && instrument.Name == "game.battles.completed")
+                l.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            var values = new Dictionary<string, object?>();
+            foreach (var tag in tags) values[tag.Key] = tag.Value;
+            duels.Add(values);
+        });
+        listener.Start();
+
+        await using var alice = await ConnectAsync();
+        await alice.Connection.InvokeAsync(nameof(ArenaHub.DuelBot));
+        var battle = (await alice.MatchFound.ReadAsync()).Battle;
+        await alice.ForfeitAsync(battle.Id);
+
+        // Other tests duel at the same time, so look for this one among them.
+        Assert.Contains(duels, d => (string?)d["game.battle.kind"] == "pvp" && (string?)d["game.battle.outcome"] == "Forfeit"
+            && (string?)d["game.duel.opponent"] == "bot" && d["game.duel.counted"] is false);
+    }
+
+    [Fact]
     public async Task Winning_MovesRatingPointsFromTheLoserToTheWinner()
     {
         var (alice, bob, battleId) = await StartBattleAsync();

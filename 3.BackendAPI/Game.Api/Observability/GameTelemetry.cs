@@ -32,6 +32,16 @@ public static class GameTelemetry
             new KeyValuePair<string, object?>("game.battle.outcome", outcome),
             new KeyValuePair<string, object?>("game.boss.difficulty", difficulty));
 
+    /// <param name="outcome">How it ended, such as "Knockout".</param>
+    /// <param name="opponent">"player" or "bot" (the Arena Bot).</param>
+    /// <param name="counted">Whether it paid rewards and moved ratings; practice and farming duels don't.</param>
+    public static void DuelCompleted(string outcome, string opponent, bool counted) =>
+        BattlesCompleted.Add(1,
+            new KeyValuePair<string, object?>("game.battle.kind", "pvp"),
+            new KeyValuePair<string, object?>("game.battle.outcome", outcome),
+            new KeyValuePair<string, object?>("game.duel.opponent", opponent),
+            new KeyValuePair<string, object?>("game.duel.counted", counted));
+
     public static void TelemetryMessageSent() => TelemetrySent.Add(1);
 
     /// <param name="kind">"refresh_token", "boss_fight" or "duel".</param>

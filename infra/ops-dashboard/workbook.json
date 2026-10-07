@@ -1,0 +1,433 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# 🃏 Kings of the Card Arena: operations\nHow the live game is doing: traffic, errors, speed, what players are doing, releases and the Azure resources behind it. Charts are empty while nobody plays (the API scales to zero and the database pauses). Email alerts for the same signals are set up by the `ALERT_EMAIL` repository variable; see docs/azure-deployment.md."
+      },
+      "name": "title"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "7b0f6a5e-3c1d-4d0b-9a55-2f1c7e0b8a10",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "label": "Time range",
+            "type": 4,
+            "isRequired": true,
+            "value": {
+              "durationMs": 86400000
+            },
+            "typeSettings": {
+              "selectableValues": [
+                {
+                  "durationMs": 3600000
+                },
+                {
+                  "durationMs": 14400000
+                },
+                {
+                  "durationMs": 43200000
+                },
+                {
+                  "durationMs": 86400000
+                },
+                {
+                  "durationMs": 259200000
+                },
+                {
+                  "durationMs": 604800000
+                },
+                {
+                  "durationMs": 2592000000
+                }
+              ],
+              "allowCustom": true
+            }
+          }
+        ],
+        "style": "pills",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components"
+      },
+      "name": "parameters"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Health"
+      },
+      "name": "health-heading"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let api = requests\n| where url !contains \"/hubs/\";\nlet total = toscalar(api | count);\nlet errors = toscalar(api | where toint(resultCode) >= 500 | count);\nlet p95 = toscalar(api | summarize percentile(duration, 95));\nlet players = toscalar(pageViews | where isnotempty(user_AuthenticatedId) | summarize dcount(user_AuthenticatedId));\nlet battles = toscalar(customMetrics | where name == \"game.battles.completed\" | summarize sum(valueSum));\nunion\n    (print Order = 1, Metric = \"API requests\", Value = todouble(total)),\n    (print Order = 2, Metric = \"Server errors (5xx)\", Value = todouble(errors)),\n    (print Order = 3, Metric = \"Slowest 5% of requests (ms)\", Value = round(todouble(p95))),\n    (print Order = 4, Metric = \"Players signed in\", Value = todouble(players)),\n    (print Order = 5, Metric = \"Battles finished\", Value = coalesce(todouble(battles), 0.0))\n| order by Order asc\n| project Metric, Value",
+        "size": 0,
+        "title": "At a glance",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "tiles",
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "Metric",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "Value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "auto"
+            }
+          },
+          "showBorder": true
+        }
+      },
+      "name": "health-tiles"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where url !contains \"/hubs/\"\n| summarize Requests = count(), [\"Server errors\"] = countif(toint(resultCode) >= 500) by bin(timestamp, {TimeRange:grain})",
+        "size": 0,
+        "title": "Requests and server errors",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "requests-chart",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where url !contains \"/hubs/\"\n| summarize Typical = percentile(duration, 50), [\"Slowest 5%\"] = percentile(duration, 95) by bin(timestamp, {TimeRange:grain})",
+        "size": 0,
+        "title": "Response time (ms)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "latency-chart",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where url !contains \"/hubs/\"\n| summarize Requests = count(), [\"Server errors\"] = countif(toint(resultCode) >= 500),\n    [\"Typical (ms)\"] = round(percentile(duration, 50)), [\"Slowest 5% (ms)\"] = round(percentile(duration, 95)) by Endpoint = name\n| top 15 by [\"Slowest 5% (ms)\"] desc",
+        "size": 0,
+        "title": "Endpoints, slowest first",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "table"
+      },
+      "name": "endpoints-table",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "exceptions\n| summarize Count = count(), [\"Last seen\"] = max(timestamp)\n    by Where = iff(client_Type == \"Browser\", \"Browser\", \"API\"), Error = type, Message = substring(outerMessage, 0, 120)\n| top 15 by Count desc",
+        "size": 0,
+        "title": "Errors in the API and in players' browsers",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "table"
+      },
+      "name": "exceptions-table",
+      "customWidth": "50"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Players and battles"
+      },
+      "name": "game-heading"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customMetrics\n| where name == \"game.battles.completed\"\n| extend Kind = tostring(customDimensions[\"game.battle.kind\"]), Opponent = tostring(customDimensions[\"game.duel.opponent\"])\n| extend Battle = case(Kind == \"pve\", \"Boss fights\", Opponent == \"bot\", \"Duels against the Arena Bot\", \"Duels between players\")\n| summarize Battles = sum(valueSum) by Battle, bin(timestamp, {TimeRange:grain})",
+        "size": 0,
+        "title": "Battles finished",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "barchart"
+      },
+      "name": "battles-chart",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where toint(resultCode) between (200 .. 299)\n| extend How = case(name endswith \"/auth/register\", \"Signed up\", name endswith \"/auth/guest\", \"Started as a guest\",\n    name endswith \"/players/me/keep\", \"Kept a guest hero\", \"\")\n| where isnotempty(How)\n| summarize Heroes = count() by How, bin(timestamp, {TimeRange:grain})",
+        "size": 0,
+        "title": "New heroes",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "barchart"
+      },
+      "name": "heroes-chart",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "pageViews\n| summarize Views = count(), Players = dcount(user_AuthenticatedId) by Screen = name\n| top 15 by Views desc",
+        "size": 0,
+        "title": "Screens players opened",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "table"
+      },
+      "name": "screens-table",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "browserTimings\n| summarize Typical = percentile(totalDuration, 50), [\"Slowest 5%\"] = percentile(totalDuration, 95) by bin(timestamp, {TimeRange:grain})",
+        "size": 0,
+        "title": "Page load time in the browser (ms)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "page-load-chart",
+      "customWidth": "50"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Releases\nEach deploy is a new version (1.0.<deploy run>). A blue-green release moves all traffic at once, so the switch shows as one colour handing over to the next."
+      },
+      "name": "release-heading"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where url !contains \"/hubs/\"\n| summarize Requests = count() by Version = application_Version, bin(timestamp, {TimeRange:grain})",
+        "size": 0,
+        "title": "Requests by API version",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "areachart"
+      },
+      "name": "versions-chart",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where url !contains \"/hubs/\"\n| summarize [\"First request\"] = min(timestamp), [\"Last request\"] = max(timestamp), Requests = count(),\n    [\"Server errors\"] = countif(toint(resultCode) >= 500) by Version = application_Version\n| order by [\"First request\"] desc",
+        "size": 0,
+        "title": "Versions seen",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "__APP_INSIGHTS_ID__"
+        ],
+        "visualization": "table"
+      },
+      "name": "versions-table",
+      "customWidth": "50"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## Azure resources\nThe free Azure SQL offer includes 100,000 vCore seconds a month; *Billed CPU* shows how fast that is used. The API runs up to the replica limit and scales to zero when nobody plays."
+      },
+      "name": "infra-heading"
+    },
+    {
+      "type": 10,
+      "content": {
+        "chartId": "api-replicas",
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.app/containerapps",
+        "metricScope": 0,
+        "resourceIds": [
+          "__API_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "timeContext": {
+          "durationMs": 86400000
+        },
+        "metrics": [
+          {
+            "namespace": "microsoft.app/containerapps",
+            "metric": "microsoft.app/containerapps--Replicas",
+            "aggregation": 3
+          }
+        ],
+        "title": "API replicas",
+        "gridSettings": {
+          "rowLimit": 10000
+        }
+      },
+      "customWidth": "50",
+      "name": "api-replicas"
+    },
+    {
+      "type": 10,
+      "content": {
+        "chartId": "api-resources",
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.app/containerapps",
+        "metricScope": 0,
+        "resourceIds": [
+          "__API_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "timeContext": {
+          "durationMs": 86400000
+        },
+        "metrics": [
+          {
+            "namespace": "microsoft.app/containerapps",
+            "metric": "microsoft.app/containerapps--UsageNanoCores",
+            "aggregation": 4
+          },
+          {
+            "namespace": "microsoft.app/containerapps",
+            "metric": "microsoft.app/containerapps--WorkingSetBytes",
+            "aggregation": 4
+          }
+        ],
+        "title": "API CPU (nanocores) and memory (bytes)",
+        "gridSettings": {
+          "rowLimit": 10000
+        }
+      },
+      "customWidth": "50",
+      "name": "api-resources"
+    },
+    {
+      "type": 10,
+      "content": {
+        "chartId": "sql-cpu",
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.sql/servers/databases",
+        "metricScope": 0,
+        "resourceIds": [
+          "__DATABASE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "timeContext": {
+          "durationMs": 86400000
+        },
+        "metrics": [
+          {
+            "namespace": "microsoft.sql/servers/databases",
+            "metric": "microsoft.sql/servers/databases--cpu_percent",
+            "aggregation": 3
+          }
+        ],
+        "title": "Database CPU (%)",
+        "gridSettings": {
+          "rowLimit": 10000
+        }
+      },
+      "customWidth": "50",
+      "name": "sql-cpu"
+    },
+    {
+      "type": 10,
+      "content": {
+        "chartId": "sql-billed",
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.sql/servers/databases",
+        "metricScope": 0,
+        "resourceIds": [
+          "__DATABASE_ID__"
+        ],
+        "timeContextFromParameter": "TimeRange",
+        "timeContext": {
+          "durationMs": 86400000
+        },
+        "metrics": [
+          {
+            "namespace": "microsoft.sql/servers/databases",
+            "metric": "microsoft.sql/servers/databases--app_cpu_billed",
+            "aggregation": 1
+          }
+        ],
+        "title": "Database billed CPU (vCore seconds)",
+        "gridSettings": {
+          "rowLimit": 10000
+        }
+      },
+      "customWidth": "50",
+      "name": "sql-billed"
+    }
+  ],
+  "fallbackResourceIds": [
+    "__APP_INSIGHTS_ID__"
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}

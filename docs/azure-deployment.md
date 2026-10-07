@@ -176,17 +176,40 @@ are asked to try changing their portrait later. The API signs in with its manage
 grants **Cognitive Services User** on the resource; its keys are switched off. Staging leaves it off. See
 [ADR 0029](adr/0029-portrait-screening.md).
 
+## Ops dashboard
+
+Every deploy creates or updates an Azure Monitor workbook called **Card Arena operations (production)** (or
+`(staging)`) in the environment's resource group. The deploy run's summary links to it, and it's also under
+Monitor > **Workbooks** or the resource group's list of resources. It shows, for a time range you pick:
+
+- **Health:** requests, server errors, the slowest 5% of response times, players signed in and battles
+  finished, with the slowest endpoints and the latest errors from the API and from players' browsers.
+- **Players and battles:** boss fights and duels (against players and against the Arena Bot), new heroes,
+  the screens players open and page load times.
+- **Releases:** requests by API version, so each deploy shows as one version taking over from the last.
+- **Azure resources:** API replicas, CPU and memory, and database CPU, including the billed vCore seconds
+  that count against the free SQL offer's 100,000 a month.
+
+The workbook is free. Its source is [`infra/ops-dashboard/workbook.json`](../infra/ops-dashboard/workbook.json),
+and CI checks every query in it; edits made in the portal are replaced the next time a deploy re-applies the Bicep template, so copy them back
+with the workbook's **Advanced Editor**. See [ADR 0033](adr/0033-ops-dashboard.md).
+
 ## Email alerts (optional)
 
 Add a repository variable `ALERT_EMAIL` with your address and run **Deploy to Azure**. The deploy then adds:
 
 - **Server errors:** an email when 5 or more player requests fail with a 5xx status within 15 minutes.
   Application Insights > **Failures** shows which endpoint failed and the exception behind it.
+- **Slow requests:** an email when the slowest 5% of player requests take over 2 seconds within
+  15 minutes (only when there were at least 20). The ops dashboard shows which endpoint and whether the API
+  or the database is at its limit.
+- **Browser errors:** an email when players' browsers report 10 or more errors within 15 minutes, which
+  can happen after a client release while the API is fine.
 - **Crash loop:** an email when the API container restarts 3 or more times within 15 minutes. Check the
   Container App's **Log stream** and **Revisions**.
 
 Each alert emails again when it resolves. Azure sends a confirmation email when you're added to the alert
-group. Together they cost well under $1 a month: about $0.50 for the error check, which runs every
+group. Together they cost under $2 a month: about $0.50 for each of the three query checks, which run every
 15 minutes, and $0.10 for the restart check. Removing the variable stops new deploys from creating them, but existing rules stay until you delete them in the portal under Monitor > Alerts > Alert rules.
 
 ## Troubleshooting

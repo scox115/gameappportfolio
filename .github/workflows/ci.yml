@@ -93,6 +93,12 @@ jobs:
       - name: Build the restore drill's database reader
         run: dotnet build infra/restore-drill/drill-database.cs
 
+      - name: Check the ops dashboard's queries
+        run: dotnet run infra/ops-dashboard/check-workbook.cs -- infra/ops-dashboard/workbook.json
+
+      - name: Build and lint the Bicep template
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+
   # Plays the game in Chromium: the published Blazor client against the real API
   # (in-memory database, no RabbitMQ), started by the tests themselves.
   browser-tests:
