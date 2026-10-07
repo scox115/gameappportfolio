@@ -14,7 +14,10 @@ public enum ProjectionResult
     Duplicate,
 
     /// <summary>An older event without match details; there's nothing to record.</summary>
-    NoDetails
+    NoDetails,
+
+    /// <summary>Every hero in the match has since deleted their account; nothing is kept.</summary>
+    HeroesDeleted
 }
 
 /// <summary>
@@ -29,6 +32,22 @@ public class MatchHistoryProjector(AppDbContext dbContext)
         if (entries.Count == 0)
         {
             return ProjectionResult.NoDetails;
+        }
+
+        // A hero may have deleted their account after the match ended and before this event
+        // arrived: they get no entry, and their opponent's entry doesn't keep their name.
+        var heroIds = entries.Select(e => e.PlayerId).ToList();
+        var remaining = await dbContext.Players.Where(p => heroIds.Contains(p.Id)).Select(p => p.Id).ToListAsync(cancellationToken);
+        foreach (var entry in entries.Where(e => heroIds.Contains(e.OpponentId) && !remaining.Contains(e.OpponentId)))
+        {
+            entry.RetireOpponent();
+        }
+        entries = entries.Where(e => remaining.Contains(e.PlayerId)).ToList();
+        if (entries.Count == 0)
+        {
+            // Nothing is left to record it against, and without an entry a repeat delivery couldn't be
+            // recognised, so the day's stats skip it too. It's one match nobody can see any more.
+            return ProjectionResult.HeroesDeleted;
         }
 
         if (await dbContext.MatchHistory.AnyAsync(e => e.MatchId == match.MatchId, cancellationToken))

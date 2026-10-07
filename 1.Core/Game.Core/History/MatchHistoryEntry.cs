@@ -10,6 +10,9 @@ namespace Game.Core.History;
 /// </summary>
 public class MatchHistoryEntry
 {
+    /// <summary>Shown instead of the name of an opponent who deleted their account.</summary>
+    public const string RetiredHeroName = "A retired hero";
+
     public Guid Id { get; private set; }
     public Guid MatchId { get; private set; }
     public Guid PlayerId { get; private set; }
@@ -32,6 +35,9 @@ public class MatchHistoryEntry
     public DateTime PlayedAt { get; private set; }
 
     private MatchHistoryEntry() { }
+
+    /// <summary>The opponent deleted their account: keep the match, drop their name.</summary>
+    public void RetireOpponent() => OpponentName = RetiredHeroName;
 
     /// <summary>One entry per hero in the match; none for an event without participant details.</summary>
     public static IReadOnlyList<MatchHistoryEntry> From(MatchCompletedEvent match)

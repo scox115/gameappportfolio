@@ -64,6 +64,8 @@ GitHub turns off scheduled workflows in a repository with no activity for 60 day
    ```
 
    The restart matters: open connections still point at the renamed database until the API restarts. Anything players did between the restore point and the swap is lost, so pick the restore point carefully.
+
+   Players who deleted their account after the restore point are back in the restored copy, and they asked for that data to be erased. Find them in Application Insights Logs with `traces | where message startswith "Player " and message endswith "deleted their account." and timestamp > datetime(<restore point>)`, then delete each one again: remove their `Players` and `AspNetUsers` rows and the rows in the other tables that hold their id (see [ADR 0020](adr/0020-account-export-and-deletion.md)).
 5. Delete the copy you no longer need once you're sure.
 
 The restored database is a regular serverless database, not the free offer. It pauses when idle, but it bills for compute while it runs. Check its pricing tier in the portal after a swap.

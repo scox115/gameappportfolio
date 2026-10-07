@@ -134,6 +134,20 @@ public class AccessibilityTests(ArenaFixture arena) : BrowserTest(arena)
     });
 
     // Presses Tab until the target has focus, the way a keyboard user gets around.
+    [Fact]
+    public Task TheAccountDialog_TakesFocusAndClosesWithEscape() => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var page = await CreateHeroAsync(NewHeroName("Keys"));
+
+        await page.GetByRole(AriaRole.Button, new() { Name = "Your account and data" }).ClickAsync();
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Your account" });
+        await Assertions.Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Close" })).ToBeFocusedAsync();
+        await AssertNoViolationsAsync(page, "account dialog");
+
+        await page.Keyboard.PressAsync("Escape");
+        await Assertions.Expect(dialog).ToBeHiddenAsync();
+    });
+
     private static async Task TabToAsync(IPage page, ILocator target, int maxPresses = 60)
     {
         await Assertions.Expect(target).ToBeVisibleAsync();

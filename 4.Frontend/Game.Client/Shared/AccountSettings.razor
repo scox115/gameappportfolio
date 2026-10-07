@@ -1,0 +1,160 @@
+@using System.Net
+@inject HttpClient Http
+@inject GameState State
+@inject IJSRuntime JS
+
+@* "Your account": download everything the game stores about the hero, or delete the hero for good. *@
+<button @onclick="Open"
+        style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer; text-decoration: underline; margin-top: 18px;">
+    ⚙️ Your account and data
+</button>
+
+@if (open)
+{
+    <div role="dialog" aria-modal="true" aria-labelledby="account-title" @onclick="Close" @onkeydown="KeyDown"
+         style="position: fixed; inset: 0; background: rgba(2,6,23,0.75); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;">
+        <div @onclick:stopPropagation="true"
+             style="background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; width: 100%; max-width: 420px; color: #f1f5f9; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 id="account-title" style="margin: 0; font-size: 1.1rem;">⚙️ Your account</h4>
+                <button aria-label="Close" @onclick="Close" @ref="closeButton"
+                        style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;">✕</button>
+            </div>
+
+            <h5 style="margin: 18px 0 6px; font-size: 0.95rem; color: #c7d2fe;">Your data</h5>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 10px;">
+                Download a copy of everything the game stores about @State.Username: your hero, purchases, match history and sign-ins.
+            </p>
+            <button @onclick="DownloadAsync" disabled="@busy"
+                    style="width: 100%; background: #4f46e5; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                @(downloading ? "Preparing your file..." : "⬇️ Download my data")
+            </button>
+
+            <h5 style="margin: 22px 0 6px; font-size: 0.95rem; color: #fca5a5;">Delete your hero</h5>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 10px;">
+                This deletes @State.Username, your gold, upgrades and match history for good, and frees the name for someone else.
+                It can't be undone. Opponents keep their record of your duels, without your name.
+            </p>
+            <label for="delete-password" style="display: block; color: #cbd5e1; font-size: 0.85rem; margin-bottom: 4px;">Your password, to confirm</label>
+            <input id="delete-password" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput"
+                   style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9;" />
+            <button @onclick="DeleteAsync" disabled="@(busy || string.IsNullOrEmpty(password))"
+                    style="width: 100%; background: #b91c1c; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; opacity: @(busy || string.IsNullOrEmpty(password) ? "0.5" : "1");">
+                @(deleting ? "Deleting..." : "Delete my hero forever")
+            </button>
+
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <p role="alert" style="color: #f87171; font-size: 0.85rem; margin: 10px 0 0;">@message</p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Shown on the sign-in screen once the hero is gone.</summary>
+    public const string DeletedMessage = "Your hero was deleted. Thanks for playing!";
+
+    private bool open;
+    private bool focusOnRender;
+    private bool downloading;
+    private bool deleting;
+    private bool busy => downloading || deleting;
+    private string password = string.Empty;
+    private string message = string.Empty;
+    private ElementReference closeButton;
+
+    private void Open()
+    {
+        password = string.Empty;
+        message = string.Empty;
+        open = true;
+        focusOnRender = true; // keyboard and screen-reader users land inside the dialog
+    }
+
+    private void Close()
+    {
+        if (!busy) open = false;
+    }
+
+    private void KeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") Close();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusOnRender)
+        {
+            focusOnRender = false;
+            await closeButton.FocusAsync();
+        }
+    }
+
+    private async Task DownloadAsync()
+    {
+        downloading = true;
+        message = string.Empty;
+        try
+        {
+            using var response = await Http.GetAsync("/api/v1/players/me/export");
+            if (!response.IsSuccessStatusCode)
+            {
+                message = "Your data couldn't be downloaded. Please try again.";
+                return;
+            }
+
+            var disposition = response.Content.Headers.ContentDisposition;
+            var fileName = disposition?.FileNameStar ?? disposition?.FileName?.Trim('"') ?? "card-arena-data.json";
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            await JS.InvokeVoidAsync("gameFiles.save", fileName, "application/json", bytes);
+        }
+        catch (HttpRequestException)
+        {
+            message = "The game server couldn't be reached. Please try again.";
+        }
+        finally
+        {
+            downloading = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        deleting = true;
+        message = string.Empty;
+        try
+        {
+            using var response = await Http.SendAsync(new HttpRequestMessage(HttpMethod.Delete, "/api/v1/players/me")
+            {
+                Content = JsonContent.Create(new { Password = password })
+            });
+
+            if (response.IsSuccessStatusCode)
+            {
+                deleting = false;
+                open = false;
+                // The account and its tokens are already gone on the server; just forget them here.
+                State.SignOut(DeletedMessage);
+                return;
+            }
+
+            message = response.StatusCode switch
+            {
+                HttpStatusCode.BadRequest => "That password isn't right.",
+                HttpStatusCode.Conflict => "Finish or forfeit your duel first, then try again.",
+                HttpStatusCode.Locked => "Too many wrong passwords. Please try again later.",
+                HttpStatusCode.TooManyRequests => "Too many attempts. Please wait a minute and try again.",
+                _ => "Your hero couldn't be deleted. Please try again.",
+            };
+        }
+        catch (HttpRequestException)
+        {
+            message = "The game server couldn't be reached. Please try again.";
+        }
+        finally
+        {
+            deleting = false;
+        }
+    }
+}

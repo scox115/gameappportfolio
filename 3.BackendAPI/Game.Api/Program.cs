@@ -73,7 +73,8 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials() // Essential if you handle secure cookies later
-              .WithExposedHeaders(SessionClaims.EndedHeader); // lets the browser read why it was signed out
+              // Lets the browser read why it was signed out, and the name of a downloaded file.
+              .WithExposedHeaders(SessionClaims.EndedHeader, Microsoft.Net.Http.Headers.HeaderNames.ContentDisposition);
     });
 });
 
@@ -276,6 +277,7 @@ builder.Services.AddSignalR(options => options.AddFilter<ActiveSessionHubFilter>
 builder.Services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
 builder.Services.AddSingleton<PvpMatchmaker>();
 builder.Services.AddScoped<PvpBattleService>();
+builder.Services.AddScoped<Game.Api.Accounts.AccountService>();
 builder.Services.AddScoped<MatchHistoryProjector>();
 builder.Services.AddHostedService<PvpTurnTimeoutWorker>();
 
