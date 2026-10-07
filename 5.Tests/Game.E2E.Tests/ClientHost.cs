@@ -55,7 +55,9 @@ public sealed class ClientHost : IAsyncDisposable
             .Replace("<meta name=\"telemetry-connection-string\" content=\"\" />",
                 $"<meta name=\"telemetry-connection-string\" content=\"{telemetry.ConnectionString}\" />")
             .Replace("<meta name=\"telemetry-api-origin\" content=\"\" />",
-                $"<meta name=\"telemetry-api-origin\" content=\"{new Uri(apiBaseUrl).GetLeftPart(UriPartial.Authority)}\" />");
+                $"<meta name=\"telemetry-api-origin\" content=\"{new Uri(apiBaseUrl).GetLeftPart(UriPartial.Authority)}\" />")
+            .Replace("<meta name=\"api-origin\" content=\"\" />",
+                $"<meta name=\"api-origin\" content=\"{new Uri(apiBaseUrl).GetLeftPart(UriPartial.Authority)}\" />");
         if (!index.Contains(telemetry.ConnectionString))
         {
             throw new InvalidOperationException("index.html has no empty telemetry-connection-string meta tag to fill in.");

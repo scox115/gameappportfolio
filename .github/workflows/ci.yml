@@ -107,6 +107,11 @@ jobs:
       - name: Build
         run: dotnet build 5.Tests/Game.E2E.Tests --configuration Release
 
+      # Lets publishing rebuild the WebAssembly runtime with only what the client uses, which roughly
+      # halves its largest file (docs/adr/0031-faster-first-visit.md).
+      - name: Install the WebAssembly build tools
+        run: dotnet workload install wasm-tools
+
       - name: Publish the client
         run: dotnet publish 4.Frontend/Game.Client --configuration Release --output client-publish
 
