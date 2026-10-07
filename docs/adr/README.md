@@ -23,5 +23,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0017](0017-restore-drills.md) | Monthly restore drills for the game database | Accepted |
 | [0018](0018-status-page.md) | A public status page backed by the API | Accepted |
 | [0019](0019-browser-telemetry.md) | Browser telemetry with the Application Insights JavaScript SDK | Accepted |
+| [0020](0020-account-export-and-deletion.md) | Players can download their data and delete their account | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.

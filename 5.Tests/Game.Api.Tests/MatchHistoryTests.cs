@@ -77,7 +77,9 @@ public class MatchHistoryTests
     public async Task ARepeatedDelivery_IsRecordedOnce()
     {
         using var factory = new GameApiFactory();
-        var duel = Duel(Guid.NewGuid(), "alpha", Guid.NewGuid(), "bravo");
+        var (_, alphaId, alpha) = await SignedInAsync(factory);
+        var (_, bravoId, bravo) = await SignedInAsync(factory);
+        var duel = Duel(alphaId, alpha, bravoId, bravo);
 
         Assert.Equal(ProjectionResult.Recorded, await ProjectAsync(factory, duel));
         Assert.Equal(ProjectionResult.Duplicate, await ProjectAsync(factory, duel));
