@@ -6,7 +6,8 @@ namespace Game.Api.Workers;
 /// <summary>
 /// Ends PvP battles whose active player ran out of time (or left), so their opponent is never
 /// left waiting. Moves made after the deadline are rejected as well, so this only speeds things up.
-/// It also keeps this replica's lobby entries fresh (see <see cref="PvpMatchmaker.HeartbeatAsync"/>).
+/// It plays the Arena Bot's turns too (see <see cref="PvpBattleService.PlayBotTurnsAsync"/>), and
+/// keeps this replica's lobby entries fresh (see <see cref="PvpMatchmaker.HeartbeatAsync"/>).
 /// </summary>
 /// <remarks>
 /// Every replica runs this. Two replicas settling the same battle is harmless: the battle row has a
@@ -31,10 +32,11 @@ public class PvpTurnTimeoutWorker(
                 using var scope = scopeFactory.CreateScope();
                 var battles = scope.ServiceProvider.GetRequiredService<PvpBattleService>();
                 await battles.ExpireOverdueTurnsAsync(stoppingToken);
+                await battles.PlayBotTurnsAsync(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                logger.LogError(ex, "Failed to settle timed-out PvP battles.");
+                logger.LogError(ex, "Failed to settle timed-out PvP battles or play the Arena Bot's turns.");
             }
 
             if (timeProvider.GetUtcNow() < nextHeartbeat) continue;

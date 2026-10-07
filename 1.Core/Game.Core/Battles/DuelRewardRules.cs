@@ -21,6 +21,8 @@ public static class DuelRewardRules
         ArgumentNullException.ThrowIfNull(battle);
         if (!battle.IsFinished) throw new InvalidOperationException("The duel isn't over yet.");
 
+        if (battle.Practice && battle.IsParticipant(ArenaBot.Id))
+            return "Practice duel against the Arena Bot: it doesn't pay rewards or change ratings.";
         if (battle.Practice)
             return "Practice duel: you're on the same network as your opponent, so it doesn't pay rewards or change ratings.";
         if (battle.EndedTooEarly)

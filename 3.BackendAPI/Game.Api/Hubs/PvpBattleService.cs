@@ -118,6 +118,95 @@ public class PvpBattleService(
         return true;
     }
 
+    /// <summary>
+    /// Starts a practice duel against the Arena Bot, for a player who doesn't want to wait for someone
+    /// else. It pays nothing and moves no ratings, so it can't be farmed (see docs/adr/0032-arena-bot.md).
+    /// </summary>
+    public async Task StartBotDuelAsync(Guid playerId)
+    {
+        await matchmaker.LeaveAsync(playerId);
+
+        // Coming back to an unfinished battle resumes it rather than starting another.
+        var existing = await GetActiveBattleAsync(playerId);
+        if (existing is not null)
+        {
+            var (you, opponent) = await LoadPlayersAsync(existing, playerId);
+            await hub.Clients.User(playerId.ToString())
+                .MatchFound(new PvpUpdate(PvpBattleView.For(playerId, existing, you, opponent, Now), null, null));
+            return;
+        }
+
+        var player = await dbContext.Players.FindAsync(playerId)
+            ?? throw new HubException("Player profile not found.");
+        await EnsureArenaBotAsync();
+
+        // The player's Duel Elixir is kept for a duel that counts. The coin flip decides who goes first.
+        var playerLoadout = new BattleLoadout(player.CardLevel(BattleCard.Fireball), player.CardLevel(BattleCard.HolyShield),
+            player.CardLevel(BattleCard.DragonClaw), BonusHp: 0, player.Class);
+        var botLoadout = ArenaBot.LoadoutFor(random);
+        var battle = random.Next(0, 2) == 0
+            ? PvpBattle.Start(playerId, ArenaBot.Id, Now, playerLoadout, botLoadout, practice: true)
+            : PvpBattle.Start(ArenaBot.Id, playerId, Now, botLoadout, playerLoadout, practice: true);
+        dbContext.PvpBattles.Add(battle);
+        await dbContext.SaveChangesAsync();
+
+        await BroadcastAsync(battle, lastTurn: null, rewards: null, (client, update) => client.MatchFound(update));
+    }
+
+    // The bot's hero row, made the first time anyone duels it. It has no sign-in account.
+    private async Task EnsureArenaBotAsync()
+    {
+        if (await dbContext.Players.AnyAsync(p => p.Id == ArenaBot.Id)) return;
+
+        var bot = new Player(ArenaBot.Id, ArenaBot.Name, startingGold: 0);
+        dbContext.Players.Add(bot);
+        try
+        {
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Another request made it at the same moment.
+            dbContext.Entry(bot).State = EntityState.Detached;
+        }
+    }
+
+    /// <summary>
+    /// Plays the Arena Bot's turn in every duel where it has had its <see cref="ArenaBot.ThinkingTime"/>.
+    /// Run every couple of seconds by <see cref="Workers.PvpTurnTimeoutWorker"/> on every replica; the
+    /// battle's concurrency token keeps two replicas from playing the same turn. Returns how many it played.
+    /// </summary>
+    public async Task<int> PlayBotTurnsAsync(CancellationToken cancellationToken = default)
+    {
+        // A turn started TurnTimeLimit before its deadline, so this is "started at least ThinkingTime ago".
+        var dueBy = Now + PvpBattle.TurnTimeLimit - ArenaBot.ThinkingTime;
+        var due = await dbContext.PvpBattles
+            .Where(b => b.Status == PvpBattleStatus.InProgress && b.ActivePlayerId == ArenaBot.Id && b.TurnDeadline <= dueBy)
+            .Select(b => b.Id)
+            .ToListAsync(cancellationToken);
+
+        var played = 0;
+        foreach (var battleId in due)
+        {
+            // Loaded one at a time: a failed save clears the change tracker, which would leave the rest unsaved.
+            var battle = await dbContext.PvpBattles.FirstOrDefaultAsync(b => b.Id == battleId, cancellationToken);
+            if (battle is null || battle.IsFinished || battle.ActivePlayerId != ArenaBot.Id) continue;
+            if (battle.IsTurnExpired(Now)) continue; // ExpireOverdueTurnsAsync settles it
+            var turn = battle.PlayCard(ArenaBot.Id, ArenaBot.ChooseCard(battle, random), random, Now);
+            try
+            {
+                await SaveAndBroadcastAsync(battle, turn);
+                played++;
+            }
+            catch (HubException)
+            {
+                // The player forfeited, or another replica played this turn, at the same moment.
+            }
+        }
+
+        return played;
+    }
+
     // Each player brings their upgraded cards, drinks a Duel Elixir if they have one and pays their
     // stake. A shop purchase saved at the same moment changes the player row, so reload and try again.
     private async Task<PvpBattle> StartDuelAsync(Guid first, Guid second, int wager, bool practice)
@@ -322,6 +411,8 @@ public class PvpBattleService(
 
         foreach (var (viewer, opponent) in new[] { (playerOne, playerTwo), (playerTwo, playerOne) })
         {
+            if (viewer.Id == ArenaBot.Id) continue; // nobody to tell
+
             var update = new PvpUpdate(
                 PvpBattleView.For(viewer.Id, battle, viewer, opponent, Now),
                 lastTurn is null ? null : PvpTurnView.For(viewer.Id, lastTurn, playedBy!.Username),

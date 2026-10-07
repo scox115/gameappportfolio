@@ -95,6 +95,31 @@ public class GameFlowTests(ArenaFixture arena) : BrowserTest(arena)
     });
 
     [Fact]
+    public Task APlayerAlone_CanDuelTheArenaBot() => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var page = await CreateHeroAsync(NewHeroName("Spar"));
+        await page.GetByRole(AriaRole.Button, new() { Name = "FIND AN OPPONENT" }).ClickAsync();
+        await page.Locator("button[aria-label=\"Friendly duel\"]").ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Practice against the Arena Bot" }).ClickAsync();
+
+        await Assertions.Expect(page.GetByText("Practice duel against the Arena Bot")).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByText("Arena Bot").First).ToBeVisibleAsync();
+
+        // The player casts Fireball on each of their turns; the server plays the bot's.
+        var heading = page.GetByRole(AriaRole.Heading, new() { NameRegex = Result });
+        var yourTurn = page.GetByText("Your turn");
+        for (var poll = 0; poll < 300 && !await heading.IsVisibleAsync(); poll++)
+        {
+            if (await yourTurn.IsVisibleAsync()) await TryClickAsync(Fireball(page).Or(heading).First);
+            await page.WaitForTimeoutAsync(200);
+        }
+
+        await Assertions.Expect(heading).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByText("doesn't pay rewards or change ratings")).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Spar Again" })).ToBeVisibleAsync();
+    });
+
+    [Fact]
     public Task SigningInOnAnotherBrowser_SignsTheFirstOneOut() => WithScreenshotsOnFailureAsync(async () =>
     {
         var name = NewHeroName("Solo");

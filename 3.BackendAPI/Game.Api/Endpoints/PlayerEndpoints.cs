@@ -145,7 +145,7 @@ public static class PlayerEndpoints
 
         // GET: /api/players/stats
         group.MapGet("/stats", async (AppDbContext dbContext) =>
-            Results.Ok(new PlayerStatsResponse(await dbContext.Players.CountAsync())))
+            Results.Ok(new PlayerStatsResponse(await dbContext.Players.CountAsync(p => p.Id != ArenaBot.Id))))
             .CacheOutput(OutputCaching.Policies.PlayerCount);
 
         // GET: /api/players/leaderboard[?class=Paladin]
@@ -163,7 +163,8 @@ public static class PlayerEndpoints
 
                 // Top 10 duelists as this class, by wins then fewest losses; rating breaks ties.
                 var classLeaders = await dbContext.Players
-                    .Where(p => p.GuestSince == null) // guests try the game; leaderboards are for heroes people kept
+                    // Guests try the game, and the Arena Bot only spars; leaderboards are for heroes people kept.
+                    .Where(p => p.GuestSince == null && p.Id != ArenaBot.Id)
                     .SelectMany(p => p.ClassRecords
                         .Where(r => r.Class == heroClass && r.Wins + r.Losses > 0)
                         .Select(r => new { Player = p, r.Wins, r.Losses }))
@@ -186,7 +187,7 @@ public static class PlayerEndpoints
 
             // Top 10 by PvP rating; level and experience break ties (such as players who haven't dueled yet)
             var topPlayers = await dbContext.Players
-                .Where(p => p.GuestSince == null)
+                .Where(p => p.GuestSince == null && p.Id != ArenaBot.Id)
                 .OrderByDescending(p => p.Rating)
                 .ThenByDescending(p => p.Level)
                 .ThenByDescending(p => p.ExperiencePoints)

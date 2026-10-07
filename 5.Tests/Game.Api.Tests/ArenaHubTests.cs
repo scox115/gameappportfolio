@@ -220,6 +220,57 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
     }
 
     [Fact]
+    public async Task ThePlayerCanDuelTheArenaBot_WhichPlaysItsOwnTurns_ForNoRewards()
+    {
+        await using var alice = await ConnectAsync();
+        Assert.True(await alice.FindOpponentAsync()); // nobody else around
+        (await alice.Http.PostAsJsonAsync("/api/v1/shop/purchases", new { Item = "DuelElixir" }, Json)).EnsureSuccessStatusCode();
+        var before = (await alice.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json))!;
+
+        await alice.Connection.InvokeAsync(nameof(ArenaHub.DuelBot));
+
+        var battle = (await alice.MatchFound.ReadAsync()).Battle;
+        Assert.True(battle.AgainstBot);
+        Assert.True(battle.Practice);
+        Assert.Equal(ArenaBot.Name, battle.Opponent.Username);
+        Assert.Equal(PvpBattle.BasePlayerMaxHp, battle.You.MaxHp); // the elixir is saved for a duel that counts
+
+        // The bot answers every move on its own; the duel always ends, one way or the other.
+        BattleRewardResponse? reward = null;
+        var botMoves = 0;
+        while (battle.Status != PvpBattleStatus.Finished)
+        {
+            if (battle.YourTurn) await alice.PlayCardAsync(battle.Id, BattleCard.Fireball);
+            var update = await alice.Updates.ReadAsync();
+            if (update.LastTurn is { YourCard: false }) botMoves++;
+            battle = update.Battle;
+            reward = update.Reward ?? reward;
+        }
+
+        Assert.True(botMoves > 0);
+        Assert.Contains("Arena Bot", reward!.NoRewardReason);
+        Assert.Equal((before.Gold, before.Rating, before.PvpWins + before.PvpLosses),
+            (reward.Player.Gold, reward.Player.Rating, reward.Player.PvpWins + reward.Player.PvpLosses));
+    }
+
+    [Fact]
+    public async Task TheArenaBot_IsLeftOffTheLeaderboardAndTheHeroCount()
+    {
+        await using var alice = await ConnectAsync();
+        await alice.Connection.InvokeAsync(nameof(ArenaHub.DuelBot));
+        var battle = (await alice.MatchFound.ReadAsync()).Battle;
+        await alice.ForfeitAsync(battle.Id);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Game.Infrastructure.Data.AppDbContext>();
+        Assert.NotNull(await db.Players.FindAsync(ArenaBot.Id));
+        var leaders = await alice.Http.GetStringAsync("/api/v1/players/leaderboard");
+        Assert.DoesNotContain("Arena Bot", leaders);
+        var stats = JsonDocument.Parse(await alice.Http.GetStringAsync("/api/v1/players/stats")).RootElement;
+        Assert.Equal(db.Players.Count() - 1, stats.GetProperty("registeredPlayers").GetInt32());
+    }
+
+    [Fact]
     public async Task Winning_MovesRatingPointsFromTheLoserToTheWinner()
     {
         var (alice, bob, battleId) = await StartBattleAsync();
