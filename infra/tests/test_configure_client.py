@@ -59,6 +59,13 @@ class ConfigureClientTests(unittest.TestCase):
         self.assertFalse((self.wwwroot / "index.html.br").exists())
         self.assertFalse((self.wwwroot / "index.html.gz").exists())
 
+    def test_the_page_knows_which_api_to_wake(self):
+        client.configure(self.wwwroot, API + "/some/path", AVATARS)
+
+        self.assertIn(f'<meta name="api-origin" content="{API}" />', self.index())
+        self.assertFalse((self.wwwroot / "index.html.br").exists())
+        self.assertFalse((self.wwwroot / "index.html.gz").exists())
+
     def test_without_a_connection_string_telemetry_stays_off(self):
         client.configure(self.wwwroot, API, AVATARS)
 

@@ -2,7 +2,7 @@
 
 A real-time card battler built as if it were a production service: a .NET 10 API and a Blazor WebAssembly client, live in Azure, deployed on every merge, and run for close to nothing. This page is the five-minute tour: what it is, how it's built, the decisions that shaped it and the numbers behind them. Each decision links to its full Architecture Decision Record (ADR).
 
-**▶ [Play it](https://play.scottcoxdev.com)** (one click as a guest) · [Source and setup](../ReadMe.md) · [All 30 ADRs](adr/README.md)
+**▶ [Play it](https://play.scottcoxdev.com)** (one click as a guest) · [Source and setup](../ReadMe.md) · [All 31 ADRs](adr/README.md)
 
 ![Two browsers playing a live duel against each other](images/duel.gif)
 
@@ -71,7 +71,7 @@ flowchart LR
 
 - **Problem:** the game has to stay online indefinitely on a personal budget, using the services a real .NET team would use.
 - **Choice:** Container Apps on the consumption plan with a minimum of zero replicas, the Azure SQL free offer (serverless, auto-pausing), Static Web Apps Free, and RabbitMQ as a sidecar rather than a paid broker. No stored Azure credentials: GitHub signs in with OIDC and the API reaches SQL, Storage and Key Vault as a managed identity.
-- **Trade-off:** the first visit after a quiet spell waits for the API and database to wake. That's stated on the front page rather than hidden. ([ADR 0007](adr/0007-free-tier-azure-hosting.md), [ADR 0008](adr/0008-passwordless-azure-access.md))
+- **Trade-off:** the first visit after a quiet spell waits for the API and database to wake. The page starts waking them the moment it opens, so they start up while the game downloads, and a strip says what's happening. Cutting the download by a quarter, to 2 MB, also helped. ([ADR 0007](adr/0007-free-tier-azure-hosting.md), [ADR 0008](adr/0008-passwordless-azure-access.md), [ADR 0031](adr/0031-faster-first-visit.md))
 
 ### 3. Scaling out without paying for it
 

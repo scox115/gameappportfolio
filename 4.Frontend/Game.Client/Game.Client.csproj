@@ -5,6 +5,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <!-- A smaller first download (docs/adr/0031-faster-first-visit.md): no culture data, so dates and
+         numbers are formatted the same, in English, for everyone. With the wasm-tools workload
+         installed, publishing also rebuilds the runtime without the code that read that data. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>

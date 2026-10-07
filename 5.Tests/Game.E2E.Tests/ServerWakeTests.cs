@@ -1,0 +1,45 @@
+using Microsoft.Playwright;
+
+namespace Game.E2E.Tests;
+
+// The strip that says the game server is waking up (wwwroot/js/wake.js and Layout/ServerWake.razor).
+public class ServerWakeTests(ArenaFixture arena) : BrowserTest(arena)
+{
+    [Fact]
+    public Task ASleepingServer_IsShownWaking_ThenAwake() => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var page = await NewBrowserAsync();
+        // The server answers "not ready" for its first few seconds, as it does while the database resumes.
+        var asleepUntil = DateTime.UtcNow.AddSeconds(5);
+        await page.RouteAsync("**/health/ready", route => DateTime.UtcNow < asleepUntil
+            ? route.FulfillAsync(new() { Status = 503, Body = "{\"status\":\"Unhealthy\"}" })
+            : route.ContinueAsync());
+
+        await page.GotoAsync(Arena.ClientUrl);
+
+        var strip = page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Waking the game server" });
+        await Assertions.Expect(strip).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Status).Filter(new() { HasText = "The game server is awake." }))
+            .ToBeVisibleAsync(new() { Timeout = 15_000 });
+        await Assertions.Expect(page.Locator(".server-wake")).ToHaveCountAsync(0, new() { Timeout = 10_000 });
+    });
+
+    [Fact]
+    public Task AnAwakeServer_ShowsNothing() => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var page = await NewBrowserAsync();
+        var checks = 0;
+        await page.RouteAsync("**/health/ready", route =>
+        {
+            checks++;
+            return route.ContinueAsync();
+        });
+
+        await page.GotoAsync(Arena.ClientUrl);
+        await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Play as a guest" })).ToBeVisibleAsync();
+        await page.WaitForTimeoutAsync(3000);
+
+        await Assertions.Expect(page.Locator(".server-wake")).ToHaveCountAsync(0);
+        Assert.Equal(1, checks); // asked once, and awake
+    });
+}

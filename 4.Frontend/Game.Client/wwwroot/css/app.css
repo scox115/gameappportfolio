@@ -235,3 +235,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, [tabindex]:focus-vis
 
 /* Staging and pull request previews: a strip across the top (Layout/EnvironmentBanner.razor) */
 .environment-banner { background: #fbbf24; color: #1c1917; text-align: center; font-size: 0.85rem; padding: 6px 12px; }
+.server-wake { background: #1e3a8a; color: #e0e7ff; text-align: center; font-size: 0.85rem; padding: 8px 12px; }
+.server-wake.awake { background: #065f46; color: #d1fae5; }
+.server-wake.unreachable { background: #7f1d1d; color: #fee2e2; }
+.server-wake a, .server-wake button { color: inherit; font: inherit; text-decoration: underline; background: none; border: none; padding: 0; cursor: pointer; }

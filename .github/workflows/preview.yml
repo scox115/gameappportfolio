@@ -53,6 +53,11 @@ jobs:
         env:
           RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
 
+      # Lets publishing rebuild the WebAssembly runtime with only what the client uses, which roughly
+      # halves its largest file (docs/adr/0031-faster-first-visit.md).
+      - name: Install the WebAssembly build tools
+        run: dotnet workload install wasm-tools
+
       - name: Build the client against staging's API
         run: |
           python3 infra/configure-client.py settings 4.Frontend/Game.Client/wwwroot "${{ steps.infra.outputs.api }}" "Preview of pull request #$PR"

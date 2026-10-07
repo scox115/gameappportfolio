@@ -10,7 +10,9 @@ only known at deploy time, so they are placeholders:
   __IMPORTMAP_HASH__                   the hash of the inline <script type="importmap"> that
                                        dotnet publish writes into index.html (it changes per build)
 
-With an Application Insights connection string, it also goes into index.html's
+It writes the API's origin into index.html's api-origin meta tag, so the page can start waking the
+API while the game downloads (wwwroot/js/wake.js). With an Application Insights connection string, it
+also goes into index.html's
 telemetry-connection-string meta tag, with the API's origin next to it, which turns on browser
 telemetry (wwwroot/js/telemetry.js). The connection string only lets a browser send telemetry, the
 same as every site using the Application Insights JavaScript SDK.
@@ -92,13 +94,15 @@ def configure(wwwroot: Path, api_url: str, avatar_url: str, connection_string: s
     config["globalHeaders"]["Content-Security-Policy"] = policy
     config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
 
+    # The API to wake while the game loads (wwwroot/js/wake.js).
+    index = set_meta(index, "api-origin", api)
     if connection_string:
         index = set_meta(index, "telemetry-connection-string", connection_string)
         index = set_meta(index, "telemetry-api-origin", api)
-        index_path.write_text(index, encoding="utf-8")
-        # dotnet publish also writes compressed copies; drop them so nothing serves the old page.
-        for stale in (wwwroot / "index.html.br", wwwroot / "index.html.gz"):
-            stale.unlink(missing_ok=True)
+    index_path.write_text(index, encoding="utf-8")
+    # dotnet publish also writes compressed copies; drop them so nothing serves the old page.
+    for stale in (wwwroot / "index.html.br", wwwroot / "index.html.gz"):
+        stale.unlink(missing_ok=True)
     return policy
 
 

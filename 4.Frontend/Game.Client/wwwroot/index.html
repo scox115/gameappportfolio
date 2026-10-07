@@ -9,6 +9,8 @@
     <!-- Filled in by the deploy (infra/set-client-csp.py); empty means no browser telemetry. -->
     <meta name="telemetry-connection-string" content="" />
     <meta name="telemetry-api-origin" content="" />
+    <!-- The API's origin, filled in by the deploy too, so js/wake.js can wake it while the game loads. -->
+    <meta name="api-origin" content="" />
     <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
@@ -31,6 +33,7 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
+    <script src="js/wake.js"></script>
     <script src="lib/applicationinsights/ai.3.4.5.gbl.min.js"></script>
     <script src="js/telemetry.js"></script>
     <script src="js/idle.js"></script>

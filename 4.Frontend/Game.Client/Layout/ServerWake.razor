@@ -1,0 +1,86 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* While wwwroot/js/wake.js wakes the game server, say so, so a slow first visit doesn't look broken.
+   Nothing shows when the server answers within a couple of seconds. *@
+@if (shown)
+{
+    <div class="server-wake @(status)" role="status">
+        @switch (status)
+        {
+            case "waking":
+                <span>⏳ <b>Waking the game server</b> (@seconds s). It sleeps when nobody is playing, so the first visit can take a minute. You can look around meanwhile.</span>
+                break;
+            case "awake":
+                <span>✅ The game server is awake.</span>
+                break;
+            default:
+                <span>The game server isn't answering. <a href="status">Check its status</a> or <button type="button" @onclick="RetryAsync">try again</button>.</span>
+                break;
+        }
+    </div>
+}
+
+@code {
+    // Shown once the server has taken this long, so a quick answer never flashes a message.
+    private const int ShowAfterSeconds = 2;
+
+    private readonly CancellationTokenSource stop = new();
+    private string status = "waking";
+    private int seconds;
+    private bool shown;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) _ = WatchAsync();
+    }
+
+    private async Task WatchAsync()
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            do
+            {
+                var state = await JS.InvokeAsync<WakeState>("gameServer.state", stop.Token);
+                var wasShown = shown;
+                status = state.Status;
+                seconds = state.Seconds;
+                shown = shown || (status != "awake" && seconds >= ShowAfterSeconds);
+                if (shown) StateHasChanged();
+
+                if (status == "unreachable") return; // until the player asks to try again
+                if (status == "awake")
+                {
+                    if (wasShown)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(4), stop.Token);
+                        shown = false;
+                        StateHasChanged();
+                    }
+                    return;
+                }
+            } while (await timer.WaitForNextTickAsync(stop.Token));
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or JSException or JSDisconnectedException)
+        {
+            // The page is closing, or wake.js isn't on it: nothing to show.
+        }
+    }
+
+    private async Task RetryAsync()
+    {
+        await JS.InvokeVoidAsync("gameServer.retry");
+        status = "waking";
+        _ = WatchAsync();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        stop.Cancel();
+        stop.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    private sealed record WakeState(string Status, int Seconds);
+}
