@@ -542,3 +542,6 @@ output staticWebAppName string = client.name
 output apiContainerAppName string = api.name
 output sqlServer string = sqlServer.properties.fullyQualifiedDomainName
 output storageAccount string = storage.name
+// Browser telemetry (wwwroot/js/telemetry.js). Not a secret: a connection string only lets a browser
+// send telemetry, and every page using the Application Insights JavaScript SDK carries one.
+output appInsightsConnectionString string = appInsights.properties.ConnectionString
