@@ -18,6 +18,7 @@ using Game.Api.Versioning;
 using Game.Api.Caching;
 using Game.Api.Features;
 using Game.Api.Security;
+using Game.Api.Operations;
 using Microsoft.AspNetCore.SignalR;
 using Game.Api.Messaging;
 using Game.Core.Battles;
@@ -294,6 +295,10 @@ builder.Services.AddOptions<CleanupOptions>()
 builder.Services.AddScoped<DataCleanupService>();
 builder.Services.AddHostedService<DataCleanupWorker>();
 
+// The public status page: what is running, and a release log written when each revision goes live.
+builder.Services.AddSingleton<BuildInfo>();
+builder.Services.AddSingleton<ReleaseRecorder>();
+
 // Security headers on every response, and HSTS outside Development.
 builder.Services.AddGameSecurityHeaders();
 builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false); // don't advertise the server
@@ -331,6 +336,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 app.UseOutputCache();
+app.UseReleaseRecording();
 
 // --- MAP MINIMAL ENDPOINTS HERE ---
 app.MapGameApi(); // /api/v1/..., plus the deprecated unversioned /api/... aliases

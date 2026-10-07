@@ -5,6 +5,7 @@
 import datetime as dt
 import importlib.util
 import io
+import subprocess
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -14,6 +15,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "restore-drill" / "restore_drill.
 spec = importlib.util.spec_from_file_location("restore_drill", SCRIPT)
 drill = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(drill)
+REAL_RECORD_RESULT = drill.record_result  # the tests below stub it out
 
 NOW = dt.datetime(2026, 10, 7, 12, 30, 45, tzinfo=dt.timezone.utc)
 SERVER = "sql-cardarena-abc.database.windows.net"
@@ -55,11 +57,14 @@ class RestoreDrillTests(unittest.TestCase):
     def setUp(self):
         self.azure = FakeAzure()
         self.databases = {"GameDb": database(), "GameDb-drill-202610071230": database()}
+        self.recorded = []
         patches = [
             mock.patch.object(drill, "az", self.azure),
             mock.patch.object(drill, "now", lambda: NOW),
             mock.patch.object(drill, "public_ip", lambda: "20.1.2.3"),
             mock.patch.object(drill, "inspect_database", lambda fqdn, name, token: self.databases[name]),
+            mock.patch.object(drill, "record_result", lambda fqdn, name, token, passed, detail:
+                              self.recorded.append((name, passed, detail))),
         ]
         for patch in patches:
             patch.start()
@@ -142,6 +147,40 @@ class RestoreDrillTests(unittest.TestCase):
 
         commands = [" ".join(call[:3]) for call in self.azure.calls]
         self.assertLess(commands.index("account get-access-token --resource"), commands.index("sql db restore"))
+
+    def test_a_passing_drill_is_recorded_on_the_live_database_for_the_status_page(self):
+        self.run_drill()
+
+        [(name, passed, detail)] = self.recorded
+        self.assertEqual(name, "GameDb")
+        self.assertTrue(passed)
+        self.assertRegex(detail, r"^Restored in \d+\.\d minutes; all 2 tables checked")
+
+    def test_a_failing_drill_is_recorded_as_failed(self):
+        self.databases["GameDb-drill-202610071230"] = database(migrations=())
+
+        self.run_drill()
+
+        [(_, passed, detail)] = self.recorded
+        self.assertFalse(passed)
+        self.assertIn("no migration history", detail)
+
+    def test_a_failed_restore_is_recorded_without_error_details(self):
+        # The status page is public; the az error stays in the workflow log.
+        self.azure.fail_restore = True
+
+        self.run_drill()
+
+        [(_, passed, detail)] = self.recorded
+        self.assertFalse(passed)
+        self.assertNotIn("Conflict", detail)
+
+    def test_recording_the_result_never_fails_the_drill(self):
+        failure = subprocess.CompletedProcess([], 1, stdout="", stderr="Invalid object name 'OperationsEvents'.")
+        with mock.patch.object(drill, "database_app", return_value=failure), redirect_stderr(io.StringIO()) as errors:
+            REAL_RECORD_RESULT(SERVER, "GameDb", "token", True, "Restored")
+
+        self.assertIn("::warning::Couldn't record the result", errors.getvalue())
 
     def test_a_restore_point_older_than_the_backups_fails_before_touching_anything(self):
         self.azure.earliest = "2026-10-07T12:25:00Z"

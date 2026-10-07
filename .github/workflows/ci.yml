@@ -74,7 +74,7 @@ jobs:
         run: python3 -m unittest discover --start-directory infra/tests --verbose
 
       - name: Build the restore drill's database reader
-        run: dotnet build infra/restore-drill/inspect-database.cs
+        run: dotnet build infra/restore-drill/drill-database.cs
 
   # Plays the game in Chromium: the published Blazor client against the real API
   # (in-memory database, no RabbitMQ), started by the tests themselves.

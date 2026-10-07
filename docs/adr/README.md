@@ -21,5 +21,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0015](0015-security-headers.md) | A strict Content Security Policy and security headers on every response | Accepted |
 | [0016](0016-blue-green-deploys.md) | Blue-green releases with Container Apps revisions | Accepted |
 | [0017](0017-restore-drills.md) | Monthly restore drills for the game database | Accepted |
+| [0018](0018-status-page.md) | A public status page backed by the API | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.

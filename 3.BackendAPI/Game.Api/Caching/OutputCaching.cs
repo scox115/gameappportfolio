@@ -22,6 +22,7 @@ public static class OutputCaching
         public const string PlayerCount = "player-count";
         public const string ArenaStats = "arena-stats";
         public const string Classes = "classes";
+        public const string Status = "status";
     }
 
     public static class Tags
@@ -58,6 +59,11 @@ public static class OutputCaching
             options.AddPolicy(Policies.Classes, policy => policy
                 .AddPolicy<SameForEveryonePolicy>()
                 .Expire(TimeSpan.FromHours(1)), excludeDefaultPolicy: true);
+
+            // The status page: at most two health checks a minute however many people are watching.
+            options.AddPolicy(Policies.Status, policy => policy
+                .AddPolicy<SameForEveryonePolicy>()
+                .Expire(TimeSpan.FromSeconds(30)), excludeDefaultPolicy: true);
         });
 
         if (configuration.GetConnectionString("Redis") is { Length: > 0 } redis)

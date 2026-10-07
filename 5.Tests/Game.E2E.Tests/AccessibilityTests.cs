@@ -145,6 +145,15 @@ public class AccessibilityTests(ArenaFixture arena) : BrowserTest(arena)
         Assert.Fail($"Couldn't reach {target} with the Tab key in {maxPresses} presses.");
     }
 
+    [Fact]
+    public Task TheStatusPage_HasNoViolations() => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var page = await NewBrowserAsync();
+        await page.GotoAsync($"{Arena.ClientUrl}/status");
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Services" })).ToBeVisibleAsync();
+        await AssertNoViolationsAsync(page, "status");
+    });
+
     private static async Task AssertNoViolationsAsync(IPage page, string screen)
     {
         // Let fades and number count-ups finish, or axe measures half-drawn colours.

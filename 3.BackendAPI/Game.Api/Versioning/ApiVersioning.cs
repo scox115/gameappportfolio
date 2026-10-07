@@ -1,3 +1,4 @@
+using Game.Api.Operations;
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using Game.Api.Endpoints;
@@ -94,6 +95,7 @@ public static class ApiVersioning
         group.MapBountyEndpoints();
         group.MapHistoryEndpoints();
         group.MapFeatureEndpoints();
+        group.MapStatusEndpoints();
         return group;
     }
 

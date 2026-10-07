@@ -77,7 +77,7 @@ You need an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/
 - **Database changes must work with the previous release.** The new revision applies EF Core migrations when it starts, while players are still on the old one, and a rollback runs old code against the new schema. Add columns and tables in one release and remove the old ones in a later release (expand, then contract), never in the same one.
 - **Backups and recovery:** Azure keeps 7 days of point-in-time database backups, and deleted portraits and secrets stay recoverable for 7 days. The **Restore drill** workflow restores the database into a temporary copy on the 1st of every month to prove it works. [disaster-recovery.md](disaster-recovery.md) has the runbooks.
 - **Logs and traces:** in the Azure portal, open the Application Insights resource and use Transaction search or Logs. Container logs are under the Container App's **Log stream**.
-- **Health:** open `https://<api>/health/ready`.
+- **Health:** the game's public status page at `/status` shows each service, the running build, the last five releases and the last restore drill. The raw checks are at `https://<api>/health/ready`. A release is logged the first time a revision serves the app's public address, so a build that fails its blue-green smoke test never appears.
 - **Query the production database from SSMS:**
   1. Allow your IP address: `az sql server firewall-rule create -g rg-card-arena -s <sql-server-name> -n my-pc --start-ip-address <your-ip> --end-ip-address <your-ip>`.
   2. Connect to `<sql-server-name>.database.windows.net` with **Microsoft Entra MFA** authentication as yourself. You are in the admin group.
