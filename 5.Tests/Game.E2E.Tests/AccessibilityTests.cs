@@ -163,6 +163,8 @@ public class AccessibilityTests(ArenaFixture arena) : BrowserTest(arena)
         var page = await CreateHeroAsync(ApiHost.AdminNames[1]);
 
         await page.GetByRole(AriaRole.Link, new() { Name = "Admin tools" }).ClickAsync();
+        await page.GetByPlaceholder("Part of a hero's name").FillAsync(player); // the list shows the first 50 only
+        await page.GetByRole(AriaRole.Button, new() { Name = "Search" }).ClickAsync();
         await page.GetByRole(AriaRole.Button, new() { Name = player }).ClickAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = player })).ToBeVisibleAsync();
         await AssertNoViolationsAsync(page, "admin tools");
@@ -201,7 +203,7 @@ public class AccessibilityTests(ArenaFixture arena) : BrowserTest(arena)
         await AssertNoViolationsAsync(page, "status");
     });
 
-    private static async Task AssertNoViolationsAsync(IPage page, string screen)
+    internal static async Task AssertNoViolationsAsync(IPage page, string screen)
     {
         // Let fades and number count-ups finish, or axe measures half-drawn colours.
         await page.WaitForTimeoutAsync(500);

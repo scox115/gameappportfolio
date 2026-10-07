@@ -15,7 +15,8 @@ public record AdminPlayerSummary(
 public record AdminPlayerDetail(
     Guid Id, string Username, HeroClass Class, int Level, int ExperiencePoints, int Gold, int Rating,
     int PvpWins, int PvpLosses, bool IsAdmin, SuspensionResponse? Suspension, DateTimeOffset? LockedOutUntil,
-    List<AuditEntryResponse> History, string? AvatarUrl = null, List<OpenReportCount>? OpenReports = null);
+    List<AuditEntryResponse> History, string? AvatarUrl = null, List<OpenReportCount>? OpenReports = null,
+    bool TwoFactorEnabled = false);
 
 /// <summary>How many players are waiting for an answer about one thing on a hero.</summary>
 public record OpenReportCount(ReportReason Reason, int Reports);
@@ -47,6 +48,8 @@ public record GoldCorrectionRequest(int Change, string Reason);
 public record RenameRequest(string NewName, string Reason);
 
 public record RemovePortraitRequest(string Reason);
+
+public record TurnOffTwoFactorForPlayerRequest(string Reason);
 
 /// <param name="Kind">Which reports to close: those about the name or those about the portrait.</param>
 public record DismissReportsRequest(ReportReason Kind, string Reason);

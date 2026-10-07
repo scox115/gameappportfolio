@@ -47,4 +47,12 @@ public class ApplicationUser : IdentityUser<Guid>
 
     /// <summary>Records the old name before an admin renames the hero.</summary>
     public void RememberPreviousName() => PreviousNormalizedUserName = NormalizedUserName;
+
+    /// <summary>
+    /// The 30-second step of the last authenticator code accepted, so the same code (or an older one)
+    /// can't be used a second time, even by someone who watched it being typed.
+    /// </summary>
+    public long? LastTwoFactorStep { get; private set; }
+
+    public void UsedTwoFactorStep(long step) => LastTwoFactorStep = step;
 }

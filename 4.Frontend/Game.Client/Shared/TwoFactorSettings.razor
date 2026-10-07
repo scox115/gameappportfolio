@@ -1,0 +1,192 @@
+@using System.Net
+@using System.Text
+@using QRCoder
+@inject HttpClient Http
+
+@* "Two-factor sign-in" in the account dialog: set up an authenticator app, keep recovery codes, or turn it off. *@
+<h5 style="margin: 22px 0 6px; font-size: 0.95rem; color: #c7d2fe;">Two-factor sign-in</h5>
+@if (status is null)
+{
+    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0;">Loading…</p>
+}
+else if (newCodes is not null)
+{
+    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 8px;">
+        Save these recovery codes somewhere safe, such as a password manager. Each one signs you in once if you lose
+        your phone. This is the only time they're shown.
+    </p>
+    <ol aria-label="Recovery codes" class="two-factor-codes">
+        @foreach (var recoveryCode in newCodes)
+        {
+            <li>@recoveryCode</li>
+        }
+    </ol>
+    <button @onclick="() => newCodes = null" class="two-factor-primary">I've saved them</button>
+}
+else if (setup is not null)
+{
+    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 8px;">
+        Scan this with an authenticator app such as Google Authenticator, Microsoft Authenticator or 1Password,
+        then type the 6-digit code it shows.
+    </p>
+    <svg role="img" aria-label="QR code for your authenticator app" viewBox="0 0 @qrSize @qrSize" class="two-factor-qr" shape-rendering="crispEdges">
+        <rect width="100%" height="100%" fill="#ffffff" />
+        <path d="@qrPath" fill="#000000" />
+    </svg>
+    <p style="color: #94a3b8; font-size: 0.8rem; margin: 6px 0 10px;">
+        Can't scan it? Enter this key: <code class="two-factor-key">@setup.sharedKey</code>
+    </p>
+    <label for="two-factor-code" class="two-factor-label">6-digit code from the app</label>
+    <input id="two-factor-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" @bind="enteredCode" @bind:event="oninput" class="two-factor-input" />
+    <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <button @onclick="EnableAsync" disabled="@(busy || string.IsNullOrWhiteSpace(enteredCode))" class="two-factor-primary" style="flex: 1;">Turn on</button>
+        <button @onclick="CancelSetup" class="two-factor-secondary">Cancel</button>
+    </div>
+}
+else if (!status.enabled)
+{
+    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 10px;">
+        Add a second step to signing in: a code from an app on your phone, so your password alone isn't enough.
+    </p>
+    <label for="two-factor-password" class="two-factor-label">Your password, to start</label>
+    <input id="two-factor-password" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput" class="two-factor-input" />
+    <button @onclick="BeginSetupAsync" disabled="@(busy || string.IsNullOrEmpty(password))" class="two-factor-primary" style="width: 100%; margin-top: 10px;">
+        Set up two-factor sign-in
+    </button>
+}
+else
+{
+    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 10px;">
+        <b style="color: #86efac;">On.</b> Signing in asks for a code from your app.
+        You have @status.recoveryCodesLeft recovery @(status.recoveryCodesLeft == 1 ? "code" : "codes") left.
+    </p>
+    <label for="two-factor-code" class="two-factor-label">Code from your app, or a recovery code</label>
+    <input id="two-factor-code" autocomplete="one-time-code" @bind="enteredCode" @bind:event="oninput" class="two-factor-input" />
+    <label for="two-factor-password" class="two-factor-label" style="margin-top: 8px;">Your password (to turn it off)</label>
+    <input id="two-factor-password" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput" class="two-factor-input" />
+    <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <button @onclick="NewCodesAsync" disabled="@(busy || string.IsNullOrWhiteSpace(enteredCode))" class="two-factor-primary" style="flex: 1;">New recovery codes</button>
+        <button @onclick="TurnOffAsync" disabled="@(busy || string.IsNullOrWhiteSpace(enteredCode) || string.IsNullOrEmpty(password))" class="two-factor-secondary">Turn off</button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(message))
+{
+    <p role="@(failed ? "alert" : "status")" style="color: @(failed ? "#f87171" : "#86efac"); font-size: 0.85rem; margin: 8px 0 0;">@message</p>
+}
+
+@code {
+    private const string Base = "/api/v1/players/me/two-factor";
+
+    private Status? status;
+    private Setup? setup;
+    private List<string>? newCodes;
+    private string qrPath = string.Empty;
+    private int qrSize;
+    private string password = string.Empty;
+    private string enteredCode = string.Empty;
+    private bool busy;
+    private bool failed;
+    private string message = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            status = await Http.GetFromJsonAsync<Status>(Base);
+        }
+        catch (HttpRequestException)
+        {
+            (failed, message) = (true, "Your two-factor settings couldn't be loaded.");
+        }
+    }
+
+    private Task BeginSetupAsync() => SendAsync("/authenticator", new { Password = password }, async response =>
+    {
+        setup = (await response.Content.ReadFromJsonAsync<Setup>())!;
+        DrawQrCode(setup.authenticatorUri);
+        message = string.Empty;
+    });
+
+    private Task EnableAsync() => SendAsync("/enable", new { Code = enteredCode }, async response =>
+    {
+        newCodes = (await response.Content.ReadFromJsonAsync<Codes>())!.codes;
+        status = new Status(true, newCodes.Count);
+        setup = null;
+        (failed, message) = (false, "Two-factor sign-in is on.");
+    });
+
+    private Task NewCodesAsync() => SendAsync("/recovery-codes", new { Code = enteredCode }, async response =>
+    {
+        newCodes = (await response.Content.ReadFromJsonAsync<Codes>())!.codes;
+        status = status! with { recoveryCodesLeft = newCodes.Count };
+        (failed, message) = (false, "Your old recovery codes no longer work.");
+    });
+
+    private Task TurnOffAsync() => SendAsync("/disable", new { Password = password, Code = enteredCode }, _ =>
+    {
+        status = new Status(false, 0);
+        (failed, message) = (false, "Two-factor sign-in is off. Your password alone signs you in.");
+        return Task.CompletedTask;
+    });
+
+    private void CancelSetup()
+    {
+        setup = null;
+        enteredCode = string.Empty;
+        message = string.Empty;
+    }
+
+    private async Task SendAsync(string path, object body, Func<HttpResponseMessage, Task> onSuccess)
+    {
+        busy = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(Base + path, body);
+            if (response.IsSuccessStatusCode)
+            {
+                password = enteredCode = string.Empty;
+                await onSuccess(response);
+            }
+            else
+            {
+                (failed, message) = (true, response.StatusCode switch
+                {
+                    HttpStatusCode.Locked => "Too many wrong attempts. Please try again later.",
+                    HttpStatusCode.TooManyRequests => "Too many attempts. Please wait a minute and try again.",
+                    _ => await ProblemText.ReadAsync(response) ?? "That didn't work. Please try again.",
+                });
+            }
+        }
+        catch (HttpRequestException)
+        {
+            (failed, message) = (true, "The game server couldn't be reached. Please try again.");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    // Drawn here as one SVG path rather than an image, so nothing about the secret leaves the browser
+    // and the page's Content Security Policy needs no change.
+    private void DrawQrCode(string text)
+    {
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(text, QRCodeGenerator.ECCLevel.M);
+        var rows = data.ModuleMatrix;
+        qrSize = rows.Count;
+        var path = new StringBuilder();
+        for (var y = 0; y < rows.Count; y++)
+        {
+            for (var x = 0; x < rows[y].Length; x++)
+            {
+                if (rows[y][x]) path.Append($"M{x} {y}h1v1h-1z");
+            }
+        }
+        qrPath = path.ToString();
+    }
+
+    private sealed record Status(bool enabled, int recoveryCodesLeft);
+    private sealed record Setup(string sharedKey, string authenticatorUri);
+    private sealed record Codes(List<string> codes);
+}

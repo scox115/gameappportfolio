@@ -91,6 +91,7 @@ public static class ApiVersioning
         group.MapAccountEndpoints();
         group.MapAdminEndpoints();
         group.MapRecoveryEndpoints();
+        group.MapTwoFactorEndpoints();
         group.MapReportEndpoints();
         group.MapBattleEndpoints();
         group.MapPvpEndpoints();
