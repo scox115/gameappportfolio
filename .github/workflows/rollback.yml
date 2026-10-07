@@ -6,6 +6,11 @@ name: Roll back the API
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: Which copy of the game
+        type: choice
+        options: [production, staging]
+        default: production
       revision:
         description: Revision to return to (leave empty for the one the last deploy replaced)
         type: string
@@ -16,14 +21,14 @@ permissions:
   id-token: write   # sign in to Azure with OIDC
 
 concurrency:
-  group: deploy-production   # never at the same time as a deploy
+  group: deploy-${{ inputs.environment }}   # never at the same time as a deploy
   cancel-in-progress: false
 
 jobs:
   rollback:
     if: vars.AZURE_CLIENT_ID != ''
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v7
 
@@ -41,7 +46,7 @@ jobs:
           from=$(bash infra/blue-green.sh live "$RESOURCE_GROUP" "$app")
           to=$(bash infra/blue-green.sh rollback "$RESOURCE_GROUP" "$app" "$REVISION")
           {
-            echo "### ↩️ API rolled back"
+            echo "### ↩️ API rolled back in ${{ inputs.environment }}"
             echo ""
             echo "- From: $from"
             echo "- To: $to"

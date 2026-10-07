@@ -232,3 +232,6 @@ button:focus-visible, input:focus-visible, a:focus-visible, [tabindex]:focus-vis
 .two-factor-qr { display: block; width: 180px; height: 180px; margin: 0 auto; border-radius: 6px; }
 .two-factor-key { color: #e2e8f0; background: #0f172a; padding: 2px 6px; border-radius: 4px; word-break: break-all; }
 .two-factor-codes { columns: 2; margin: 0 0 10px; padding-left: 1.6em; color: #e2e8f0; font-family: ui-monospace, Consolas, monospace; font-size: 0.9rem; line-height: 1.7; }
+
+/* Staging and pull request previews: a strip across the top (Layout/EnvironmentBanner.razor) */
+.environment-banner { background: #fbbf24; color: #1c1917; text-align: center; font-size: 0.85rem; padding: 6px 12px; }

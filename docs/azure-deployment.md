@@ -25,7 +25,7 @@ Every merge to `main` that passes CI is deployed to Azure by [`.github/workflows
 | Log Analytics + Application Insights | Pay as you go, capped at 0.15 GB a day | $0 within the 5 GB monthly free allowance |
 | App Configuration (optional, for feature flags) | Free: one store per subscription, 1,000 requests a day | $0 |
 
-These are estimates. Set a [budget alert](https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-acm-create-budgets) on the resource group (for example $5) so you hear about any surprise. You can claim only one free SQL database per subscription.
+These are estimates. Set a [budget alert](https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-acm-create-budgets) on the resource group (for example $5) so you hear about any surprise. The free SQL offer covers up to 10 databases per subscription, all in one region, so production and staging fit.
 
 **Trade-offs of staying free:** after about five idle minutes the API scales to zero and the database pauses after an hour. The next visitor waits up to a couple of minutes while both start. There is only ever one API replica, because the PvP lobby lives in memory.
 
@@ -83,6 +83,28 @@ You need an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/
   1. Allow your IP address: `az sql server firewall-rule create -g rg-card-arena -s <sql-server-name> -n my-pc --start-ip-address <your-ip> --end-ip-address <your-ip>`.
   2. Connect to `<sql-server-name>.database.windows.net` with **Microsoft Entra MFA** authentication as yourself. You are in the admin group.
 - **Tear it all down:** `az group delete --name rg-card-arena`. The Entra group and deploy app stay; delete them in Entra ID if you're done for good.
+
+## Staging and pull request previews (optional)
+
+A second copy of the game that every commit reaches before production, and a preview site for each pull request. See [ADR 0026](adr/0026-staging-and-previews.md).
+
+1. Run the setup script again for staging (same subscription):
+
+   ```powershell
+   .\infra\setup.ps1 -SubscriptionId <subscription id> -Environment staging
+   ```
+
+   It creates `rg-card-arena-staging` and the identity `id-card-arena-api-staging`, lets the GitHub `staging` environment sign in as the deploy app, saves staging's own resource group, identity, JWT key and RabbitMQ password on that environment, and sets the repository variable `STAGING_ENABLED` to `true`.
+2. Run **Deploy to Azure** (or merge anything). The run now has two jobs: **staging**, then **production**, which starts only if staging succeeded and reuses the image staging tested. The first staging deploy takes about 10 minutes.
+3. Optional: to approve each production release by hand, go to **Settings > Environments > production** and add yourself under **Required reviewers**. Don't add reviewers to `staging`, or every pull request preview would wait for approval too.
+
+How it works day to day:
+
+- **Staging's address** is in the staging job's summary and on the `staging` environment in GitHub. Every page shows a yellow strip saying it's a test copy. Its heroes are separate from production's; sign up there to try a build. Admins come from `ADMIN_USERNAMES` unless you set a different value on the staging environment.
+- **Previews:** each pull request to `main` gets the client built from its branch at its own address, posted as a comment on the pull request and updated on every push. It calls staging's API, so API changes in the pull request show up only after they're merged and reach staging. Closing the pull request deletes the preview. The Free plan holds three at a time.
+- **Urgent fix while staging is broken:** run **Deploy to Azure** with **Go straight to production** ticked.
+- **Roll back staging:** run **Roll back the API** and choose `staging`.
+- **Turn staging off:** delete the `STAGING_ENABLED` variable (deploys go straight to production again), then `az group delete --name rg-card-arena-staging`.
 
 ## Custom domain (optional)
 

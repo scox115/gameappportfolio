@@ -1,0 +1,15 @@
+@inject IConfiguration Configuration
+
+@* A strip across the top of staging and pull request previews, so nobody mistakes them for the real game. *@
+@if (!string.IsNullOrWhiteSpace(label))
+{
+    <div class="environment-banner" role="note">
+        <b>@label</b> · a test copy of the game with its own heroes, which can be wiped at any time.
+    </div>
+}
+
+@code {
+    private string? label;
+
+    protected override void OnInitialized() => label = Configuration["EnvironmentLabel"];
+}
