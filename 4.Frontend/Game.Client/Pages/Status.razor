@@ -1,0 +1,213 @@
+@page "/status"
+@inject HttpClient Http
+
+<PageTitle>System status · Kings of the Card Arena</PageTitle>
+
+<div class="status-shell">
+<div class="status-page">
+    <header class="status-header">
+        <a href="" class="status-home">⚔️ Kings of the Card Arena</a>
+        <h1>System status</h1>
+    </header>
+
+    @if (loading && status is null)
+    {
+        <section class="status-banner status-checking" role="status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <div>
+                <strong>Checking the game server…</strong>
+                <p>It sleeps when nobody is playing, so the first check after a quiet spell can take up to a minute.</p>
+            </div>
+        </section>
+    }
+    else if (status is null)
+    {
+        <section class="status-banner status-unhealthy" role="status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <div>
+                <strong>Can't reach the game server</strong>
+                <p>It may still be waking up. Try again in a minute.</p>
+            </div>
+        </section>
+    }
+    else
+    {
+        <section class="status-banner @BannerClass(status.Status)" role="status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <div>
+                <strong>@Headline(status.Status)</strong>
+                <p>Checked @When(status.CheckedAt). The page shows results up to 30 seconds old.</p>
+            </div>
+        </section>
+
+        <section aria-labelledby="services-heading">
+            <h2 id="services-heading">Services</h2>
+            <ul class="status-list">
+                @foreach (var check in status.Checks.OrderBy(c => Order(c.Name)))
+                {
+                    <li>
+                        <span class="status-pill @PillClass(check.Status)">@Label(check.Status)</span>
+                        <div>
+                            <strong>@FriendlyName(check.Name)</strong>
+                            <span class="status-muted">@Purpose(check.Name)</span>
+                            @if (check.Status != "Healthy" && !string.IsNullOrEmpty(check.Description))
+                            {
+                                <span class="status-note">@check.Description</span>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        </section>
+
+        <section aria-labelledby="running-heading">
+            <h2 id="running-heading">What's running</h2>
+            <dl class="status-facts">
+                <dt>Game server</dt>
+                <dd>v@(status.Version)@if (status.Commit is not null){<span class="status-muted"> · commit @Short(status.Commit)</span>}</dd>
+                <dt>Game client</dt>
+                <dd>@AppVersion.Number<span class="status-muted"> · commit @AppVersion.Commit</span></dd>
+                @if (status.Revision is not null)
+                {
+                    <dt>Server revision</dt>
+                    <dd>@status.Revision</dd>
+                }
+                <dt>Awake since</dt>
+                <dd>@When(status.AwakeSince)</dd>
+            </dl>
+        </section>
+
+        <section aria-labelledby="releases-heading">
+            <h2 id="releases-heading">Recent releases</h2>
+            @if (status.Releases.Count == 0)
+            {
+                <p class="status-muted">No releases recorded yet.</p>
+            }
+            else
+            {
+                <p class="status-muted">Each release is tested on its own before players move to it, and the previous one stays ready for a one-click rollback.</p>
+                <ol class="status-list">
+                    @foreach (var release in status.Releases)
+                    {
+                        <li>
+                            <span class="status-pill status-pill-info">v@(release.Version)</span>
+                            <div>
+                                <strong>@When(release.At)</strong>
+                                @if (release.Commit is not null)
+                                {
+                                    <span class="status-muted">commit @Short(release.Commit)</span>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ol>
+            }
+        </section>
+
+        <section aria-labelledby="backups-heading">
+            <h2 id="backups-heading">Backups</h2>
+            <p class="status-muted">Every month the live database is restored from its backups into a temporary copy, which is checked against the real one.</p>
+            @if (status.LastRestoreDrill is { } drill)
+            {
+                <ul class="status-list">
+                    <li>
+                        <span class="status-pill @(drill.Succeeded ? "status-pill-healthy" : "status-pill-unhealthy")">@(drill.Succeeded ? "Passed" : "Failed")</span>
+                        <div>
+                            <strong>Last restore drill: @When(drill.At)</strong>
+                            @if (!string.IsNullOrEmpty(drill.Detail))
+                            {
+                                <span class="status-muted">@drill.Detail</span>
+                            }
+                        </div>
+                    </li>
+                </ul>
+            }
+            else
+            {
+                <p class="status-muted">No restore drill recorded yet.</p>
+            }
+        </section>
+    }
+
+    <p class="status-actions">
+        <button type="button" class="status-refresh" @onclick="LoadAsync" disabled="@loading">@(loading ? "Checking…" : "Check again")</button>
+        <a href="">Back to the game</a>
+    </p>
+</div>
+</div>
+
+@code {
+    private SystemStatus? status;
+    private bool loading;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    // No automatic refresh: every check wakes the database, which would otherwise never pause
+    // (and use up the free tier) while someone leaves this tab open.
+    private async Task LoadAsync()
+    {
+        loading = true;
+        try
+        {
+            status = await Http.GetFromJsonAsync<SystemStatus>("/api/v1/status");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            status = null;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private static string Headline(string overall) => overall switch
+    {
+        "Healthy" => "All systems operational",
+        "Degraded" => "The game is up, with some features limited",
+        _ => "The game is down"
+    };
+
+    private static string BannerClass(string overall) => overall switch
+    {
+        "Healthy" => "status-healthy",
+        "Degraded" => "status-degraded",
+        _ => "status-unhealthy"
+    };
+
+    private static string PillClass(string check) => check switch
+    {
+        "Healthy" => "status-pill-healthy",
+        "Degraded" => "status-pill-degraded",
+        _ => "status-pill-unhealthy"
+    };
+
+    private static string Label(string check) => check switch
+    {
+        "Healthy" => "Operational",
+        "Degraded" => "Degraded",
+        _ => "Down"
+    };
+
+    private static int Order(string name) => name switch { "database" => 0, "blob-storage" => 1, _ => 2 };
+
+    private static string FriendlyName(string name) => name switch
+    {
+        "database" => "Game database",
+        "blob-storage" => "Portrait storage",
+        "message-broker" => "Match history pipeline",
+        _ => name
+    };
+
+    private static string Purpose(string name) => name switch
+    {
+        "database" => "Heroes, gold, battles and duels. Nothing works without it.",
+        "blob-storage" => "Hero portraits. Only uploads stop if it's down.",
+        "message-broker" => "Recent matches and arena stats. Battles still count if it's down.",
+        _ => ""
+    };
+
+    private static string Short(string commit) => commit[..Math.Min(7, commit.Length)];
+
+    private static string When(DateTimeOffset at) => at.ToLocalTime().ToString("MMM d, yyyy 'at' HH:mm");
+}

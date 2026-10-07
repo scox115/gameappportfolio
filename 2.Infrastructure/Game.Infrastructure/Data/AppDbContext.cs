@@ -1,6 +1,7 @@
 using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Core.History;
+using Game.Core.Operations;
 using Game.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -23,6 +24,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<MatchHistoryEntry> MatchHistory => Set<MatchHistoryEntry>();
     public DbSet<DailyArenaStats> DailyArenaStats => Set<DailyArenaStats>();
+    public DbSet<OperationsEvent> OperationsEvents => Set<OperationsEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

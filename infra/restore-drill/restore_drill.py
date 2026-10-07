@@ -9,7 +9,8 @@ restore took, and then deletes the copy. Players are not affected: the live data
     restore_drill.py --resource-group rg-card-arena [--minutes-ago 10] [--keep]
 
 It needs the Azure CLI signed in as an admin of the SQL server (the deploy app, see
-docs/disaster-recovery.md) and the .NET SDK, which runs inspect-database.cs next to this file.
+docs/disaster-recovery.md) and the .NET SDK, which runs drill-database.cs next to this file. The result
+is also written to the live database, where the public status page shows it.
 See docs/adr/0017-restore-drills.md.
 """
 import argparse
@@ -22,7 +23,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-INSPECT = Path(__file__).with_name("inspect-database.cs")
+DATABASE_APP = Path(__file__).with_name("drill-database.cs")
 SQL_RESOURCE = "https://database.windows.net/"
 
 
@@ -44,14 +45,25 @@ def public_ip():
         return response.read().decode().strip()
 
 
+def database_app(token, *args):
+    """Runs drill-database.cs, signed in to SQL with the token."""
+    return subprocess.run(["dotnet", "run", str(DATABASE_APP), "--", *args],
+                          capture_output=True, text=True, env={**os.environ, "SQL_ACCESS_TOKEN": token})
+
+
 def inspect_database(server_fqdn, database, token):
-    """Migrations and per-table row counts of one database, read by inspect-database.cs."""
-    result = subprocess.run(
-        ["dotnet", "run", str(INSPECT), "--", server_fqdn, database],
-        capture_output=True, text=True, env={**os.environ, "SQL_ACCESS_TOKEN": token})
+    """Migrations and per-table row counts of one database."""
+    result = database_app(token, "inspect", server_fqdn, database)
     if result.returncode != 0:
         raise RuntimeError(f"Couldn't read {database}: {result.stderr.strip() or result.stdout.strip()}")
     return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def record_result(server_fqdn, database, token, passed, detail):
+    """Adds the drill's result to the live database, for the public status page. Never fails the drill."""
+    result = database_app(token, "record", server_fqdn, database, "passed" if passed else "failed", detail)
+    if result.returncode != 0:
+        log(f"::warning::Couldn't record the result for the status page: {result.stderr.strip() or result.stdout.strip()}")
 
 
 def now():
@@ -134,20 +146,28 @@ def run(group, database, minutes_ago, keep, server=None):
         token = az("account", "get-access-token", "--resource", SQL_RESOURCE, "--query", "accessToken")
         live = inspect_database(fqdn, database, token)
 
-        log(f"Restoring {database} as of {restore_point:%Y-%m-%d %H:%M} UTC into {drill}...")
-        clock = time.monotonic()
-        # The copy is a small serverless database that pauses itself, so a forgotten one costs next to nothing.
-        restore_started = True
-        az("sql", "db", "restore", "--resource-group", group, "--server", server_name, "--name", database,
-           "--dest-name", drill, "--time", f"{restore_point:%Y-%m-%dT%H:%M:%S}",
-           "--edition", "GeneralPurpose", "--family", "Gen5", "--capacity", "1",
-           "--compute-model", "Serverless", "--min-capacity", "0.5", "--auto-pause-delay", "60",
-           "--backup-storage-redundancy", "Local")
-        seconds = time.monotonic() - clock
-        log(f"Restored in {seconds / 60:.1f} minutes. Comparing it with the live database...")
-
-        restored = inspect_database(fqdn, drill, token)
+        try:
+            log(f"Restoring {database} as of {restore_point:%Y-%m-%d %H:%M} UTC into {drill}...")
+            clock = time.monotonic()
+            # The copy is a small serverless database that pauses itself, so a forgotten one costs next to nothing.
+            restore_started = True
+            az("sql", "db", "restore", "--resource-group", group, "--server", server_name, "--name", database,
+               "--dest-name", drill, "--time", f"{restore_point:%Y-%m-%dT%H:%M:%S}",
+               "--edition", "GeneralPurpose", "--family", "Gen5", "--capacity", "1",
+               "--compute-model", "Serverless", "--min-capacity", "0.5", "--auto-pause-delay", "60",
+               "--backup-storage-redundancy", "Local")
+            seconds = time.monotonic() - clock
+            log(f"Restored in {seconds / 60:.1f} minutes. Comparing it with the live database...")
+            restored = inspect_database(fqdn, drill, token)
+        except RuntimeError:
+            # Shown on the public status page, so no error details; those are in the workflow log.
+            record_result(fqdn, database, token, False, "The restore or the check of the copy failed.")
+            raise
         problems = compare(live, restored)
+        minutes = f"Restored in {seconds / 60:.1f} minutes"
+        record_result(fqdn, database, token, not problems,
+                      f"{minutes}; all {len(restored['tables'])} tables checked against the live database." if not problems
+                      else f"{minutes}, but the copy didn't match: {' '.join(problems)}")
         return problems, summary(server_name, database, drill, restore_point, seconds, live, restored, problems)
     finally:
         if restore_started and not keep:

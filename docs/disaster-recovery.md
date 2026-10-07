@@ -23,8 +23,9 @@ A backup nobody has restored is only a hope. On the 1st of every month, the **Re
 1. Lets only the runner's own IP address through the SQL firewall, for the length of the drill.
 2. Signs in to the database and reads the live one first, so a sign-in or firewall problem shows up before the long wait. (In GitHub Actions the Azure CLI's sign-in can only fetch new tokens for 5 minutes, so the database token has to be fetched up front.)
 3. Restores `GameDb` as it was 10 minutes ago into a new database, `GameDb-drill-<time>`, and times the restore.
-4. Reads the copy with `infra/restore-drill/inspect-database.cs` and compares the two databases' migrations and row counts. The drill fails if the copy has no migration history, is missing tables, or is empty while the live database has data. Small differences in row counts are expected, because players kept playing after the restore point.
-5. Deletes the copy and the firewall rule, even if a step failed.
+4. Reads the copy with `infra/restore-drill/drill-database.cs` and compares the two databases' migrations and row counts. The drill fails if the copy has no migration history, is missing tables, or is empty while the live database has data. Small differences in row counts are expected, because players kept playing after the restore point.
+5. Records the result in the live database, where the public [status page](https://play.scottcoxdev.com/status) shows it (without error details).
+6. Deletes the copy and the firewall rule, even if a step failed.
 
 The run summary shows the restore time and a table of live and restored row counts. GitHub emails you when a scheduled run fails. Players are not affected, because the live database is only read. The copy is a small serverless database that exists for a few minutes once restored, so a drill costs a few cents.
 

@@ -1,0 +1,184 @@
+/* The same dark backdrop as the game screen. */
+.status-shell {
+    background: #0f172a;
+    min-height: 100vh;
+}
+
+.status-page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+    color: #f8fafc;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.status-header {
+    border-bottom: 2px solid #334155;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+}
+
+.status-home {
+    color: #a5b4fc;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.status-home:hover,
+.status-home:focus-visible {
+    text-decoration: underline;
+}
+
+/* Blazor moves focus to the heading after navigation, for screen readers; no ring is needed there. */
+h1:focus {
+    outline: none;
+}
+
+h1 {
+    margin: 8px 0 0;
+    font-size: 1.8rem;
+    font-weight: 800;
+}
+
+h2 {
+    margin: 32px 0 8px;
+    font-size: 1.15rem;
+    color: #e2e8f0;
+}
+
+.status-banner {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-left-width: 6px;
+    border-radius: 12px;
+    padding: 16px 18px;
+}
+
+.status-banner strong {
+    font-size: 1.15rem;
+}
+
+.status-banner p {
+    margin: 4px 0 0;
+    color: #cbd5e1;
+}
+
+.status-dot {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.status-healthy { border-left-color: #4ade80; color: #4ade80; }
+.status-degraded { border-left-color: #fbbf24; color: #fbbf24; }
+.status-unhealthy { border-left-color: #f87171; color: #f87171; }
+.status-checking { border-left-color: #94a3b8; color: #94a3b8; }
+
+.status-banner strong { color: #f8fafc; }
+
+.status-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.status-list li {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+
+.status-list li div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.status-pill {
+    flex: none;
+    min-width: 96px;
+    text-align: center;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.status-pill-healthy { background: #4ade80; }
+.status-pill-degraded { background: #fbbf24; }
+.status-pill-unhealthy { background: #f87171; }
+.status-pill-info { background: #a5b4fc; }
+
+.status-muted {
+    color: #cbd5e1;
+    font-size: 0.92rem;
+}
+
+.status-note {
+    color: #fde68a;
+    font-size: 0.92rem;
+}
+
+.status-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 18px;
+    margin: 0;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 14px;
+}
+
+.status-facts dt { color: #cbd5e1; }
+.status-facts dd { margin: 0; overflow-wrap: anywhere; }
+
+.status-actions {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    margin-top: 32px;
+}
+
+.status-actions a { color: #a5b4fc; }
+
+.status-refresh {
+    background: #4f46e5;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.status-refresh:disabled {
+    background: #475569;
+    cursor: wait;
+}
+
+.status-refresh:focus-visible,
+.status-actions a:focus-visible {
+    outline: 3px solid #a5b4fc;
+    outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+    .status-list li { flex-direction: column; gap: 8px; }
+    .status-facts { grid-template-columns: 1fr; }
+    .status-facts dd { margin-bottom: 6px; }
+}
