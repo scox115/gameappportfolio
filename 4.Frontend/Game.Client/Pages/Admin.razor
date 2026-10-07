@@ -5,7 +5,8 @@
 
 <PageTitle>Admin tools · Kings of the Card Arena</PageTitle>
 
-@* Admin tools: find a player, suspend or reinstate them, correct their gold, and read the audit log.
+@* Admin tools: work through players' reports, find a player, rename them or take down their portrait,
+   suspend or reinstate them, correct their gold, and read the audit log.
    The API enforces the Admin role; this page only hides itself from everyone else. *@
 <div class="admin-shell">
 <div class="admin-page">
@@ -20,6 +21,38 @@
     }
     else
     {
+        <section aria-labelledby="reports-title">
+            <h2 id="reports-title">Reports</h2>
+            <p class="admin-muted">Names and portraits players reported, most reported first. Pick a hero to rename them, take the portrait down, or dismiss the reports.</p>
+            @if (reports.Count == 0)
+            {
+                <p class="admin-muted">Nothing is waiting.</p>
+            }
+            else
+            {
+                <ul class="admin-reports">
+                    @foreach (var r in reports)
+                    {
+                        <li class="@(selected?.id == r.targetId ? "admin-selected" : null)">
+                            @if (r.avatarUrl is { } portrait)
+                            {
+                                <img src="@portrait" alt="@($"{r.targetName}'s reported portrait")" class="admin-portrait" />
+                            }
+                            <div>
+                                <button class="admin-link" @onclick="() => SelectAsync(r.targetId)">@r.targetName</button>
+                                <span class="admin-muted">· @(r.reason == "Portrait" ? "portrait" : "name") ·
+                                    @r.reports report@(r.reports == 1 ? "" : "s") · last @AdminFormat.When(r.lastReportedAt)</span>
+                                @foreach (var note in r.notes)
+                                {
+                                    <div class="admin-note">“@note”</div>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
         <section aria-labelledby="find-title">
             <h2 id="find-title">Find a player</h2>
             <form class="admin-row" @onsubmit="SearchAsync">
@@ -71,6 +104,14 @@
                     @if (selected.lockedOutUntil is { } locked) { <span> · locked out after failed sign-ins until @AdminFormat.When(locked)</span> }
                 </p>
 
+                <div class="admin-row">
+                    <img src="@Avatars.For(selected.avatarUrl, selected.username)" alt="@(selected.avatarUrl is null ? "" : $"{selected.username}'s portrait")" class="admin-portrait" />
+                    @if (OpenReports.Count > 0)
+                    {
+                        <p class="admin-warning" style="margin: 0;">Waiting for an answer: @string.Join(" and ", OpenReports.Select(r => $"{r.reports} {(r.reason == "Portrait" ? "portrait" : "name")} report{(r.reports == 1 ? "" : "s")}")).</p>
+                    }
+                </div>
+
                 @if (selected.suspension is { } s)
                 {
                     <p class="admin-warning">Suspended @(s.until is { } until ? $"until {AdminFormat.When(until)}" : "until reinstated"). Reason: @s.reason</p>
@@ -96,6 +137,41 @@
                             @(selected.suspension is null ? "Suspend" : "Reinstate")
                         </button>
                     </form>
+
+                    <form @onsubmit="RenameAsync">
+                        <h3>Rename</h3>
+                        <label for="rename-name">New name (they can still sign in with the old one)</label>
+                        <input id="rename-name" type="text" maxlength="50" @bind="newName" @bind:event="oninput" />
+                        <label for="rename-reason">Reason for the rename</label>
+                        <textarea id="rename-reason" rows="2" maxlength="500" @bind="renameReason" @bind:event="oninput"></textarea>
+                        <button type="submit" class="admin-button" disabled="@(busy || string.IsNullOrWhiteSpace(newName) || string.IsNullOrWhiteSpace(renameReason))">Rename</button>
+                    </form>
+
+                    <form @onsubmit="RemovePortraitAsync">
+                        <h3>Remove portrait</h3>
+                        <label for="portrait-reason">Reason for removing it</label>
+                        <textarea id="portrait-reason" rows="2" maxlength="500" @bind="portraitReason" @bind:event="oninput"></textarea>
+                        <button type="submit" class="admin-button admin-danger" disabled="@(busy || selected.avatarUrl is null || string.IsNullOrWhiteSpace(portraitReason))">
+                            @(selected.avatarUrl is null ? "No portrait" : "Remove portrait")
+                        </button>
+                    </form>
+
+                    @if (OpenReports.Count > 0)
+                    {
+                        <form @onsubmit="DismissAsync">
+                            <h3>Dismiss reports</h3>
+                            <label for="dismiss-kind">Which reports</label>
+                            <select id="dismiss-kind" @bind="dismissKind">
+                                @foreach (var r in OpenReports)
+                                {
+                                    <option value="@r.reason">@(r.reason == "Portrait" ? "Portrait" : "Name") (@r.reports)</option>
+                                }
+                            </select>
+                            <label for="dismiss-reason">Why it's fine</label>
+                            <textarea id="dismiss-reason" rows="2" maxlength="500" @bind="dismissReason" @bind:event="oninput"></textarea>
+                            <button type="submit" class="admin-button admin-quiet" disabled="@(busy || string.IsNullOrWhiteSpace(dismissReason))">Dismiss</button>
+                        </form>
+                    }
 
                     <form @onsubmit="CorrectGoldAsync">
                         <h3>Correct gold</h3>
@@ -147,12 +223,20 @@
     private List<AdminPlayerDto>? players;
     private AdminPlayerDetailDto? selected;
     private List<AuditEntryDto> audit = [];
+    private List<ReportQueueDto> reports = [];
     private bool moreAudit;
 
     private int suspendDays = 7;
     private string suspendReason = string.Empty;
     private int goldChange;
     private string goldReason = string.Empty;
+    private string newName = string.Empty;
+    private string renameReason = string.Empty;
+    private string portraitReason = string.Empty;
+    private string dismissKind = "Name";
+    private string dismissReason = string.Empty;
+
+    private List<OpenReportDto> OpenReports => selected?.openReports ?? [];
 
     private bool busy;
     private bool failed;
@@ -162,6 +246,7 @@
     {
         if (!State.IsAdmin) return;
         await LoadAuditAsync();
+        await LoadReportsAsync();
         await SearchAsync();
     }
 
@@ -173,10 +258,15 @@
     private async Task SelectAsync(Guid id)
     {
         message = string.Empty;
-        suspendReason = string.Empty;
-        goldReason = string.Empty;
-        goldChange = 0;
+        ClearForms();
         selected = await Http.GetFromJsonAsync<AdminPlayerDetailDto>($"/api/v1/admin/players/{id}");
+        dismissKind = OpenReports.FirstOrDefault()?.reason ?? "Name";
+    }
+
+    private void ClearForms()
+    {
+        suspendReason = goldReason = renameReason = portraitReason = dismissReason = newName = string.Empty;
+        goldChange = 0;
     }
 
     private Task SuspendOrReinstateAsync() => selected!.suspension is null
@@ -185,6 +275,15 @@
 
     private Task CorrectGoldAsync() =>
         ChangeAsync("gold", new { Change = goldChange, Reason = goldReason }, $"{selected!.username}'s gold was corrected by {goldChange:+#,0;-#,0}.");
+
+    private Task RenameAsync() =>
+        ChangeAsync("rename", new { NewName = newName.Trim(), Reason = renameReason }, $"{selected!.username} is now called {newName.Trim()}.");
+
+    private Task RemovePortraitAsync() =>
+        ChangeAsync("remove-portrait", new { Reason = portraitReason }, $"{selected!.username}'s portrait was taken down.");
+
+    private Task DismissAsync() =>
+        ChangeAsync("dismiss-reports", new { Kind = dismissKind, Reason = dismissReason }, $"The {dismissKind.ToLowerInvariant()} reports about {selected!.username} were dismissed.");
 
     private async Task ChangeAsync(string action, object body, string done)
     {
@@ -197,9 +296,10 @@
             {
                 selected = await response.Content.ReadFromJsonAsync<AdminPlayerDetailDto>();
                 (failed, message) = (false, done);
-                suspendReason = goldReason = string.Empty;
-                goldChange = 0;
+                ClearForms();
+                dismissKind = OpenReports.FirstOrDefault()?.reason ?? "Name";
                 await LoadAuditAsync();
+                await LoadReportsAsync();
                 await SearchAsync();
             }
             else
@@ -222,6 +322,11 @@
     {
         audit = await Http.GetFromJsonAsync<List<AuditEntryDto>>($"/api/v1/admin/audit?take={AuditPage}") ?? [];
         moreAudit = audit.Count == AuditPage;
+    }
+
+    private async Task LoadReportsAsync()
+    {
+        reports = await Http.GetFromJsonAsync<List<ReportQueueDto>>("/api/v1/admin/reports") ?? [];
     }
 
     private async Task LoadOlderAuditAsync()
@@ -250,6 +355,10 @@
     private record AdminPlayerDto(Guid id, string username, string @class, int level, int gold, int rating, bool isAdmin, SuspensionDto? suspension);
     private record AdminPlayerDetailDto(
         Guid id, string username, string @class, int level, int experiencePoints, int gold, int rating, int pvpWins, int pvpLosses,
-        bool isAdmin, SuspensionDto? suspension, DateTimeOffset? lockedOutUntil, List<AuditEntryDto> history);
+        bool isAdmin, SuspensionDto? suspension, DateTimeOffset? lockedOutUntil, List<AuditEntryDto> history,
+        string? avatarUrl, List<OpenReportDto>? openReports);
+    private record OpenReportDto(string reason, int reports);
+    private record ReportQueueDto(Guid targetId, string targetName, string? avatarUrl, string reason, int reports,
+        DateTime firstReportedAt, DateTime lastReportedAt, List<string> notes);
     private record ProblemDto(string? detail);
 }

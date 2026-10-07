@@ -33,7 +33,8 @@ public record AdminChange(AdminChangeStatus Status, string? Message = null, Admi
 }
 
 /// <summary>
-/// What admins can do: find players, suspend and reinstate them, and correct their gold. Every
+/// What admins can do: find players, suspend and reinstate them, and correct their gold (names,
+/// portraits and reports are in <see cref="Moderation.ModerationService"/>). Every
 /// change is written to the audit log in the same save as the change itself, so one never
 /// happens without the other. See docs/adr/0021-admin-roles-and-audit-log.md.
 /// </summary>
@@ -168,15 +169,15 @@ public class AdminService(
         return Done(await DetailAsync(player, user, cancellationToken));
     }
 
-    private async Task<(Player? Player, ApplicationUser? User)> LoadAsync(Guid playerId, CancellationToken cancellationToken) =>
+    internal async Task<(Player? Player, ApplicationUser? User)> LoadAsync(Guid playerId, CancellationToken cancellationToken) =>
         (await dbContext.Players.FindAsync([playerId], cancellationToken),
          await dbContext.Users.FirstOrDefaultAsync(u => u.Id == playerId, cancellationToken));
 
-    private void Record(AdminActor actor, AdminAction action, Player target, string reason, string? detail = null) =>
+    internal void Record(AdminActor actor, AdminAction action, Player target, string reason, string? detail = null) =>
         dbContext.AuditLog.Add(new AuditLogEntry(
             Now.UtcDateTime, action, actor.Id, actor.Name, target.Id, target.Username, reason, detail));
 
-    private async Task<AdminPlayerDetail> DetailAsync(Player p, ApplicationUser user, CancellationToken cancellationToken)
+    internal async Task<AdminPlayerDetail> DetailAsync(Player p, ApplicationUser user, CancellationToken cancellationToken)
     {
         var history = await dbContext.AuditLog.AsNoTracking()
             .Where(e => e.TargetId == p.Id)
@@ -184,11 +185,17 @@ public class AdminService(
             .Take(MaxResults)
             .ToListAsync(cancellationToken);
 
+        var openReports = await dbContext.PlayerReports.AsNoTracking()
+            .Where(r => r.TargetId == p.Id && r.ResolvedAt == null)
+            .GroupBy(r => r.Reason)
+            .Select(g => new OpenReportCount(g.Key, g.Count()))
+            .ToListAsync(cancellationToken);
+
         var lockedOut = user.LockoutEnd is { } end && end > Now ? end : (DateTimeOffset?)null;
         return new AdminPlayerDetail(
             p.Id, p.Username, p.Class, p.Level, p.ExperiencePoints, p.Gold, p.Rating, p.PvpWins, p.PvpLosses,
             await IsAdminAsync(p.Id, cancellationToken), SuspensionOf(user), lockedOut,
-            history.Select(AuditEntryResponse.From).ToList());
+            history.Select(AuditEntryResponse.From).ToList(), p.AvatarUrl, openReports.OrderBy(r => r.Reason).ToList());
     }
 
     private SuspensionResponse? SuspensionOf(ApplicationUser user) =>
@@ -196,7 +203,7 @@ public class AdminService(
             ? new SuspensionResponse(user.SuspendedUntil == DateTimeOffset.MaxValue ? null : user.SuspendedUntil, user.SuspensionReason ?? string.Empty)
             : null;
 
-    private async Task<bool> IsAdminAsync(Guid playerId, CancellationToken cancellationToken) =>
+    internal async Task<bool> IsAdminAsync(Guid playerId, CancellationToken cancellationToken) =>
         (await AdminIdsAsync([playerId], cancellationToken)).Count > 0;
 
     private async Task<HashSet<Guid>> AdminIdsAsync(List<Guid> playerIds, CancellationToken cancellationToken)
@@ -209,7 +216,7 @@ public class AdminService(
         return ids.ToHashSet();
     }
 
-    private static bool TryReason(string? given, out string reason, out AdminChange problem)
+    internal static bool TryReason(string? given, out string reason, out AdminChange problem)
     {
         try
         {
@@ -225,7 +232,7 @@ public class AdminService(
         }
     }
 
-    private static AdminChange Done(AdminPlayerDetail player) => new(AdminChangeStatus.Done, Player: player);
+    internal static AdminChange Done(AdminPlayerDetail player) => new(AdminChangeStatus.Done, Player: player);
 
     /// <summary>A time players and admins can read, such as "14 Oct 2026 03:30 UTC".</summary>
     public static string Describe(DateTimeOffset at) =>

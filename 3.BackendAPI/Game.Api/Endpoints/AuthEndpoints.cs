@@ -2,11 +2,15 @@ using Game.Api.Admin;
 using Game.Api.Auth;
 using Game.Api.Hubs;
 using Game.Api.Models;
+using Game.Api.Moderation;
+using Game.Api.Options;
 using Game.Core.Entities;
+using Game.Core.Moderation;
 using Game.Infrastructure.Data;
 using Game.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Game.Api.Endpoints;
 
@@ -27,14 +31,16 @@ public static class AuthEndpoints
             TokenService tokenService,
             RefreshTokenService refreshTokens,
             SessionNotifier notifier,
-            AdminRoleSync roleSync) =>
+            AdminRoleSync roleSync,
+            ModerationService moderation,
+            IOptions<AdminOptions> adminOptions) =>
         {
             var username = request.Username?.Trim() ?? string.Empty;
-            if (username.Length is < 3 or > 50)
+            if (HeroNames.Problem(username, allowStaffNames: adminOptions.Value.IsAdmin(username)) is { } nameProblem)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
-                    [nameof(RegisterRequest.Username)] = ["Username must be between 3 and 50 characters."]
+                    [nameof(RegisterRequest.Username)] = [nameProblem]
                 });
             }
 
@@ -46,7 +52,9 @@ public static class AuthEndpoints
                 });
             }
 
-            if (await dbContext.Players.AnyAsync(p => p.Username == username))
+            // A name an admin took away stays reserved for the hero who had it (they can still sign in with it).
+            if (await dbContext.Players.AnyAsync(p => p.Username == username)
+                || await moderation.NameTakenAsync(userManager.NormalizeName(username), except: null))
             {
                 return Results.Conflict(new { message = $"The username '{username}' is already taken." });
             }
@@ -85,6 +93,13 @@ public static class AuthEndpoints
             var user = string.IsNullOrWhiteSpace(request.Username)
                 ? null
                 : await userManager.FindByNameAsync(request.Username.Trim());
+
+            // A hero an admin renamed can still sign in with their old name; the response carries the new one.
+            if (user is null && !string.IsNullOrWhiteSpace(request.Username))
+            {
+                var previous = userManager.NormalizeName(request.Username.Trim());
+                user = await dbContext.Users.FirstOrDefaultAsync(u => u.PreviousNormalizedUserName == previous);
+            }
 
             // Same response for an unknown user and a wrong password, so usernames can't be probed.
             if (user is null)

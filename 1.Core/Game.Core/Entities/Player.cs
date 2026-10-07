@@ -136,6 +136,16 @@ public class Player
         AvatarUrl = url;
     }
 
+    /// <summary>Takes the portrait away, as when an admin removes an offensive one.</summary>
+    public void RemoveAvatar() => AvatarUrl = null;
+
+    /// <summary>Gives the hero a new name, as when an admin replaces an offensive one.</summary>
+    public void Rename(string username)
+    {
+        if (string.IsNullOrWhiteSpace(username)) throw new ArgumentException("A hero needs a name.", nameof(username));
+        Username = username;
+    }
+
     public void AddGold(int amount)
     {
         if (amount < 0) throw new ArgumentException("Cannot add negative gold.");

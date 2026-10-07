@@ -2,6 +2,7 @@ using Game.Api.Options;
 using Game.Api.Workers;
 using Game.Core.Admin;
 using Game.Core.Battles;
+using Game.Core.Moderation;
 using Game.Infrastructure.Data;
 using Game.Infrastructure.Identity;
 using Microsoft.Data.Sqlite;
@@ -79,6 +80,27 @@ public sealed class DataCleanupTests : IDisposable
         Assert.Equal(1, result.ExpiredEmailLinks);
         await using var db = NewContext();
         Assert.Equal([recent.Id], await db.AccountTokens.Select(t => t.Id).ToListAsync());
+    }
+
+    [Fact]
+    public async Task Reports_AreDeletedLongAfterAnAdminClosedThem_ButOpenOnesStay()
+    {
+        PlayerReport Report(int daysAgo, int? closedDaysAgo)
+        {
+            var report = new PlayerReport(Guid.NewGuid(), _userId, ReportReason.Name, null, Now.AddDays(-daysAgo));
+            if (closedDaysAgo is { } closed) report.Resolve(ReportOutcome.Dismissed, Now.AddDays(-closed));
+            return report;
+        }
+        var longClosed = Report(daysAgo: 200, closedDaysAgo: 100);
+        var recentlyClosed = Report(daysAgo: 200, closedDaysAgo: 30);
+        var stillOpen = Report(daysAgo: 300, closedDaysAgo: null);
+        await SaveAsync(longClosed, recentlyClosed, stillOpen);
+
+        var result = await RunCleanupAsync();
+
+        Assert.Equal(1, result.ClosedReports);
+        await using var db = NewContext();
+        Assert.Equal([recentlyClosed.Id, stillOpen.Id], await db.PlayerReports.OrderBy(r => r.Id).Select(r => r.Id).ToListAsync());
     }
 
     [Fact]

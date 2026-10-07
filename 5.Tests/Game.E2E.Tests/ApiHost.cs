@@ -30,7 +30,7 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
     public string BaseUrl { get; }
 
     /// <summary>Heroes created with these names are admins (one per test, since names are unique).</summary>
-    public static readonly string[] AdminNames = ["RefereeFlow", "RefereeAxe"];
+    public static readonly string[] AdminNames = ["RefereeFlow", "RefereeAxe", "RefereeJudge"];
 
     /// <summary>Every email the API "sent", in order; tests open the links in them.</summary>
     public Mailbox Emails { get; } = new();
@@ -81,6 +81,16 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
             RemoveAll<IEmailSender>(services);
             services.AddSingleton<IEmailSender>(Emails);
         });
+    }
+
+    /// <summary>Puts a hero at the top of the leaderboard, so a test can find them there among every other test's heroes.</summary>
+    public async Task SetRatingAsync(string username, int rating)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.SingleAsync(p => p.Username == username);
+        db.Entry(player).Property(p => p.Rating).CurrentValue = rating;
+        await db.SaveChangesAsync();
     }
 
     private static void RemoveAll<T>(IServiceCollection services)

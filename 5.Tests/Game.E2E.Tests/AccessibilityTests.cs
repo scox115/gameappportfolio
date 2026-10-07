@@ -30,14 +30,21 @@ public class AccessibilityTests(ArenaFixture arena) : BrowserTest(arena)
     });
 
     [Fact]
-    public Task TheTownLeaderboardAndShop_HaveNoViolations() => WithScreenshotsOnFailureAsync(async () =>
+    public Task TheTownLeaderboardReportDialogAndShop_HaveNoViolations() => WithScreenshotsOnFailureAsync(async () =>
     {
+        await CreateHeroAsync(NewHeroName("A11y")); // someone else on the leaderboard to report
         var page = await CreateHeroAsync(NewHeroName("A11y"));
         await AssertNoViolationsAsync(page, "town");
 
         await page.GetByRole(AriaRole.Button, new() { Name = "Leaderboards" }).ClickAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Tab).First).ToBeVisibleAsync();
         await AssertNoViolationsAsync(page, "leaderboard");
+
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("^Report ") }).First.ClickAsync();
+        var report = page.GetByRole(AriaRole.Dialog);
+        await Assertions.Expect(report.GetByRole(AriaRole.Button, new() { Name = "Send report" })).ToBeVisibleAsync();
+        await AssertNoViolationsAsync(page, "report dialog");
+        await report.GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
 
         await page.GetByRole(AriaRole.Button, new() { Name = "Town Dashboard" }).ClickAsync();
         await page.GetByRole(AriaRole.Button, new() { Name = "GOLD SHOP" }).ClickAsync();

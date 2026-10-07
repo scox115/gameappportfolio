@@ -2,6 +2,7 @@ using Game.Core.Admin;
 using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Core.History;
+using Game.Core.Moderation;
 using Game.Core.Operations;
 using Game.Infrastructure.Identity;
 using Game.Infrastructure.Messaging;
@@ -30,6 +31,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<OperationsEvent> OperationsEvents => Set<OperationsEvent>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<PlayerReport> PlayerReports => Set<PlayerReport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

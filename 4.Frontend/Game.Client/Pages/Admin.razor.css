@@ -179,3 +179,33 @@
 .admin-ok {
     color: #86efac;
 }
+
+.admin-reports {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+}
+
+.admin-reports li {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 10px;
+    border-bottom: 1px solid #334155;
+}
+
+.admin-portrait {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #0f172a;
+}
+
+.admin-note {
+    color: #cbd5e1;
+    font-size: 0.85rem;
+    font-style: italic;
+    margin-top: 4px;
+}

@@ -4,6 +4,7 @@ using Game.Core.Bounties;
 using Game.Core.Entities;
 using Game.Core.Events;
 using Game.Core.History;
+using Game.Core.Moderation;
 
 namespace Game.Api.Accounts;
 
@@ -20,16 +21,21 @@ public record AccountExport(
     List<AccountExport.Match> MatchHistory,
     List<AccountExport.BossFight> BossFights,
     List<AccountExport.Duel> Duels,
-    List<AccountExport.AdminDecision> AdminDecisions)
+    List<AccountExport.AdminDecision> AdminDecisions,
+    List<AccountExport.ReportFiled> ReportsFiled)
 {
     /// <param name="RecoveryEmail">The confirmed address reset links go to, if the player added one.</param>
     /// <param name="SuspendedUntil">Set while an admin has suspended the account; the year 9999 means until reinstated.</param>
+    /// <param name="PreviousUsername">The name the hero had before an admin renamed it (in capitals, as stored); it still signs in.</param>
     public record SignInAccount(
         Guid Id, string Username, DateTimeOffset? LockedOutUntil, int FailedSignInAttempts,
-        DateTimeOffset? SuspendedUntil, string? SuspensionReason, string? RecoveryEmail);
+        DateTimeOffset? SuspendedUntil, string? SuspensionReason, string? RecoveryEmail, string? PreviousUsername = null);
 
     /// <summary>Something an admin did to the account. Which admin did it is left out.</summary>
     public record AdminDecision(DateTime At, AdminAction Action, string Reason, string? Detail);
+
+    /// <summary>A report this player made about another hero, and what came of it (null while it waits).</summary>
+    public record ReportFiled(DateTime At, Guid HeroId, ReportReason Reason, string? Note, ReportOutcome? Outcome);
 
     public record SignInSession(DateTime StartedAt, DateTime ExpiresAt, DateTime? EndedAt);
 
