@@ -26,6 +26,16 @@ public class OutboxMessage
 
     public string? LastError { get; private set; }
 
+    /// <summary>
+    /// Until when a relay has claimed the row. With several API replicas, each relay claims a batch before
+    /// sending it, so two replicas never send the same row at once. A relay that dies mid-batch simply lets
+    /// its claim run out, and another relay picks the rows up.
+    /// </summary>
+    public DateTime? ClaimedUntil { get; private set; }
+
+    /// <summary>Changes with every claim; a concurrency token, so two relays can't both claim the same row.</summary>
+    public Guid ClaimToken { get; private set; }
+
     private OutboxMessage() { }
 
     public OutboxMessage(Guid id, string queue, string payload, DateTime createdAt)
@@ -36,8 +46,24 @@ public class OutboxMessage
         CreatedAt = createdAt;
     }
 
+    public bool IsClaimable(DateTime now) => ClaimedUntil is null || ClaimedUntil <= now;
+
+    public void Claim(DateTime until)
+    {
+        ClaimedUntil = until;
+        ClaimToken = Guid.NewGuid();
+    }
+
+    /// <summary>Gives the row back, so any relay can send it next time.</summary>
+    public void Release()
+    {
+        ClaimedUntil = null;
+        ClaimToken = Guid.NewGuid();
+    }
+
     public void Failed(string error)
     {
+        Release();
         Attempts++;
         LastError = error.Length <= ErrorMaxLength ? error : error[..ErrorMaxLength];
     }

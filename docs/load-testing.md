@@ -42,7 +42,7 @@ All runs used the 0.5 CPU / 1 GiB API container and the `load` profile: a 1-minu
 
 - In Azure, SQL runs in Central US and the API runs in East US 2 (see PR #39), so each database query adds a cross-region round trip. Expect higher median times live, even at low load.
 - The Azure SQL free offer is serverless and pauses when idle. The first request after a pause waits for it to wake up, which is the known cold start.
-- The API can't simply add replicas, because the PvP lobby lives in memory (`maxReplicas: 1`). Going past one replica needs a shared lobby (for example in SQL or Redis) and an Azure SignalR Service backplane.
+- Past that, Container Apps adds replicas (up to `API_MAX_REPLICAS`, 3 by default). The duel lobby and live messages are shared through SQL, so players on different replicas still meet ([ADR 0027](adr/0027-scale-out.md)). This test measures one replica, which is the unit that scales.
 
 **Why the test doesn't run against the live game:**
 

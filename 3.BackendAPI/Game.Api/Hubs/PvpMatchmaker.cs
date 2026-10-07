@@ -1,3 +1,8 @@
+using System.Collections.Concurrent;
+using Game.Core.Battles;
+using Game.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
 namespace Game.Api.Hubs;
 
 /// <param name="SameNetwork">The two players connected from the same IP address.</param>
@@ -8,63 +13,139 @@ public record PvpPairing(Guid OpponentId, bool SameNetwork);
 /// someone who chose the same wager.
 /// </summary>
 /// <remarks>
-/// The queue lives in memory, so it suits a single API instance. Running several instances
-/// needs a shared queue (for example Redis or a database table) and an Azure SignalR backplane.
+/// The queue is the PvpLobby table, so every API replica shares it (see docs/adr/0027-scale-out.md).
+/// No locks are held: taking an opponent deletes their entry, and if another replica deleted it first
+/// the save fails and the next opponent is tried. Each operation uses its own DbContext, so a retry
+/// never disturbs the caller's changes.
 /// </remarks>
-public class PvpMatchmaker
+public class PvpMatchmaker(IServiceScopeFactory scopeFactory, TimeProvider timeProvider, ILogger<PvpMatchmaker> logger)
 {
-    private readonly Lock _gate = new();
+    // Players waiting through a connection to this replica, whose entries this replica keeps fresh.
+    private readonly ConcurrentDictionary<Guid, byte> _waitingHere = new();
 
-    private sealed record Waiting(Guid PlayerId, string? Network);
-
-    private readonly Dictionary<int, List<Waiting>> _waitingByWager = new();
+    private DateTime Now => timeProvider.GetUtcNow().UtcDateTime;
 
     /// <summary>
-    /// Returns the longest-waiting opponent with the same wager, or null after putting this player
-    /// in the queue. Joining again with a different wager moves the player.
+    /// Returns the longest-waiting opponent with the same wager, or null when the player is now waiting.
+    /// Joining again with a different wager moves the player.
     /// </summary>
     /// <param name="network">The player's IP address, or null when it isn't known.</param>
     /// <param name="avoidSameNetwork">Skip opponents on the same network, so wagers can't move gold between one person's accounts.</param>
-    public PvpPairing? JoinOrPair(Guid playerId, int wager = 0, string? network = null, bool avoidSameNetwork = false)
+    public async Task<PvpPairing?> JoinOrPairAsync(Guid playerId, int wager = 0, string? network = null, bool avoidSameNetwork = false)
     {
-        lock (_gate)
-        {
-            RemoveLocked(playerId);
-            var queue = _waitingByWager.TryGetValue(wager, out var existing) ? existing : _waitingByWager[wager] = new();
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            var opponent = queue.FirstOrDefault(w => !(avoidSameNetwork && SameNetwork(w.Network, network)));
-            if (opponent is not null)
+        // Join first, then look for an opponent. Of two players joining at once, at least one sees the
+        // other, since each one's entry is saved before it looks. If both see each other and try to pair,
+        // the deletes collide and only one save succeeds.
+        var me = new PvpLobbyEntry(playerId, wager, network, Now);
+        if (await db.PvpLobby.FindAsync(playerId) is { } old)
+        {
+            db.PvpLobby.Remove(old);
+            try
             {
-                queue.Remove(opponent);
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                db.ChangeTracker.Clear(); // paired a moment ago; joining again starts afresh
+            }
+        }
+        db.PvpLobby.Add(me);
+        await db.SaveChangesAsync();
+        _waitingHere[playerId] = 0;
+
+        while (true)
+        {
+            var freshSince = Now - PvpLobbyEntry.StaleAfter;
+            var candidates = await db.PvpLobby
+                .Where(e => e.Wager == wager && e.PlayerId != playerId && e.SeenAt >= freshSince)
+                .OrderBy(e => e.JoinedAt)
+                .Take(20)
+                .ToListAsync();
+            var opponent = candidates.FirstOrDefault(e => !(avoidSameNetwork && SameNetwork(e.Network, network)));
+            if (opponent is null) return null;
+
+            // Take the opponent and leave the lobby in one save. If either row is already gone, someone else
+            // got there first: they either took this opponent (try the next) or took this player (wait for them).
+            db.PvpLobby.RemoveRange(opponent, me);
+            try
+            {
+                await db.SaveChangesAsync();
+                _waitingHere.TryRemove(playerId, out _);
                 return new PvpPairing(opponent.PlayerId, SameNetwork(opponent.Network, network));
             }
-
-            queue.Add(new Waiting(playerId, network));
-            return null;
+            catch (DbUpdateConcurrencyException)
+            {
+                db.ChangeTracker.Clear();
+                if (await db.PvpLobby.FindAsync(playerId) is not { } stillWaiting)
+                {
+                    // Another player took this one; their replica is starting the duel and will tell us.
+                    _waitingHere.TryRemove(playerId, out _);
+                    return null;
+                }
+                me = stillWaiting;
+            }
         }
     }
 
-    public void Leave(Guid playerId)
+    public async Task LeaveAsync(Guid playerId)
     {
-        lock (_gate)
+        _waitingHere.TryRemove(playerId, out _);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        if (await db.PvpLobby.FindAsync(playerId) is not { } entry) return;
+
+        db.PvpLobby.Remove(entry);
+        try
         {
-            RemoveLocked(playerId);
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Already gone: paired or removed somewhere else.
         }
     }
 
-    public bool IsWaiting(Guid playerId)
+    public async Task<bool> IsWaitingAsync(Guid playerId)
     {
-        lock (_gate)
-        {
-            return _waitingByWager.Values.Any(queue => queue.Any(w => w.PlayerId == playerId));
-        }
+        await using var scope = scopeFactory.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<AppDbContext>().PvpLobby.AnyAsync(e => e.PlayerId == playerId);
     }
 
-    private void RemoveLocked(Guid playerId)
+    /// <summary>
+    /// Marks the players waiting through this replica as still there, and clears out entries nobody has
+    /// vouched for in a long while (left by a replica that stopped without saying goodbye).
+    /// </summary>
+    public async Task HeartbeatAsync(CancellationToken cancellationToken = default)
     {
-        foreach (var queue in _waitingByWager.Values)
+        var now = Now;
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var waitingHere = _waitingHere.Keys.ToList();
+        if (waitingHere.Count > 0)
         {
-            queue.RemoveAll(w => w.PlayerId == playerId);
+            var entries = await db.PvpLobby.Where(e => waitingHere.Contains(e.PlayerId)).ToListAsync(cancellationToken);
+            foreach (var gone in waitingHere.Except(entries.Select(e => e.PlayerId)))
+            {
+                _waitingHere.TryRemove(gone, out _); // paired, or left through another replica
+            }
+            foreach (var entry in entries) entry.StillHere(now);
+        }
+
+        var abandoned = now - PvpLobbyEntry.StaleAfter * 10;
+        db.PvpLobby.RemoveRange(await db.PvpLobby.Where(e => e.SeenAt < abandoned).ToListAsync(cancellationToken));
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // A player was paired between the read and the save; the next heartbeat catches up.
+            logger.LogDebug(ex, "Lobby heartbeat raced with a pairing.");
         }
     }
 

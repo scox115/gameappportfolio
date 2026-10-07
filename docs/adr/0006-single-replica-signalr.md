@@ -1,6 +1,6 @@
 # 0006. Real-time duels on SignalR with an in-memory lobby, one replica
 
-- **Status:** Accepted
+- **Status:** Superseded by [0027](0027-scale-out.md)
 - **Date:** 2026-10-05
 
 ## Context

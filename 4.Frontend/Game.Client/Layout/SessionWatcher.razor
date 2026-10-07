@@ -1,5 +1,6 @@
 @using Game.Client.Services
 @using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.Http.Connections
 @inject GameState State
 @inject ApiEndpoint Api
 @inject TokenRefresher Tokens
@@ -30,7 +31,13 @@
             connectedPlayerId = State.PlayerId;
             hub = new HubConnectionBuilder()
                 .WithUrl(new Uri(Api.BaseAddress, "hubs/session"), options =>
-                    options.AccessTokenProvider = Tokens.GetAccessTokenAsync)
+                {
+                    options.AccessTokenProvider = Tokens.GetAccessTokenAsync;
+                    // Straight to WebSockets: with several API replicas, a separate negotiate request could reach a
+                    // different replica from the connection itself.
+                    options.SkipNegotiation = true;
+                    options.Transports = HttpTransportType.WebSockets;
+                })
                 .WithAutomaticReconnect()
                 .Build();
 

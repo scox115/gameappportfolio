@@ -9,7 +9,7 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0003](0003-rewards-synchronous-messaging-for-read-models.md) | Pay rewards in the request, use RabbitMQ only for read models | Accepted, partly superseded by 0023 |
 | [0004](0004-optimistic-concurrency.md) | Optimistic concurrency on players and battles | Accepted |
 | [0005](0005-identity-jwt-refresh-tokens.md) | ASP.NET Core Identity with short JWTs and rotating refresh tokens | Accepted |
-| [0006](0006-single-replica-signalr.md) | Real-time duels on SignalR with an in-memory lobby, one replica | Accepted |
+| [0006](0006-single-replica-signalr.md) | Real-time duels on SignalR with an in-memory lobby, one replica | Superseded by 0027 |
 | [0007](0007-free-tier-azure-hosting.md) | Host on Azure free tiers, scaling to zero | Accepted |
 | [0008](0008-passwordless-azure-access.md) | No stored Azure credentials: managed identity and GitHub OIDC | Accepted |
 | [0009](0009-url-segment-api-versioning.md) | Version the API in the URL | Accepted |
@@ -30,5 +30,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0024](0024-moderation-and-reports.md) | Name rules, player reports and admin moderation of names and portraits | Accepted |
 | [0025](0025-two-factor-sign-in.md) | Two-factor sign-in with an authenticator app and recovery codes | Accepted |
 | [0026](0026-staging-and-previews.md) | A staging copy every commit reaches first, and previews for pull requests | Accepted |
+| [0027](0027-scale-out.md) | More than one API replica, with shared state in SQL | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.

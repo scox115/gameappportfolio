@@ -130,6 +130,7 @@ jobs:
             ${{ inputs.environment == 'production' && vars.APP_CONFIGURATION || '' }}
             ${{ vars.ADMIN_USERNAMES }}
             ${{ inputs.environment == 'production' && vars.EMAIL_RECOVERY || '' }}
+            ${{ vars.API_MAX_REPLICAS }}
             ${{ secrets.JWT_SIGNING_KEY }}
             ${{ secrets.RABBITMQ_PASSWORD }}
             ${{ secrets.GHCR_READ_TOKEN }}
@@ -161,6 +162,7 @@ jobs:
               registryPassword="$REGISTRY_PASSWORD" \
               liveRevision="${{ steps.live.outputs.revision }}" \
               environmentName="${{ inputs.environment }}" \
+              maxReplicas="${{ vars.API_MAX_REPLICAS || '3' }}" \
             --query properties.outputs --output json > outputs.json
         env:
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}

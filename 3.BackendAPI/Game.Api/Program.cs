@@ -25,6 +25,7 @@ using Game.Api.Security;
 using Game.Api.Operations;
 using Microsoft.AspNetCore.SignalR;
 using Game.Api.Messaging;
+using Game.Api.ScaleOut;
 using Game.Core.Battles;
 using System.Text.Json.Serialization;
 using Game.Infrastructure.Identity;
@@ -314,8 +315,26 @@ builder.Services.AddSingleton<MatchOutbox>();
 builder.Services.AddSingleton<TelemetryBrokerStatus>();
 
 // --- 🆚 REAL-TIME PVP ARENA (SignalR) ---
-builder.Services.AddSignalR(options => options.AddFilter<ActiveSessionHubFilter>())
+var signalR = builder.Services.AddSignalR(options => options.AddFilter<ActiveSessionHubFilter>())
     .AddJsonProtocol(options => options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+// --- 📈 SCALE OUT ---
+// With more than one API replica, a player's opponent may be connected to another replica, so hub
+// messages have to reach every replica (see docs/adr/0027-scale-out.md). The lobby and the outbox are
+// shared through SQL whatever this is set to.
+builder.Services.AddOptions<ScaleOutOptions>().Bind(builder.Configuration.GetSection(ScaleOutOptions.SectionName));
+switch (builder.Configuration.GetSection(ScaleOutOptions.SectionName).GetValue<BackplaneKind>(nameof(ScaleOutOptions.Backplane)))
+{
+    case BackplaneKind.Sql:
+        builder.Services.AddSingleton<SqlBackplane>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<SqlBackplane>());
+        builder.Services.AddSingleton(typeof(HubLifetimeManager<>), typeof(SqlBackplaneHubLifetimeManager<>));
+        break;
+    case BackplaneKind.Redis:
+        signalR.AddStackExchangeRedis(GetRequiredConnectionString(builder.Configuration, "Redis"),
+            redis => redis.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("card-arena"));
+        break;
+}
 builder.Services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
 builder.Services.AddSingleton<PvpMatchmaker>();
 builder.Services.AddScoped<PvpBattleService>();

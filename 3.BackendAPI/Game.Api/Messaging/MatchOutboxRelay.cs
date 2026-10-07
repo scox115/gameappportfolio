@@ -14,11 +14,16 @@ namespace Game.Api.Messaging;
 /// consumer ignores a match it has already recorded, so a resend is harmless. While the broker is down
 /// the rows simply wait in the database, however many there are and however long it takes.
 /// </summary>
+/// <remarks>
+/// Every API replica runs a relay. Each one claims a batch before sending it (a concurrency token on the
+/// row decides who wins), so two replicas never send the same rows at once. See docs/adr/0027-scale-out.md.
+/// </remarks>
 public class MatchOutboxRelay(
     MatchOutbox outbox,
     IServiceScopeFactory scopeFactory,
     IConnectionFactory connectionFactory,
     TelemetryBrokerStatus status,
+    TimeProvider timeProvider,
     ILogger<MatchOutboxRelay> logger) : BackgroundService
 {
     /// <summary>Rows sent per look at the table.</summary>
@@ -29,6 +34,9 @@ public class MatchOutboxRelay(
     /// New matches ring the doorbell, so this only matters after a crash.
     /// </summary>
     public static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
+
+    /// <summary>How long a claim lasts. A relay that stops mid-batch leaves its rows to others after this.</summary>
+    public static readonly TimeSpan ClaimFor = TimeSpan.FromMinutes(1);
 
     private IConnection? _connection;
     private IChannel? _channel;
@@ -81,10 +89,25 @@ public class MatchOutboxRelay(
         await using var scope = scopeFactory.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var batch = await dbContext.OutboxMessages
+            .Where(m => m.ClaimedUntil == null || m.ClaimedUntil <= now)
             .OrderBy(m => m.CreatedAt)
             .Take(BatchSize)
             .ToListAsync(cancellationToken);
+        if (batch.Count == 0) return 0;
+
+        // Claim the batch first. If another replica claimed any of these rows a moment ago, the save fails;
+        // look again at once, which finds whatever is still unclaimed.
+        foreach (var message in batch) message.Claim(now + ClaimFor);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return BatchSize;
+        }
 
         var sent = 0;
         try
@@ -104,6 +127,9 @@ public class MatchOutboxRelay(
         }
         finally
         {
+            // Hand back the rows this batch didn't get to, so they needn't wait for the claim to run out.
+            foreach (var message in batch.Skip(sent)) message.Release();
+
             // Record what went out (and the failure, if any) even when the batch stopped part way.
             // If this save fails, those rows are sent again later; the consumer skips repeats.
             if (dbContext.ChangeTracker.HasChanges())

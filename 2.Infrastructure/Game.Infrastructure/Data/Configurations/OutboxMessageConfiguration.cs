@@ -18,6 +18,8 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         builder.Property(m => m.Payload).IsRequired();
         builder.Property(m => m.LastError).HasMaxLength(OutboxMessage.ErrorMaxLength);
 
+        builder.Property(m => m.ClaimToken).IsConcurrencyToken();
+
         builder.HasIndex(m => m.CreatedAt); // the relay sends oldest first
     }
 }
