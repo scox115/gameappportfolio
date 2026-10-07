@@ -126,6 +126,14 @@ def run(group, database, minutes_ago, keep, server=None):
        "--name", rule, "--start-ip-address", ip, "--end-ip-address", ip)
     restore_started = False
     try:
+        # Get the database token and read the live database now, before the restore. In GitHub Actions the
+        # Azure CLI signs in with a GitHub OIDC assertion that expires 5 minutes after sign-in, so a token
+        # for a new resource can't be fetched after a long restore (AADSTS700024). The token itself lasts
+        # about an hour. Reading the live database first also proves the firewall and sign-in work before
+        # waiting on a restore.
+        token = az("account", "get-access-token", "--resource", SQL_RESOURCE, "--query", "accessToken")
+        live = inspect_database(fqdn, database, token)
+
         log(f"Restoring {database} as of {restore_point:%Y-%m-%d %H:%M} UTC into {drill}...")
         clock = time.monotonic()
         # The copy is a small serverless database that pauses itself, so a forgotten one costs next to nothing.
@@ -138,8 +146,6 @@ def run(group, database, minutes_ago, keep, server=None):
         seconds = time.monotonic() - clock
         log(f"Restored in {seconds / 60:.1f} minutes. Comparing it with the live database...")
 
-        token = az("account", "get-access-token", "--resource", SQL_RESOURCE, "--query", "accessToken")
-        live = inspect_database(fqdn, database, token)
         restored = inspect_database(fqdn, drill, token)
         problems = compare(live, restored)
         return problems, summary(server_name, database, drill, restore_point, seconds, live, restored, problems)
