@@ -65,17 +65,24 @@ public class AccountService(
             .Select(e => new AccountExport.AdminDecision(e.At, e.Action, e.Reason, e.Detail))
             .ToListAsync(cancellationToken);
 
+        var reportsFiled = await dbContext.PlayerReports.AsNoTracking()
+            .Where(r => r.ReporterId == playerId)
+            .OrderByDescending(r => r.CreatedAt)
+            .Select(r => new AccountExport.ReportFiled(r.CreatedAt, r.TargetId, r.Reason, r.Note, r.Outcome))
+            .ToListAsync(cancellationToken);
+
         return new AccountExport(
             ExportedAt: timeProvider.GetUtcNow(),
             Account: new AccountExport.SignInAccount(
                 user.Id, user.UserName ?? player.Username, user.LockoutEnd, user.AccessFailedCount,
-                user.SuspendedUntil, user.SuspensionReason, user.EmailConfirmed ? user.Email : null),
+                user.SuspendedUntil, user.SuspensionReason, user.EmailConfirmed ? user.Email : null, user.PreviousNormalizedUserName),
             Profile: AccountExport.HeroProfile.From(player),
             SignInSessions: sessions,
             MatchHistory: history.Select(AccountExport.Match.From).ToList(),
             BossFights: bossFights,
             Duels: duels.Select(d => AccountExport.Duel.From(d, playerId)).ToList(),
-            AdminDecisions: adminDecisions);
+            AdminDecisions: adminDecisions,
+            ReportsFiled: reportsFiled);
     }
 
     /// <summary>Deletes the account, the hero and everything recorded about them.</summary>
@@ -103,6 +110,9 @@ public class AccountService(
         dbContext.Matches.RemoveRange(await dbContext.Matches
             .Where(m => m.PlayerOneId == playerId || m.PlayerTwoId == playerId).ToListAsync(cancellationToken));
         dbContext.MatchHistory.RemoveRange(await dbContext.MatchHistory.Where(e => e.PlayerId == playerId).ToListAsync(cancellationToken));
+        // Reports they made and reports about them: neither means anything once the hero is gone.
+        dbContext.PlayerReports.RemoveRange(await dbContext.PlayerReports
+            .Where(r => r.ReporterId == playerId || r.TargetId == playerId).ToListAsync(cancellationToken));
 
         // Opponents keep their own record of the match, without this hero's name.
         foreach (var entry in await dbContext.MatchHistory.Where(e => e.OpponentId == playerId).ToListAsync(cancellationToken))

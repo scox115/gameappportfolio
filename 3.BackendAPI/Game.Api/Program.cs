@@ -270,17 +270,21 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(RateLimits.Registration, context => PerAddress(context, limits => limits.RegistrationsPerHour, TimeSpan.FromHours(1)));
     options.AddPolicy(RateLimits.SignIn, context => PerAddress(context, limits => limits.SignInsPerMinute, TimeSpan.FromMinutes(1)));
     options.AddPolicy(RateLimits.Recovery, context => PerAddress(context, limits => limits.RecoveryRequestsPerHour, TimeSpan.FromHours(1)));
-    options.AddPolicy(RateLimits.AvatarUpload, context => RateLimitPartition.GetFixedWindowLimiter(
-        context.User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "anonymous",
-        _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = context.RequestServices.GetRequiredService<IOptions<AntiCheatOptions>>().Value.AvatarUploadsPerHour,
-            Window = TimeSpan.FromHours(1),
-            QueueLimit = 0
-        }));
+    options.AddPolicy(RateLimits.AvatarUpload, context => PerPlayer(context, limits => limits.AvatarUploadsPerHour, TimeSpan.FromHours(1)));
+    options.AddPolicy(RateLimits.Report, context => PerPlayer(context, limits => limits.ReportsPerHour, TimeSpan.FromHours(1)));
     options.OnRejected = async (context, cancellationToken) =>
         await context.HttpContext.Response.WriteAsJsonAsync(
             new { message = "Too many attempts from your network. Please wait a little and try again." }, cancellationToken);
+
+    static RateLimitPartition<string> PerPlayer(HttpContext context, Func<AntiCheatOptions, int> limit, TimeSpan window) =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirstValue(JwtRegisteredClaimNames.Sub) ?? "anonymous",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = limit(context.RequestServices.GetRequiredService<IOptions<AntiCheatOptions>>().Value),
+                Window = window,
+                QueueLimit = 0
+            });
 
     static RateLimitPartition<string> PerAddress(HttpContext context, Func<AntiCheatOptions, int> limit, TimeSpan window) =>
         RateLimitPartition.GetFixedWindowLimiter(
@@ -310,6 +314,7 @@ builder.Services.AddSingleton<PvpMatchmaker>();
 builder.Services.AddScoped<PvpBattleService>();
 builder.Services.AddScoped<Game.Api.Accounts.AccountService>();
 builder.Services.AddScoped<MatchHistoryProjector>();
+builder.Services.AddScoped<Game.Api.Moderation.ModerationService>();
 builder.Services.AddHostedService<PvpTurnTimeoutWorker>();
 
 // Enums such as battle cards and status travel as readable strings ("DragonClaw", "Won").

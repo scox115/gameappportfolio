@@ -15,7 +15,16 @@ public enum AdminAction
     GrantAdmin,
 
     /// <summary>An account stopped being an admin because it was taken out of Admin:Usernames.</summary>
-    RevokeAdmin
+    RevokeAdmin,
+
+    /// <summary>A hero's name was replaced, usually because players reported it.</summary>
+    Rename,
+
+    /// <summary>A hero's portrait was taken down, usually because players reported it.</summary>
+    RemovePortrait,
+
+    /// <summary>Reports about a hero were looked at and closed with nothing changed.</summary>
+    DismissReports
 }
 
 /// <summary>

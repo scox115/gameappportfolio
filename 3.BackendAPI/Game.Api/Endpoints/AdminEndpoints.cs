@@ -3,11 +3,13 @@ using System.Security.Claims;
 using Game.Api.Admin;
 using Game.Api.Auth;
 using Game.Api.Models;
+using Game.Api.Moderation;
 
 namespace Game.Api.Endpoints;
 
 // Tools for running the game, for accounts with the Admin role only (see AdminRoleSync).
-// Every change needs a reason and is written to the audit log.
+// Every change needs a reason and is written to the audit log. Moderation (reports, renames and
+// portraits) is described in docs/adr/0024-moderation-and-reports.md.
 public static class AdminEndpoints
 {
     public static void MapAdminEndpoints(this IEndpointRouteBuilder app)
@@ -31,6 +33,19 @@ public static class AdminEndpoints
 
         group.MapPost("/players/{id:guid}/gold", async (Guid id, GoldCorrectionRequest request, ClaimsPrincipal user, AdminService admin, CancellationToken cancellationToken) =>
             ToResult(await admin.CorrectGoldAsync(Actor(user), id, request, cancellationToken)));
+
+        group.MapPost("/players/{id:guid}/rename", async (Guid id, RenameRequest request, ClaimsPrincipal user, ModerationService moderation, CancellationToken cancellationToken) =>
+            ToResult(await moderation.RenameAsync(Actor(user), id, request, cancellationToken)));
+
+        group.MapPost("/players/{id:guid}/remove-portrait", async (Guid id, RemovePortraitRequest request, ClaimsPrincipal user, ModerationService moderation, CancellationToken cancellationToken) =>
+            ToResult(await moderation.RemovePortraitAsync(Actor(user), id, request, cancellationToken)));
+
+        group.MapPost("/players/{id:guid}/dismiss-reports", async (Guid id, DismissReportsRequest request, ClaimsPrincipal user, ModerationService moderation, CancellationToken cancellationToken) =>
+            ToResult(await moderation.DismissAsync(Actor(user), id, request, cancellationToken)));
+
+        // GET: /api/v1/admin/reports, what players reported and is still waiting, most reported first
+        group.MapGet("/reports", async (ModerationService moderation, CancellationToken cancellationToken) =>
+            Results.Ok(await moderation.QueueAsync(cancellationToken)));
 
         // GET: /api/v1/admin/audit?before=120, newest first; pass the last id seen to page back
         group.MapGet("/audit", async (AdminService admin, int? take, long? before, CancellationToken cancellationToken) =>

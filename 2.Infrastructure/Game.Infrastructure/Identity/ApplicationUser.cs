@@ -38,4 +38,13 @@ public class ApplicationUser : IdentityUser<Guid>
         SuspendedUntil = null;
         SuspensionReason = null;
     }
+
+    /// <summary>
+    /// The normalized name the hero had before an admin renamed it. The player can still sign in with
+    /// it, so a rename never locks anyone out, and nobody else can register it.
+    /// </summary>
+    public string? PreviousNormalizedUserName { get; private set; }
+
+    /// <summary>Records the old name before an admin renames the hero.</summary>
+    public void RememberPreviousName() => PreviousNormalizedUserName = NormalizedUserName;
 }

@@ -7,14 +7,15 @@ using Microsoft.Extensions.Options;
 
 namespace Game.Api.Workers;
 
-public record CleanupResult(int ExpiredRefreshTokens, int FinishedBossFights, int FinishedDuels, int OldAuditEntries = 0, int ExpiredEmailLinks = 0)
+public record CleanupResult(int ExpiredRefreshTokens, int FinishedBossFights, int FinishedDuels, int OldAuditEntries = 0, int ExpiredEmailLinks = 0, int ClosedReports = 0)
 {
-    public int Total => ExpiredRefreshTokens + FinishedBossFights + FinishedDuels + OldAuditEntries + ExpiredEmailLinks;
+    public int Total => ExpiredRefreshTokens + FinishedBossFights + FinishedDuels + OldAuditEntries + ExpiredEmailLinks + ClosedReports;
 }
 
 /// <summary>
 /// Deletes rows that are no longer needed: refresh tokens long past their expiry, the working
-/// state of battles that finished long ago, expired email links, and admin audit log entries older than a year. Battles still in progress are never touched: an
+/// state of battles that finished long ago, expired email links, reports an admin closed long ago, and
+/// admin audit log entries older than a year. Battles still in progress are never touched: an
 /// unfinished boss fight waits for its player to come back, and duels are settled by
 /// <see cref="PvpTurnTimeoutWorker"/>.
 /// </summary>
@@ -28,6 +29,7 @@ public class DataCleanupService(AppDbContext dbContext, TimeProvider timeProvide
         var tokenCutoff = now.AddDays(-_options.ExpiredTokenRetentionDays);
         var battleCutoff = now.AddDays(-_options.FinishedBattleRetentionDays);
         var auditCutoff = now.AddDays(-_options.AuditLogRetentionDays);
+        var reportCutoff = now.AddDays(-_options.ResolvedReportRetentionDays);
 
         // Expired tokens can't be used, and revoked ones are only kept until they'd have expired
         // anyway, so reuse of a stolen token is still caught while it matters.
@@ -50,7 +52,10 @@ public class DataCleanupService(AppDbContext dbContext, TimeProvider timeProvide
         var auditEntries = await DeleteInBatchesAsync(
             dbContext.AuditLog.Where(e => e.At < auditCutoff).OrderBy(e => e.At), "audit_log_entry", cancellationToken);
 
-        return new CleanupResult(tokens, bossFights, duels, auditEntries, emailLinks);
+        var reports = await DeleteInBatchesAsync(
+            dbContext.PlayerReports.Where(r => r.ResolvedAt < reportCutoff).OrderBy(r => r.ResolvedAt), "player_report", cancellationToken);
+
+        return new CleanupResult(tokens, bossFights, duels, auditEntries, emailLinks, reports);
     }
 
     // Each batch is its own DELETE TOP (n) statement and transaction, so a large backlog is cleared

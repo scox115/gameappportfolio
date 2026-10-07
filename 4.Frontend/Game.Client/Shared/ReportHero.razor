@@ -1,0 +1,125 @@
+@using System.Net
+@inject HttpClient Http
+
+@* A small "Report" button next to another hero, opening a dialog to report their name or portrait. *@
+<button class="report-hero-button" @onclick="Open" aria-label="@($"Report {HeroName}")" title="Report an offensive name or portrait">
+    ⚑<span class="report-hero-label"> Report</span>
+</button>
+
+@if (open)
+{
+    <div role="dialog" aria-modal="true" aria-labelledby="@titleId" @onclick="Close" @onkeydown="KeyDown" class="report-hero-backdrop">
+        <div @onclick:stopPropagation="true" class="report-hero-dialog">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                <h4 id="@titleId" style="margin: 0; font-size: 1.1rem;">⚑ Report @HeroName</h4>
+                <button aria-label="Close" @onclick="Close" @ref="closeButton" class="report-hero-close">✕</button>
+            </div>
+
+            @if (sent)
+            {
+                <p role="status" style="color: #86efac; margin: 16px 0 0;">
+                    Thanks. An admin will look at @HeroName's @(reason == "Portrait" ? "portrait" : "name"). They won't be told who reported it.
+                </p>
+                <button @onclick="Close" class="report-hero-submit" style="margin-top: 16px;">Done</button>
+            }
+            else
+            {
+                <p style="color: #94a3b8; font-size: 0.85rem; margin: 12px 0;">
+                    Report names or portraits that are offensive or pretend to be staff. Losing a duel isn't a reason to report.
+                </p>
+                <fieldset style="border: none; padding: 0; margin: 0;">
+                    <legend style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 6px;">What's wrong?</legend>
+                    <label class="report-hero-choice">
+                        <input type="radio" name="@($"{titleId}-reason")" checked="@(reason == "Name")" @onchange="@(() => reason = "Name")" />
+                        Their name
+                    </label>
+                    @if (HasPortrait)
+                    {
+                        <label class="report-hero-choice">
+                            <input type="radio" name="@($"{titleId}-reason")" checked="@(reason == "Portrait")" @onchange="@(() => reason = "Portrait")" />
+                            Their portrait
+                        </label>
+                    }
+                </fieldset>
+                <label for="@($"{titleId}-note")" style="display: block; color: #cbd5e1; font-size: 0.85rem; margin: 12px 0 4px;">Anything an admin should know? (optional)</label>
+                <textarea id="@($"{titleId}-note")" @bind="note" @bind:event="oninput" maxlength="200" rows="3" class="report-hero-note"></textarea>
+                <button @onclick="SendAsync" disabled="@busy" class="report-hero-submit">
+                    @(busy ? "Sending..." : "Send report")
+                </button>
+                @if (!string.IsNullOrEmpty(message))
+                {
+                    <p role="alert" style="color: #f87171; font-size: 0.85rem; margin: 10px 0 0;">@message</p>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid HeroId { get; set; }
+    [Parameter, EditorRequired] public string HeroName { get; set; } = string.Empty;
+
+    /// <summary>Whether the hero has their own portrait (not the generated default), so it can be reported.</summary>
+    [Parameter] public bool HasPortrait { get; set; }
+
+    private bool open;
+    private bool focusOnRender;
+    private bool busy;
+    private bool sent;
+    private string reason = "Name";
+    private string note = string.Empty;
+    private string message = string.Empty;
+    private ElementReference closeButton;
+    private string titleId => $"report-{HeroId:N}";
+
+    private void Open()
+    {
+        reason = "Name";
+        note = string.Empty;
+        message = string.Empty;
+        sent = false;
+        open = true;
+        focusOnRender = true; // keyboard and screen-reader users land inside the dialog
+    }
+
+    private void Close()
+    {
+        if (!busy) open = false;
+    }
+
+    private void KeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") Close();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusOnRender)
+        {
+            focusOnRender = false;
+            await closeButton.FocusAsync();
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        busy = true;
+        message = string.Empty;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync($"/api/v1/players/{HeroId}/reports",
+                new { Reason = reason, Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim() });
+            if (response.IsSuccessStatusCode) sent = true;
+            else if (response.StatusCode == HttpStatusCode.TooManyRequests) message = "You've sent a lot of reports. Try again later.";
+            else message = await ProblemText.ReadAsync(response) ?? "The report couldn't be sent. Please try again.";
+        }
+        catch (HttpRequestException)
+        {
+            message = "The report couldn't be sent. Please try again.";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

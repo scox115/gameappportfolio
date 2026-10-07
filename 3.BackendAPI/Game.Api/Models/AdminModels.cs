@@ -1,5 +1,6 @@
 using Game.Core.Admin;
 using Game.Core.Battles;
+using Game.Core.Moderation;
 
 namespace Game.Api.Models;
 
@@ -14,7 +15,18 @@ public record AdminPlayerSummary(
 public record AdminPlayerDetail(
     Guid Id, string Username, HeroClass Class, int Level, int ExperiencePoints, int Gold, int Rating,
     int PvpWins, int PvpLosses, bool IsAdmin, SuspensionResponse? Suspension, DateTimeOffset? LockedOutUntil,
-    List<AuditEntryResponse> History);
+    List<AuditEntryResponse> History, string? AvatarUrl = null, List<OpenReportCount>? OpenReports = null);
+
+/// <summary>How many players are waiting for an answer about one thing on a hero.</summary>
+public record OpenReportCount(ReportReason Reason, int Reports);
+
+/// <summary>
+/// One line of the report queue: everything players reported about one hero's name or portrait,
+/// with the newest notes they left. Reporters aren't named, so admins judge the name, not the people.
+/// </summary>
+public record ReportQueueItem(
+    Guid TargetId, string TargetName, string? AvatarUrl, ReportReason Reason, int Reports,
+    DateTime FirstReportedAt, DateTime LastReportedAt, List<string> Notes);
 
 public record AuditEntryResponse(
     long Id, DateTime At, AdminAction Action, string ActorName, Guid TargetId, string TargetName, string Reason, string? Detail)
@@ -30,3 +42,14 @@ public record ReinstateRequest(string Reason);
 
 /// <param name="Change">Gold to add (positive) or take away (negative).</param>
 public record GoldCorrectionRequest(int Change, string Reason);
+
+/// <param name="NewName">The hero's new name; it must follow the same rules as at sign-up.</param>
+public record RenameRequest(string NewName, string Reason);
+
+public record RemovePortraitRequest(string Reason);
+
+/// <param name="Kind">Which reports to close: those about the name or those about the portrait.</param>
+public record DismissReportsRequest(ReportReason Kind, string Reason);
+
+/// <summary>A player reporting another hero.</summary>
+public record ReportRequest(ReportReason Reason, string? Note = null);

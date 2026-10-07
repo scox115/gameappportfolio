@@ -27,7 +27,7 @@ public static class RecoveryEmails
     private static EmailMessage Build(string to, string subject, string hero, string intro, string action, Uri link, string footer)
     {
         var plain = $"Hello {hero},\n\n{intro}\n\n{link}\n\n{footer}\n\nKings of the Card Arena";
-        static string e(string? text) => WebUtility.HtmlEncode(text);
+        static string e(string text) => WebUtility.HtmlEncode(text);
         var html = $"""
             <div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;color:#0f172a">
               <h1 style="font-size:20px">⚔️ Kings of the Card Arena</h1>

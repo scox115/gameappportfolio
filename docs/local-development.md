@@ -150,9 +150,10 @@ CI runs them on every pull request in the `browser-tests` job, and uploads the s
 | `FeatureManagement:Duels` / `HeroicBoss` / `GoldShop` | `true` | inherited | no |
 | `AppConfig:Endpoint` | none (flags from appsettings) | none | no; set by the Azure deployment when `APP_CONFIGURATION` is `true` |
 | `Cleanup:FirstRunDelay` / `Interval` | `00:01:00` / `06:00:00` | inherited | no |
-| `Cleanup:ExpiredTokenRetentionDays` / `FinishedBattleRetentionDays` / `AuditLogRetentionDays` / `BatchSize` | `7` / `30` / `365` / `1000` | inherited | no |
+| `Cleanup:ExpiredTokenRetentionDays` / `FinishedBattleRetentionDays` / `AuditLogRetentionDays` / `ResolvedReportRetentionDays` / `BatchSize` | `7` / `30` / `365` / `90` / `1000` | inherited | no |
 | `Email:Provider` / `ClientBaseUrl` | `None` (no recovery) / none | `Log` (emails, with their links, are written to the API's console) / `http://localhost:5091` | no; the Azure deployment sets `AzureCommunicationServices`, `Email:Endpoint` and `Email:Sender` when `EMAIL_RECOVERY` is `true` |
 | `AntiCheat:RecoveryRequestsPerHour` | `10` per IP address | inherited | no |
+| `AntiCheat:ReportsPerHour` | `10` reports of other heroes per player | inherited | no |
 | `Admin:Usernames` | empty (no admins) | empty; set it with user-secrets to try the admin tools, e.g. `dotnet user-secrets set "Admin:Usernames" "MyHero" --project 3.BackendAPI/Game.Api` | no; set by the Azure deployment from `ADMIN_USERNAMES` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none (no export) | `http://localhost:4317` (the dashboard container) | no |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | none (no export) | none | set by the Azure deployment |

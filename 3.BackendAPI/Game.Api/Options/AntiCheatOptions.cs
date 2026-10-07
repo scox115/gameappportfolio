@@ -28,4 +28,8 @@ public class AntiCheatOptions
     /// <summary>Account recovery requests (reset links, confirmation emails) allowed per IP address per hour.</summary>
     [Range(1, int.MaxValue)]
     public int RecoveryRequestsPerHour { get; set; } = 10;
+
+    /// <summary>Reports a player can file per hour, so the admin queue can't be flooded.</summary>
+    [Range(1, int.MaxValue)]
+    public int ReportsPerHour { get; set; } = 10;
 }

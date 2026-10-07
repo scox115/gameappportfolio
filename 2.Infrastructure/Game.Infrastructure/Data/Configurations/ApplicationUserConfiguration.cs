@@ -10,5 +10,9 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
     public void Configure(EntityTypeBuilder<ApplicationUser> builder)
     {
         builder.Property(u => u.SuspensionReason).HasMaxLength(ApplicationUser.SuspensionReasonMaxLength);
+
+        // Same length as Identity's own NormalizedUserName; looked up when a renamed hero signs in.
+        builder.Property(u => u.PreviousNormalizedUserName).HasMaxLength(256);
+        builder.HasIndex(u => u.PreviousNormalizedUserName);
     }
 }

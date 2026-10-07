@@ -409,7 +409,13 @@
                     <div style="font-weight: bold; font-size: 1.1rem; color: #f1f5f9;">@player.Username @(player.Shielded ? "🛡️" : "")</div>
                 </div>
             </div>
-            <div style="color: #22d3ee; font-size: 0.85rem;">🏅 Rating @player.Rating</div>
+            <div style="color: #22d3ee; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <span>🏅 Rating @player.Rating</span>
+                @if (player.Id != State.PlayerId)
+                {
+                    <ReportHero HeroId="player.Id" HeroName="@player.Username" HasPortrait="@(!string.IsNullOrEmpty(player.AvatarUrl))" />
+                }
+            </div>
             @if (!string.IsNullOrEmpty(player.Title))
             {
                 <div style="color: #fbbf24; font-size: 0.85rem; font-style: italic;">👑 @player.Title</div>

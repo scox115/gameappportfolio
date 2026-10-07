@@ -39,6 +39,9 @@ public class MatchHistoryEntry
     /// <summary>The opponent deleted their account: keep the match, drop their name.</summary>
     public void RetireOpponent() => OpponentName = RetiredHeroName;
 
+    /// <summary>Shows the opponent's new name after an admin renamed them, so an offensive name doesn't live on here.</summary>
+    public void RenameOpponent(string name) => OpponentName = name;
+
     /// <summary>One entry per hero in the match; none for an event without participant details.</summary>
     public static IReadOnlyList<MatchHistoryEntry> From(MatchCompletedEvent match)
     {

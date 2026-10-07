@@ -39,6 +39,13 @@ public class CleanupOptions
     [Range(30, 3650)]
     public int AuditLogRetentionDays { get; set; } = 365;
 
+    /// <summary>
+    /// Days a report is kept after an admin dealt with it, to spot a hero reported again and again.
+    /// Reports still waiting are never deleted. The privacy policy promises 90 days.
+    /// </summary>
+    [Range(1, 3650)]
+    public int ResolvedReportRetentionDays { get; set; } = 90;
+
     /// <summary>Rows deleted per statement, so a big backlog never holds long locks.</summary>
     [Range(1, 100_000)]
     public int BatchSize { get; set; } = 1_000;

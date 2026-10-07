@@ -23,6 +23,8 @@ public sealed class ArenaFixture : IAsyncLifetime
 
     public ApiHost.Mailbox Emails => _api!.Emails;
 
+    public Task SetRatingAsync(string username, int rating) => _api!.SetRatingAsync(username, rating);
+
     /// <summary>What the browsers sent to "Application Insights".</summary>
     public TelemetrySink Telemetry => _telemetry!;
 
