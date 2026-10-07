@@ -137,3 +137,4 @@ group. Together they cost well under $1 a month: about $0.50 for the error check
 - **The deploy fails on the custom domain** (`CNAME Record is invalid` or similar): the CNAME record doesn't
   resolve to the Static Web App yet. Check it with `Resolve-DnsName`, wait for DNS to update, and run the workflow
   again. Clear the `CUSTOM_DOMAIN` variable to deploy without it.
+- **The deploy shows a warning like `blob-storage is Degraded`**: the game is up, but an optional service isn't. Blob storage only matters for portrait uploads, RabbitMQ only for match history. "Refused the API's identity" means the managed identity is missing its **Storage Blob Data Contributor** role on the storage account (a full deploy, `full: true`, puts it back). "Unreachable" means the storage account couldn't be reached at all; the API's **Log stream** has the exception.

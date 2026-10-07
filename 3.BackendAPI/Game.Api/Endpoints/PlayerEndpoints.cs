@@ -14,9 +14,8 @@ namespace Game.Api.Endpoints;
 
 public static class PlayerEndpoints
 {
-    // TODO: move this
-    // 1. Declare a typed form container at the bottom of the file or in your Models folder
-    private const string AvatarContainer = "player-avatars";
+    /// <summary>The blob container portraits are uploaded to (the blob storage health check reads it too).</summary>
+    public const string AvatarContainer = "player-avatars";
 
     private static IResult AvatarProblem(string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { ["File"] = [message] });
