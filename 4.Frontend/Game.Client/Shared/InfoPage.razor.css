@@ -1,0 +1,66 @@
+/* The same dark backdrop as the game and the status page. */
+.info-shell {
+    background: #0f172a;
+    min-height: 100vh;
+}
+
+.info-page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+    color: #e2e8f0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+}
+
+.info-header {
+    border-bottom: 2px solid #334155;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+}
+
+.info-header h1 {
+    margin: 12px 0 0;
+    font-size: 1.8rem;
+    color: #f8fafc;
+}
+
+h1:focus {
+    outline: none;
+}
+
+.info-updated {
+    margin: 4px 0 0;
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+.info-home,
+.info-back a,
+.info-body ::deep a {
+    color: #a5b4fc;
+}
+
+.info-home {
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.info-home:hover,
+.info-home:focus-visible {
+    text-decoration: underline;
+}
+
+.info-body ::deep h2 {
+    font-size: 1.2rem;
+    color: #f8fafc;
+    margin: 28px 0 8px;
+}
+
+.info-body ::deep li {
+    margin-bottom: 6px;
+}
+
+.info-back {
+    margin-top: 32px;
+}

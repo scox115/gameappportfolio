@@ -1,0 +1,60 @@
+@page "/privacy"
+
+<PageTitle>Privacy Policy · Kings of the Card Arena</PageTitle>
+
+<InfoPage Title="Privacy Policy" Updated="@LegalInfo.LastUpdated">
+    <p>
+        Kings of the Card Arena is run by @LegalInfo.Owner, who is responsible for your data. This page explains what the game
+        stores, why, how long it keeps it, and how you can download or delete it.
+    </p>
+
+    <h2>What we store</h2>
+    <ul>
+        <li><b>Your account:</b> your hero name and a hash of your password (never the password itself), plus failed sign-in counts used to lock out password guessing.</li>
+        <li><b>Your hero:</b> class, level, gold, rating, purchases, titles, cosmetics, bounties and your portrait if you upload one.</li>
+        <li><b>Your games:</b> boss fights, duels, match history and the daily arena totals they add to (which don't identify anyone).</li>
+        <li><b>Sign-in sessions:</b> when each session started and ends. Only a hash of each session token is kept.</li>
+    </ul>
+    <p>We don't ask for your email address, real name, location or payment details, and we don't sell or share your data.</p>
+
+    <h2>Technical data</h2>
+    <ul>
+        <li>
+            <b>Diagnostics:</b> to find bugs and slow spots, the game sends Microsoft Application Insights which screens you open,
+            how long pages and requests take, and any errors, tagged with your hero's id (not its name) once you sign in. Your
+            IP address is used for an approximate country or city and is not stored.
+        </li>
+        <li><b>Abuse protection:</b> your IP address is held in memory briefly to limit sign-in attempts and spot duels between two accounts on one network.</li>
+        <li><b>Your browser:</b> the game sets no cookies. It saves your sound on/off choice in your browser's local storage, the diagnostics library briefly holds unsent data in session storage, and your sign-in is kept in memory only, so closing the tab signs you out.</li>
+    </ul>
+
+    <h2>Where it lives</h2>
+    <p>
+        Everything is stored in Microsoft Azure data centers in the United States. Microsoft processes it on our behalf
+        to host the game.
+    </p>
+
+    <h2>How long we keep it</h2>
+    <ul>
+        <li>Your account, hero and match history: until you delete your hero.</li>
+        <li>Finished battles: 30 days. Expired sign-in sessions: 7 days after they end.</li>
+        <li>Diagnostics and logs: 30 days.</li>
+        <li>After you delete your hero, copies can remain in database backups and deleted-file storage for up to 7 days, and in diagnostics for up to 30 days, before they're gone for good.</li>
+    </ul>
+
+    <h2>Your choices and rights</h2>
+    <ul>
+        <li><b>See your data:</b> <b>Your account and data</b> in town downloads a file with everything stored about your hero.</li>
+        <li><b>Delete your data:</b> the same place deletes your hero and everything tied to it straight away. Opponents keep their record of duels with you, but your name is removed from it.</li>
+        <li>For anything else, such as correcting something, get in touch through <a href="@LegalInfo.ContactUrl">@LegalInfo.Contact</a>.</li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>The game isn't aimed at children under 13, and we don't knowingly keep data about them. If you believe a child has an account, get in touch and it will be removed.</p>
+
+    <h2>Changes</h2>
+    <p>
+        If this policy changes, the date above changes with it. See also the <a href="terms">Terms of Service</a> and
+        the game's <a href="status">system status</a>.
+    </p>
+</InfoPage>

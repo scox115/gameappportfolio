@@ -1,0 +1,15 @@
+.site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 18px;
+    padding: 18px 16px 24px;
+    background: #0f172a;
+    color: #94a3b8;
+    font-size: 0.85rem;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.site-footer a {
+    color: #a5b4fc;
+}
