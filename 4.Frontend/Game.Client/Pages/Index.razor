@@ -186,7 +186,7 @@
                                             <button aria-label="Close" @onclick="ClosePortraitPopup" @ref="portraitCloseButton"
                                                     style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;">✕</button>
                                         </div>
-                                        <p style="color: #94a3b8; font-size: 0.85rem; margin: 8px 0 14px;">PNG or JPG, up to 5 MB.</p>
+                                        <p style="color: #94a3b8; font-size: 0.85rem; margin: 8px 0 14px;">PNG or JPG, up to 4 MB.</p>
                                         <InputFile OnChange="HandleFileSelected" accept=".png,.jpg,.jpeg" aria-label="Portrait image (PNG or JPG)" style="color: #94a3b8; width: 100%;" />
                                         @if (!string.IsNullOrEmpty(uploadError))
                                         {
@@ -588,6 +588,13 @@
         catch (NotSupportedException) { return null; } // an empty or non-JSON body
     }
 
+    // The first validation message, or the problem's detail, or null when the body isn't a problem.
+    private static async Task<string?> ProblemMessageAsync(HttpResponseMessage res)
+    {
+        var problem = await ReadProblem(res);
+        return problem?.errors?.SelectMany(e => e.Value).FirstOrDefault() ?? problem?.detail;
+    }
+
     // Turns an ASP.NET Core validation problem (e.g. password rules) into one readable line.
     private static async Task<string> ReadValidationMessage(HttpResponseMessage res)
     {
@@ -615,7 +622,7 @@
             uploading = true;
             uploadError = string.Empty;
             using var content = new MultipartFormDataContent();
-            var fileStream = selectedFile.OpenReadStream(maxAllowedSize: 1024 * 1024 * 5);
+            var fileStream = selectedFile.OpenReadStream(maxAllowedSize: 1024 * 1024 * 4);
             var streamContent = new StreamContent(fileStream);
             streamContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType);
             content.Add(streamContent, "File", selectedFile.Name);
@@ -630,12 +637,15 @@
             }
             else uploadError = res.StatusCode switch
             {
-                HttpStatusCode.BadRequest or HttpStatusCode.RequestEntityTooLarge => "That file couldn't be used. Pick a PNG or JPG under 5 MB.",
+                // The server says why: not a PNG or JPG, too big, or turned away by the content check.
+                HttpStatusCode.BadRequest or HttpStatusCode.ServiceUnavailable => await ProblemMessageAsync(res)
+                    ?? "That file couldn't be used. Pick a PNG or JPG under 4 MB.",
+                HttpStatusCode.RequestEntityTooLarge => "That file couldn't be used. Pick a PNG or JPG under 4 MB.",
                 HttpStatusCode.TooManyRequests => "You've changed your portrait a lot recently. Please try again later.",
                 _ => "Upload failed. Please try again."
             };
         }
-        catch { uploadError = "Upload failed. Make sure the file is a PNG or JPG under 5 MB and try again."; }
+        catch { uploadError = "Upload failed. Make sure the file is a PNG or JPG under 4 MB and try again."; }
         finally { uploading = false; }
     }
 
@@ -1010,6 +1020,7 @@
     {
         public string? detail { get; set; }
         public bool twoFactorRequired { get; set; }
+        public Dictionary<string, string[]>? errors { get; set; }
     }
 
     public class ValidationProblemDto

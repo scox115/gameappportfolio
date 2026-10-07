@@ -162,6 +162,20 @@ Until then the game hides "Forgot your password?" and the recovery email setting
 identity, which the deploy grants **Communication and Email Service Owner** on the Communication Services resource.
 See [ADR 0022](adr/0022-account-recovery-by-email.md).
 
+## Portrait screening (optional)
+
+Azure AI Content Safety can check every uploaded portrait for hateful, sexual, self-harm and graphically violent
+content before anyone else sees it. Its free tier covers 5,000 images a month.
+
+1. Register its resource provider once (the deploy app isn't allowed to): `az provider register --namespace Microsoft.CognitiveServices`. Running `infra/setup.ps1` again does this too.
+2. Add a repository variable `CONTENT_SAFETY` with the value `true`, then run **Deploy to Azure**.
+
+Until then portraits go up unchecked, and players' reports are the only check. Once it's on, a portrait is
+never stored or shown without passing: if the service is down or the month's free allowance is used up, players
+are asked to try changing their portrait later. The API signs in with its managed identity, which the deploy
+grants **Cognitive Services User** on the resource; its keys are switched off. Staging leaves it off. See
+[ADR 0029](adr/0029-portrait-screening.md).
+
 ## Email alerts (optional)
 
 Add a repository variable `ALERT_EMAIL` with your address and run **Deploy to Azure**. The deploy then adds:

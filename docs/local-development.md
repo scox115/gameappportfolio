@@ -161,6 +161,7 @@ dotnet test 5.Tests/Game.Api.Tests
 | `Cleanup:FirstRunDelay` / `Interval` | `00:01:00` / `06:00:00` | inherited | no |
 | `Cleanup:ExpiredTokenRetentionDays` / `FinishedBattleRetentionDays` / `AuditLogRetentionDays` / `ResolvedReportRetentionDays` / `BatchSize` | `7` / `30` / `365` / `90` / `1000` | inherited | no |
 | `Email:Provider` / `ClientBaseUrl` | `None` (no recovery) / none | `Log` (emails, with their links, are written to the API's console) / `http://localhost:5091` | no; the Azure deployment sets `AzureCommunicationServices`, `Email:Endpoint` and `Email:Sender` when `EMAIL_RECOVERY` is `true` |
+| `ContentSafety:Endpoint` | none (portraits aren't screened) | none | no; set by the Azure deployment when `CONTENT_SAFETY` is `true` |
 | `AntiCheat:RecoveryRequestsPerHour` | `10` per IP address | inherited | no |
 | `AntiCheat:ReportsPerHour` | `10` reports of other heroes per player | inherited | no |
 | `Admin:Usernames` | empty (no admins) | empty; set it with user-secrets to try the admin tools, e.g. `dotnet user-secrets set "Admin:Usernames" "MyHero" --project 3.BackendAPI/Game.Api` | no; set by the Azure deployment from `ADMIN_USERNAMES` |

@@ -68,6 +68,9 @@ param appConfiguration string = ''
 @description('Set to true to send account recovery emails with Azure Communication Services (see docs/adr/0022-account-recovery-by-email.md). Needs the Microsoft.Communication resource provider registered first.')
 param emailRecovery string = ''
 
+@description('Set to true to screen uploaded portraits with Azure AI Content Safety on its free tier (see docs/adr/0029-portrait-screening.md). Needs the Microsoft.CognitiveServices resource provider registered first.')
+param contentSafety string = ''
+
 @description('Usernames that are admins, separated by commas (see docs/adr/0021-admin-roles-and-audit-log.md). Leave empty for none.')
 param adminUsernames string = ''
 
@@ -90,6 +93,7 @@ var databaseName = 'GameDb'
 var usePrivateRegistry = !empty(registryUsername)
 var featureFlagStoreEnabled = toLower(appConfiguration) == 'true'
 var emailEnabled = toLower(emailRecovery) == 'true'
+var contentSafetyEnabled = toLower(contentSafety) == 'true'
 
 resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: apiIdentityName
@@ -237,6 +241,35 @@ resource apiSendsEmail 'Microsoft.Authorization/roleAssignments@2022-04-01' = if
   scope: communication
   properties: {
     roleDefinitionId: communicationEmailServiceOwner
+    principalId: apiIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// --- Portrait screening ---
+// Azure AI Content Safety on the free tier (5,000 images a month, 5 a second). Keys are switched off:
+// the API signs in with its managed identity.
+
+resource portraitScreen 'Microsoft.CognitiveServices/accounts@2024-10-01' = if (contentSafetyEnabled) {
+  name: 'cs-${appName}-${take(suffix, 8)}'
+  location: location
+  tags: tags
+  kind: 'ContentSafety'
+  sku: { name: 'F0' }
+  properties: {
+    customSubDomainName: 'cs-${appName}-${suffix}' // needed for Microsoft Entra ID sign-in
+    disableLocalAuth: true
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+var cognitiveServicesUser = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908')
+
+resource apiScreensPortraits 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (contentSafetyEnabled) {
+  name: guid(portraitScreen.id, apiIdentity.id, cognitiveServicesUser)
+  scope: portraitScreen
+  properties: {
+    roleDefinitionId: cognitiveServicesUser
     principalId: apiIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
@@ -457,6 +490,8 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'Email__Provider', value: 'AzureCommunicationServices' }
             { name: 'Email__Endpoint', value: 'https://${communication!.properties.hostName}' }
             { name: 'Email__Sender', value: 'DoNotReply@${emailDomain!.properties.mailFromSenderDomain}' }
+          ] : [], contentSafetyEnabled ? [
+            { name: 'ContentSafety__Endpoint', value: portraitScreen!.properties.endpoint }
           ] : [], empty(customDomain) ? [] : [
             { name: 'Cors__AllowedOrigins__1', value: 'https://${customDomain}' }
           ], featureFlagStoreEnabled ? [

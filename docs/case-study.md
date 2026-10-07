@@ -2,7 +2,7 @@
 
 A real-time card battler built as if it were a production service: a .NET 10 API and a Blazor WebAssembly client, live in Azure, deployed on every merge, and run for close to nothing. This page is the five-minute tour: what it is, how it's built, the decisions that shaped it and the numbers behind them. Each decision links to its full Architecture Decision Record (ADR).
 
-**▶ [Play it](https://play.scottcoxdev.com)** · [Source and setup](../ReadMe.md) · [All 28 ADRs](adr/README.md)
+**▶ [Play it](https://play.scottcoxdev.com)** · [Source and setup](../ReadMe.md) · [All 29 ADRs](adr/README.md)
 
 ![Two browsers playing a live duel against each other](images/duel.gif)
 
@@ -126,7 +126,6 @@ The fix was one query instead of two. The lasting change was making sure it can'
 
 - **Put the API and database in one region.** The database sits in Central US because Azure wasn't taking new SQL servers in the API's region (East US 2) at setup, which adds a cross-region round trip to every query.
 - **Swap the SQL backplane for Azure SignalR Service or Redis** once the extra delay or the database load matters more than the monthly cost. Both are a configuration change.
-- **Screen uploaded portraits automatically** with Azure AI Content Safety. Today players report them and admins remove them ([ADR 0024](adr/0024-moderation-and-reports.md)).
 
 ## Where to look in the code
 
