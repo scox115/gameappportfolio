@@ -135,6 +135,14 @@ class RestoreDrillTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("dbo.Battles", errors)
 
+    def test_the_database_token_is_fetched_before_the_restore(self):
+        # In GitHub Actions the CLI can't get a token for a new resource once its 5-minute OIDC sign-in
+        # has expired, and a restore takes far longer than that.
+        self.run_drill()
+
+        commands = [" ".join(call[:3]) for call in self.azure.calls]
+        self.assertLess(commands.index("account get-access-token --resource"), commands.index("sql db restore"))
+
     def test_a_restore_point_older_than_the_backups_fails_before_touching_anything(self):
         self.azure.earliest = "2026-10-07T12:25:00Z"
 

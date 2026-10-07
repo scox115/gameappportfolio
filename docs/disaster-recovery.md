@@ -12,7 +12,7 @@ This guide covers what is backed up, how much data and time a recovery can cost,
 | Secrets (Key Vault) | Soft delete | 7 days | None, within the 7 days |
 | Code, infrastructure and configuration | Git, Bicep and the repository variables; a deploy rebuilds everything else | Forever | None |
 
-**Recovery time (RTO):** the monthly drill measures how long a restore of the real database takes and writes it in its run summary. That number is the one to plan for. For a database this size it is minutes, not hours.
+**Recovery time (RTO):** the monthly drill measures how long a restore of the real database takes and writes it in its run summary. That number is the one to plan for. The first drill, on 2026-10-07, took **21.9 minutes** to restore, so plan on about half an hour from deciding to restore to having the copy online.
 
 **Not covered:** the backups are stored in the same region (`requestedBackupStorageRedundancy: 'Local'`, the cheapest option), so they would not survive the loss of a whole Azure region. Geo-redundant backups cost extra, so for a portfolio game a region outage is an accepted risk. See [ADR 0017](adr/0017-restore-drills.md).
 
@@ -20,12 +20,13 @@ This guide covers what is backed up, how much data and time a recovery can cost,
 
 A backup nobody has restored is only a hope. On the 1st of every month, the **Restore drill** workflow (`.github/workflows/restore-drill.yml`) runs `infra/restore-drill/restore_drill.py`. The drill:
 
-1. Restores `GameDb` as it was 10 minutes ago into a new database, `GameDb-drill-<time>`, and times the restore.
-2. Lets only the runner's own IP address through the SQL firewall, for the length of the drill.
-3. Reads both databases with `infra/restore-drill/inspect-database.cs` and compares their migrations and row counts. The drill fails if the copy has no migration history, is missing tables, or is empty while the live database has data. Small differences in row counts are expected, because players kept playing after the restore point.
-4. Deletes the copy and the firewall rule, even if a step failed.
+1. Lets only the runner's own IP address through the SQL firewall, for the length of the drill.
+2. Signs in to the database and reads the live one first, so a sign-in or firewall problem shows up before the long wait. (In GitHub Actions the Azure CLI's sign-in can only fetch new tokens for 5 minutes, so the database token has to be fetched up front.)
+3. Restores `GameDb` as it was 10 minutes ago into a new database, `GameDb-drill-<time>`, and times the restore.
+4. Reads the copy with `infra/restore-drill/inspect-database.cs` and compares the two databases' migrations and row counts. The drill fails if the copy has no migration history, is missing tables, or is empty while the live database has data. Small differences in row counts are expected, because players kept playing after the restore point.
+5. Deletes the copy and the firewall rule, even if a step failed.
 
-The run summary shows the restore time and a table of live and restored row counts. GitHub emails you when a scheduled run fails. Players are not affected, because the live database is only read. The copy is a small serverless database that exists for a few minutes, so a drill costs a few cents.
+The run summary shows the restore time and a table of live and restored row counts. GitHub emails you when a scheduled run fails. Players are not affected, because the live database is only read. The copy is a small serverless database that exists for a few minutes once restored, so a drill costs a few cents.
 
 To run it by hand, open **Actions > Restore drill > Run workflow**. You can choose how far back to restore and whether to keep the copy so you can look at it in SSMS. If you keep it, delete it afterwards:
 
