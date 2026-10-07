@@ -1,6 +1,6 @@
 # 0003. Pay rewards in the request, use RabbitMQ only for read models
 
-- **Status:** Accepted
+- **Status:** Accepted; how events are sent is superseded by [0023](0023-transactional-outbox.md)
 - **Date:** 2026-10-06
 
 ## Context
@@ -10,7 +10,7 @@ Originally the API published "match finished" to RabbitMQ and `MatchConsumerWork
 ## Decision
 
 - **Rewards are written in the request that ends the battle**, in the same `SaveChanges` as the battle itself, guarded by optimistic concurrency ([0004](0004-optimistic-concurrency.md)). The player sees the reward in the response.
-- **RabbitMQ carries facts for read models only.** After a battle ends, the API puts a `MatchCompletedEvent` (kind, difficulty, turns, participants, outcome) on a bounded in-memory channel. `MatchTelemetrySender` publishes it with retries, so a battle request never waits on the broker.
+- **RabbitMQ carries facts for read models only.** After a battle ends, the API publishes a `MatchCompletedEvent` (kind, difficulty, turns, participants, outcome) in the background, so a battle request never waits on the broker. (Since [0023](0023-transactional-outbox.md) the event is saved to an outbox table with the match and sent from there.)
 - `MatchConsumerWorker` builds match history and daily arena stats through `MatchHistoryProjector`. A unique index on (MatchId, PlayerId) makes it idempotent; messages are acknowledged only after the save, and database errors requeue up to five times.
 
 ## Alternatives considered
@@ -22,4 +22,4 @@ Originally the API published "match finished" to RabbitMQ and `MatchConsumerWork
 
 - No reward can be lost, delayed or paid twice because of messaging.
 - The history page and arena stats are eventually consistent, normally under a second behind.
-- If the broker is down the game keeps working. `/health/ready` reports it as Degraded rather than Unhealthy, and up to 1,000 events wait in memory (oldest dropped first).
+- If the broker is down the game keeps working. `/health/ready` reports it as Degraded rather than Unhealthy, and events wait until it is back (in memory at first; in the outbox since [0023](0023-transactional-outbox.md)).

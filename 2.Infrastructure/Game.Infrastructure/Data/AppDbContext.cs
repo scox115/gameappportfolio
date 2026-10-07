@@ -4,6 +4,7 @@ using Game.Core.Entities;
 using Game.Core.History;
 using Game.Core.Operations;
 using Game.Infrastructure.Identity;
+using Game.Infrastructure.Messaging;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<DailyArenaStats> DailyArenaStats => Set<DailyArenaStats>();
     public DbSet<OperationsEvent> OperationsEvents => Set<OperationsEvent>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
