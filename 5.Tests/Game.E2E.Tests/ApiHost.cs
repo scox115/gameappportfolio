@@ -48,6 +48,7 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
         builder.UseSetting("Cleanup:Enabled", "false"); // the in-memory database can't bulk delete
         // Every browser comes from 127.0.0.1, so lift the per-address limits.
         builder.UseSetting("AntiCheat:RegistrationsPerHour", "100000");
+        builder.UseSetting("AntiCheat:GuestsPerHour", "100000");
         builder.UseSetting("AntiCheat:SignInsPerMinute", "100000");
         builder.UseSetting("AntiCheat:AvatarUploadsPerHour", "100000");
         builder.UseSetting("RabbitMq:UserName", "test");

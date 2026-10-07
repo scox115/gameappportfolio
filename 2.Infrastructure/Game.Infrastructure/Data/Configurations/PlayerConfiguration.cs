@@ -42,6 +42,9 @@ public class PlayerConfiguration : IEntityTypeConfiguration<Player>
             .HasDefaultValue(EloRating.StartingRating);
         builder.HasIndex(p => p.Rating);
 
+        // For the cleanup worker, which deletes guests nobody kept (see docs/adr/0030-guest-play.md).
+        builder.HasIndex(p => p.GuestSince);
+
         // Upgraded cards live in their own table, one row per card the player has upgraded.
         builder.OwnsMany(p => p.CardUpgrades, upgrades =>
         {

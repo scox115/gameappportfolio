@@ -82,6 +82,7 @@ public class GameApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:AzureBlobStorage", "UseDevelopmentStorage=true");
         // Every test client shares one address, so lift the per-address limits (RateLimitTests sets its own).
         builder.UseSetting("AntiCheat:RegistrationsPerHour", "100000");
+        builder.UseSetting("AntiCheat:GuestsPerHour", "100000");
         builder.UseSetting("AntiCheat:SignInsPerMinute", "100000");
         builder.UseSetting("AntiCheat:AvatarUploadsPerHour", "100000");
         // The in-memory database can't bulk delete; DataCleanupTests runs the cleanup on SQLite instead.

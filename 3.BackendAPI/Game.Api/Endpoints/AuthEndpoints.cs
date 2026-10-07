@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Game.Api.Admin;
 using Game.Api.Auth;
 using Game.Api.Hubs;
@@ -79,6 +80,53 @@ public static class AuthEndpoints
             var session = await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier, roleSync);
             return Results.Created("/players/me", session);
         }).RequireRateLimiting(RateLimits.Registration);
+
+        // Starts a guest hero with a made-up name and no password, so anyone can try the game in one click.
+        // The player can keep it later with a name and password of their own (POST /players/me/keep);
+        // otherwise the cleanup worker deletes it (see docs/adr/0030-guest-play.md).
+        group.MapPost("/guest", async (
+            GuestRequest? request,
+            UserManager<ApplicationUser> userManager,
+            AppDbContext dbContext,
+            TokenService tokenService,
+            RefreshTokenService refreshTokens,
+            SessionNotifier notifier,
+            AdminRoleSync roleSync,
+            TimeProvider timeProvider,
+            ILogger<GuestRequest> logger) =>
+        {
+            if (request?.Class is { } chosen && !Enum.IsDefined(chosen))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(GuestRequest.Class)] = ["Unknown class."]
+                });
+            }
+
+            // A million names, so a clash is rare; try a few before giving up.
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                var name = $"Guest{RandomNumberGenerator.GetInt32(1_000_000):D6}";
+                if (HeroNames.Problem(name) is not null || await dbContext.Players.AnyAsync(p => p.Username == name)) continue;
+
+                var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = name };
+                var player = Player.StartAsGuest(user.Id, name, Player.StartingGold, timeProvider.GetUtcNow().UtcDateTime);
+                if (request?.Class is { } heroClass) player.ChooseStartingClass(heroClass);
+
+                dbContext.Players.Add(player);
+                var result = await userManager.CreateAsync(user); // no password: the session is the only way in
+                if (result.Succeeded)
+                {
+                    var session = await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier, roleSync);
+                    return Results.Created("/players/me", session);
+                }
+
+                dbContext.Entry(player).State = EntityState.Detached;
+                logger.LogInformation("Guest name {Name} was taken a moment ago; trying another.", name);
+            }
+
+            return Results.Problem("Couldn't start a guest hero. Please try again.", statusCode: StatusCodes.Status503ServiceUnavailable);
+        }).RequireRateLimiting(RateLimits.Guest);
 
         group.MapPost("/login", async (
             LoginRequest request,

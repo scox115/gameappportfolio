@@ -295,6 +295,7 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy(RateLimits.Registration, context => PerAddress(context, limits => limits.RegistrationsPerHour, TimeSpan.FromHours(1)));
+    options.AddPolicy(RateLimits.Guest, context => PerAddress(context, limits => limits.GuestsPerHour, TimeSpan.FromHours(1)));
     options.AddPolicy(RateLimits.SignIn, context => PerAddress(context, limits => limits.SignInsPerMinute, TimeSpan.FromMinutes(1)));
     options.AddPolicy(RateLimits.Recovery, context => PerAddress(context, limits => limits.RecoveryRequestsPerHour, TimeSpan.FromHours(1)));
     options.AddPolicy(RateLimits.AvatarUpload, context => PerPlayer(context, limits => limits.AvatarUploadsPerHour, TimeSpan.FromHours(1)));
@@ -376,6 +377,7 @@ builder.Services.AddOptions<CleanupOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 builder.Services.AddScoped<DataCleanupService>();
+builder.Services.AddScoped<GuestCleanupService>();
 builder.Services.AddHostedService<DataCleanupWorker>();
 
 // The public status page: what is running, and a release log written when each revision goes live.

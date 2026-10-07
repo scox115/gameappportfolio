@@ -35,7 +35,7 @@
                 <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 15px;">
                     @foreach (var option in Stakes)
                     {
-                        var affordable = option <= State.Gold;
+                        var affordable = option <= State.Gold && (option == 0 || !State.IsGuest);
                         <button @onclick="() => Search(option)" disabled="@(!affordable)"
                                 aria-label="@(option == 0 ? "Friendly duel" : $"Wager {option} gold")"
                                 style="background: @(affordable ? (option == 0 ? "#0e7490" : "#b45309") : "#475569"); color: white; padding: 12px 18px; border: none; border-radius: 8px; font-weight: bold; cursor: @(affordable ? "pointer" : "not-allowed");">
@@ -43,6 +43,10 @@
                         </button>
                     }
                 </div>
+                @if (State.IsGuest)
+                {
+                    <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 12px;">Save your hero in town to duel for gold.</p>
+                }
             }
             else if (string.IsNullOrEmpty(errorMsg))
             {
@@ -379,7 +383,7 @@
         battle = null;
         reward = null;
         logs.Clear();
-        if (stake <= State.Gold)
+        if (stake <= State.Gold && (stake == 0 || !State.IsGuest))
         {
             await Search(stake);
         }

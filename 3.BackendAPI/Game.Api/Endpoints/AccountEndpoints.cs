@@ -2,10 +2,16 @@ using System.Security.Claims;
 using System.Text.Json;
 using Game.Api.Accounts;
 using Game.Api.Auth;
+using Game.Api.Models;
+using Game.Api.Moderation;
+using Game.Api.Options;
+using Game.Core.Moderation;
+using Game.Infrastructure.Data;
 using Game.Infrastructure.Identity;
 using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Game.Api.Endpoints;
@@ -32,6 +38,54 @@ public static class AccountEndpoints
             var options = new JsonSerializerOptions(json.Value.SerializerOptions) { WriteIndented = true };
             var file = JsonSerializer.SerializeToUtf8Bytes(export, options);
             return Results.File(file, "application/json", $"card-arena-{export.Account.Username}-{export.ExportedAt:yyyy-MM-dd}.json");
+        });
+
+        // POST: /api/players/me/keep, a guest keeps their hero under a name and password of their own
+        group.MapPost("/keep", async (
+            ClaimsPrincipal user,
+            KeepGuestRequest request,
+            UserManager<ApplicationUser> userManager,
+            AppDbContext dbContext,
+            ModerationService moderation,
+            IOptions<AdminOptions> adminOptions) =>
+        {
+            var account = await userManager.FindByIdAsync(user.GetPlayerId().ToString());
+            var player = await dbContext.Players.FindAsync(user.GetPlayerId());
+            if (account is null || player is null) return Results.NotFound("Player profile not found.");
+            if (!player.IsGuest) return Results.Conflict(new { message = "This hero is already saved." });
+
+            var username = request.Username?.Trim() ?? string.Empty;
+            if (HeroNames.Problem(username, allowStaffNames: adminOptions.Value.IsAdmin(username)) is { } nameProblem)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(KeepGuestRequest.Username)] = [nameProblem] });
+            }
+
+            if (await dbContext.Players.AnyAsync(p => p.Username == username && p.Id != player.Id)
+                || await moderation.NameTakenAsync(userManager.NormalizeName(username), except: null))
+            {
+                return Results.Conflict(new { message = $"The username '{username}' is already taken." });
+            }
+
+            // The name, the password and the hero are saved together: AddPasswordAsync checks the password
+            // rules first and saves nothing if they fail.
+            player.KeepAs(username);
+            account.UserName = username;
+            // Opponents' match history shows the new name, not the made-up one.
+            foreach (var entry in await dbContext.MatchHistory.Where(e => e.OpponentId == player.Id).ToListAsync())
+            {
+                entry.RenameOpponent(username);
+            }
+            var result = await userManager.AddPasswordAsync(account, request.Password ?? string.Empty);
+            if (!result.Succeeded)
+            {
+                return result.Errors.Any(e => e.Code == nameof(IdentityErrorDescriber.DuplicateUserName))
+                    ? Results.Conflict(new { message = $"The username '{username}' is already taken." })
+                    : Results.ValidationProblem(result.Errors
+                        .GroupBy(e => e.Code.StartsWith("Password", StringComparison.Ordinal) ? nameof(KeepGuestRequest.Password) : nameof(KeepGuestRequest.Username))
+                        .ToDictionary(g => g.Key, g => g.Select(e => e.Description).ToArray()));
+            }
+
+            return Results.Ok(PlayerProfileResponse.From(player));
         });
 
         // DELETE: /api/players/me, with the password, since this can't be undone

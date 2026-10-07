@@ -40,6 +40,9 @@ public class GameState
     /// <summary>True when the account has the Admin role, which shows the admin tools.</summary>
     public bool IsAdmin { get; private set; }
     public string Username { get; private set; } = string.Empty;
+
+    /// <summary>A guest hero: a made-up name and no password, until the player keeps it.</summary>
+    public bool IsGuest { get; private set; }
     public int Gold { get; private set; }
     public int Level { get; private set; }
     public string AvatarUrl { get; private set; } = string.Empty;
@@ -113,6 +116,20 @@ public class GameState
         NotifyStateChanged();
     }
 
+    public void UpdateGuest(bool isGuest)
+    {
+        IsGuest = isGuest;
+        NotifyStateChanged();
+    }
+
+    /// <summary>The guest hero now has a name and password of the player's own.</summary>
+    public void KeptAs(string username)
+    {
+        Username = username;
+        IsGuest = false;
+        NotifyStateChanged();
+    }
+
     public void UpdateAvatar(string url)
     {
         AvatarUrl = url;
@@ -127,6 +144,7 @@ public class GameState
         IsAdmin = false;
         PlayerId = Guid.Empty;
         Username = string.Empty;
+        IsGuest = false;
         Gold = 0;
         Level = 0;
         AvatarUrl = string.Empty;
