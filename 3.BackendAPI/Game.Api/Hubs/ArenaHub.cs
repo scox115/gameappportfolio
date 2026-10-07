@@ -30,6 +30,13 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatu
         return await battles.FindOpponentAsync(PlayerId, wager, Network);
     }
 
+    /// <summary>Starts a practice duel against the Arena Bot instead of waiting for another player.</summary>
+    public async Task DuelBot()
+    {
+        await EnsureDuelsAreOnAsync();
+        await battles.StartBotDuelAsync(PlayerId);
+    }
+
     // Switching duels off stops new ones; duels already under way play out.
     private async Task EnsureDuelsAreOnAsync()
     {

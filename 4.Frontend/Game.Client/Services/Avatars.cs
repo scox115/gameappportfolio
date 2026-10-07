@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 
 namespace Game.Client.Services;
@@ -14,7 +15,8 @@ public static class Avatars
         if (!string.IsNullOrEmpty(avatarUrl)) return avatarUrl;
 
         var name = string.IsNullOrWhiteSpace(username) ? "?" : username.Trim();
-        var initial = WebUtility.HtmlEncode(char.ToUpperInvariant(name[0]).ToString());
+        // The first whole character, so a name starting with an emoji (the Arena Bot's) keeps it.
+        var initial = WebUtility.HtmlEncode(StringInfo.GetNextTextElement(name).ToUpperInvariant());
         // A stable hash (string.GetHashCode changes between runs); dark enough for white text.
         var hue = (name.Aggregate(0, (hash, c) => unchecked(hash * 31 + c)) & 0x7fffffff) % 360;
         var svg = $"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='hsl({hue},55%,35%)'/>" +

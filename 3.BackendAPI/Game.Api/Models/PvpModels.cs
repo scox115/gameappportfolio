@@ -24,7 +24,8 @@ public record PvpBattleView(
     int Wager,
     bool Practice,
     PvpEndReason? EndReason,
-    IReadOnlyList<BattleCardResponse> YourCards)
+    IReadOnlyList<BattleCardResponse> YourCards,
+    bool AgainstBot = false)
 {
     // TurnSecondsLeft lets the browser count down without trusting its own clock.
     public static PvpBattleView For(Guid viewerId, PvpBattle battle, Player you, Player opponent, DateTime now) =>
@@ -41,7 +42,8 @@ public record PvpBattleView(
             battle.Wager,
             battle.Practice,
             battle.EndReason,
-            BattleCards.All.Select(c => BattleCardResponse.From(battle.CardFor(viewerId, c.Card), battle.LevelOf(viewerId, c.Card))).ToList());
+            BattleCards.All.Select(c => BattleCardResponse.From(battle.CardFor(viewerId, c.Card), battle.LevelOf(viewerId, c.Card))).ToList(),
+            battle.IsParticipant(ArenaBot.Id));
 
     private static PvpPlayerView PlayerView(PvpBattle battle, Player player) =>
         new(player.Id, player.Username, player.TitleName, player.Rating, player.AvatarUrl, player.EquippedFrame, battle.HpOf(player.Id), battle.MaxHpOf(player.Id), battle.IsShielded(player.Id),

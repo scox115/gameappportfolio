@@ -35,5 +35,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0029](0029-portrait-screening.md) | Screen portraits with Azure AI Content Safety before they're shown | Accepted |
 | [0030](0030-guest-play.md) | Let people play as a guest, and keep the hero later | Accepted |
 | [0031](0031-faster-first-visit.md) | A smaller client, and wake the server while it loads | Accepted |
+| [0032](0032-arena-bot.md) | A bot to duel when nobody else is in the lobby | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.
