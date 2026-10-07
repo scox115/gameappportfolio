@@ -76,6 +76,19 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      # Blue-green: players stay on this revision until the new one has passed its smoke test.
+      - name: Find the API revision players are on
+        id: live
+        run: |
+          app=$(az containerapp list --resource-group "$RESOURCE_GROUP" \
+            --query "[?ends_with(name, '-api')].name | [0]" --output tsv)
+          revision=""
+          if [ -n "$app" ]; then revision=$(bash infra/blue-green.sh live "$RESOURCE_GROUP" "$app"); fi
+          echo "Live API revision: ${revision:-none (first deploy)}"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
       # Re-applying the Bicep template takes about 3 minutes even when nothing changed. Its inputs
       # (the template, the settings and the secrets) are fingerprinted, and the fingerprint is part of
       # the deployment's name, so a run whose fingerprint matches the last successful deployment only
@@ -132,6 +145,7 @@ jobs:
               rabbitMqPassword="$RABBITMQ_PASSWORD" \
               registryUsername="$registry_user" \
               registryPassword="$REGISTRY_PASSWORD" \
+              liveRevision="${{ steps.live.outputs.revision }}" \
             --query properties.outputs --output json > outputs.json
         env:
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
@@ -149,14 +163,30 @@ jobs:
         env:
           RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
 
+      # The new revision has no traffic yet. Test it on its own address, then move players to it;
+      # if it fails, it is deactivated and players never see it. The previous revision stays on
+      # standby for the Rollback workflow.
+      - name: Release the new API revision
+        id: release
+        run: |
+          app=$(jq -r .apiContainerAppName.value outputs.json)
+          new=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$app" \
+            --query properties.latestRevisionName --output tsv)
+          bash infra/blue-green.sh release "$RESOURCE_GROUP" "$app" "$new" "${{ steps.live.outputs.revision }}"
+          echo "revision=$new" >> "$GITHUB_OUTPUT"
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
       - name: Read the deployed addresses
         id: infra
         run: |
-          echo "api=$(jq -r .apiUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
-          echo "client=$(jq -r .clientUrl.value outputs.json)" >> "$GITHUB_OUTPUT"
-          echo "game=$(jq -r '(.gameUrl // .clientUrl).value' outputs.json)" >> "$GITHUB_OUTPUT"
-          echo "swa=$(jq -r .staticWebAppName.value outputs.json)" >> "$GITHUB_OUTPUT"
-          echo "avatars=https://$(jq -r .storageAccount.value outputs.json).blob.core.windows.net" >> "$GITHUB_OUTPUT"
+          {
+            echo "api=$(jq -r .apiUrl.value outputs.json)"
+            echo "client=$(jq -r .clientUrl.value outputs.json)"
+            echo "game=$(jq -r '(.gameUrl // .clientUrl).value' outputs.json)"
+            echo "swa=$(jq -r .staticWebAppName.value outputs.json)"
+            echo "avatars=https://$(jq -r .storageAccount.value outputs.json).blob.core.windows.net"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build the client against the deployed API
         run: |
@@ -209,6 +239,7 @@ jobs:
             echo ""
             echo "- Game: ${{ steps.infra.outputs.game }}"
             echo "- API health: $api/health/ready"
+            echo "- API revision: ${{ steps.release.outputs.revision }} (standby for rollback: ${{ steps.live.outputs.revision || 'none' }})"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Keep GitHub Container Registry tidy (and inside the free storage allowance).

@@ -1,0 +1,53 @@
+name: Roll back the API
+
+# Moves players back to an earlier API revision. Each deploy keeps the revision it replaced active,
+# with no traffic and scaled to zero, so this takes about a minute. The game client is not rolled
+# back, so this suits a bad API release; if the new client needs the new API, fix forward instead.
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Revision to return to (leave empty for the one the last deploy replaced)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write   # sign in to Azure with OIDC
+
+concurrency:
+  group: deploy-production   # never at the same time as a deploy
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    if: vars.AZURE_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sign in to Azure
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Move traffic back
+        run: |
+          app=$(az containerapp list --resource-group "$RESOURCE_GROUP" \
+            --query "[?ends_with(name, '-api')].name | [0]" --output tsv)
+          from=$(bash infra/blue-green.sh live "$RESOURCE_GROUP" "$app")
+          to=$(bash infra/blue-green.sh rollback "$RESOURCE_GROUP" "$app" "$REVISION")
+          {
+            echo "### ↩️ API rolled back"
+            echo ""
+            echo "- From: $from"
+            echo "- To: $to"
+            echo ""
+            echo "The next deploy from main releases a new revision as usual."
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          REVISION: ${{ inputs.revision }}

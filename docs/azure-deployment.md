@@ -72,6 +72,9 @@ You need an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/
 ## Day to day
 
 - **Deploys:** merge to `main`. CI runs first, and the deploy only starts if CI passes. When nothing in `infra/main.bicep`, the repository variables or the secrets changed since the last successful deployment, the workflow skips the Bicep deployment and only swaps the API's image, which saves about 3 minutes. To force the full deployment anyway, run **Deploy to Azure** from the Actions tab with **Redeploy the infrastructure** ticked.
+- **Blue-green releases:** every deploy creates a new API revision that gets no players at first. The workflow tests it on its own address (`/health/ready` and a real API call), then moves all traffic to it. If the test fails, the new revision is switched off, players stay on the old one, and the run fails. The revision it replaced stays active with no traffic, scaled to zero, so it costs nothing. See [ADR 0016](adr/0016-blue-green-deploys.md).
+- **Roll back:** in the Actions tab, run **Roll back the API**. Leave the revision empty to return to the one the last deploy replaced, or enter any revision name from the Container App's **Revisions and replicas** page. It is tested before players are moved. The game client is not rolled back, so this suits a bad API release; if the new client needs the new API, fix forward instead. The next merge to `main` deploys forward as usual.
+- **Database changes must work with the previous release.** The new revision applies EF Core migrations when it starts, while players are still on the old one, and a rollback runs old code against the new schema. Add columns and tables in one release and remove the old ones in a later release (expand, then contract), never in the same one.
 - **Logs and traces:** in the Azure portal, open the Application Insights resource and use Transaction search or Logs. Container logs are under the Container App's **Log stream**.
 - **Health:** open `https://<api>/health/ready`.
 - **Query the production database from SSMS:**
@@ -130,6 +133,7 @@ group. Together they cost well under $1 a month: about $0.50 for the error check
   region for your subscription. The database defaults to `centralus`; to use another region, add a
   repository variable `AZURE_SQL_LOCATION` (for example `westus2` or `northcentralus`) and run the
   workflow again. The rest of the app stays where it is.
+- **The deploy fails at "Release the new API revision"**: the new build didn't pass its smoke test, and players are still on the previous revision. The log names the revision; open it under the Container App's **Revisions and replicas**, or its **Log stream**, to see why it didn't start (a failing migration is the usual cause). Fix it and merge again.
 - **The deploy fails on the custom domain** (`CNAME Record is invalid` or similar): the CNAME record doesn't
   resolve to the Static Web App yet. Check it with `Resolve-DnsName`, wait for DNS to update, and run the workflow
   again. Clear the `CUSTOM_DOMAIN` variable to deploy without it.
