@@ -65,6 +65,9 @@ param alertEmail string = ''
 @description('Set to true to keep feature flags in Azure App Configuration (free tier), so they can be flipped without a deploy.')
 param appConfiguration string = ''
 
+@description('Usernames that are admins, separated by commas (see docs/adr/0021-admin-roles-and-audit-log.md). Leave empty for none.')
+param adminUsernames string = ''
+
 @description('The API revision serving players now. A deploy keeps all traffic on it, so the new revision starts with none until infra/blue-green.sh has tested it. Leave empty on the very first deploy.')
 param liveRevision string = ''
 
@@ -385,6 +388,7 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'ForwardedHeaders__TrustAllProxies', value: 'true' }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
             { name: 'Cors__AllowedOrigins__0', value: 'https://${client.properties.defaultHostname}' }
+            { name: 'Admin__Usernames', value: adminUsernames }
           ], empty(customDomain) ? [] : [
             { name: 'Cors__AllowedOrigins__1', value: 'https://${customDomain}' }
           ], featureFlagStoreEnabled ? [

@@ -29,6 +29,9 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
 
     public string BaseUrl { get; }
 
+    /// <summary>Heroes created with these names are admins (one per test, since names are unique).</summary>
+    public static readonly string[] AdminNames = ["RefereeFlow", "RefereeAxe"];
+
     /// <summary>Flips feature flags while the API runs, the way Azure App Configuration does.</summary>
     public FeatureSwitches Features { get; } = new();
 
@@ -48,6 +51,7 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
         builder.UseSetting("RabbitMq:Password", "test");
         builder.UseSetting("Jwt:SigningKey", "browser-tests-signing-key-that-is-long-enough");
         builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        builder.UseSetting("Admin:Usernames", string.Join(',', AdminNames));
         builder.ConfigureAppConfiguration(configuration => configuration.Add(Features));
 
         builder.ConfigureServices(services =>

@@ -16,14 +16,16 @@ public record PlayerProfileResponse(
 
 /// <summary>
 /// A signed-in session. Use the access token on API calls until ExpiresAt, then trade the refresh
-/// token at /api/v1/auth/refresh for a new pair; each refresh token works once.
+/// token at /api/v1/auth/refresh for a new pair; each refresh token works once. Roles lists what
+/// else the account may do, such as "Admin".
 /// </summary>
 public record AuthResponse(
     string AccessToken,
     DateTimeOffset ExpiresAt,
     string RefreshToken,
     DateTimeOffset RefreshTokenExpiresAt,
-    PlayerProfileResponse Player);
+    PlayerProfileResponse Player,
+    List<string> Roles);
 
 /// <param name="RegisteredPlayers">Every hero who has signed up.</param>
 public record PlayerStatsResponse(int RegisteredPlayers);

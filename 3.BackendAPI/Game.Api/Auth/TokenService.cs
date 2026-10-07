@@ -14,18 +14,23 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
 {
     private readonly JwtOptions _options = options.Value;
 
-    public AccessToken CreateAccessToken(ApplicationUser user)
+    /// <summary>The claim holding the account's roles, such as "Admin".</summary>
+    public const string RoleClaim = "role";
+
+    /// <param name="roles">The account's roles; the token carries them, so admin checks need no database read.</param>
+    public AccessToken CreateAccessToken(ApplicationUser user, IEnumerable<string> roles)
     {
         var now = timeProvider.GetUtcNow();
         var expiresAt = now.AddMinutes(_options.AccessTokenMinutes);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim(SessionClaims.SessionId, user.CurrentSessionId?.ToString() ?? string.Empty)
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(SessionClaims.SessionId, user.CurrentSessionId?.ToString() ?? string.Empty)
         };
+        claims.AddRange(roles.Select(role => new Claim(RoleClaim, role)));
 
         var token = new JwtSecurityToken(
             issuer: _options.Issuer,

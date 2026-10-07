@@ -17,7 +17,12 @@ public class ActiveSessionHubFilter(ActiveSessionValidator sessions) : IHubFilte
         var connection = invocationContext.Context;
         if (connection.User is not { } user || !await sessions.IsCurrentAsync(user, connection.ConnectionAborted))
         {
-            throw new HubException("You signed in on another browser, so this one was signed out.");
+            var reason = connection.User is { } signedIn
+                ? await sessions.EndReasonAsync(signedIn, connection.ConnectionAborted)
+                : SessionClaims.SignedInElsewhere;
+            throw new HubException(reason == SessionClaims.Suspended
+                ? "Your hero was suspended, so you were signed out."
+                : "You signed in on another browser, so this one was signed out.");
         }
 
         return await next(invocationContext);

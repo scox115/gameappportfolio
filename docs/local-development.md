@@ -150,7 +150,8 @@ CI runs them on every pull request in the `browser-tests` job, and uploads the s
 | `FeatureManagement:Duels` / `HeroicBoss` / `GoldShop` | `true` | inherited | no |
 | `AppConfig:Endpoint` | none (flags from appsettings) | none | no; set by the Azure deployment when `APP_CONFIGURATION` is `true` |
 | `Cleanup:FirstRunDelay` / `Interval` | `00:01:00` / `06:00:00` | inherited | no |
-| `Cleanup:ExpiredTokenRetentionDays` / `FinishedBattleRetentionDays` / `BatchSize` | `7` / `30` / `1000` | inherited | no |
+| `Cleanup:ExpiredTokenRetentionDays` / `FinishedBattleRetentionDays` / `AuditLogRetentionDays` / `BatchSize` | `7` / `30` / `365` / `1000` | inherited | no |
+| `Admin:Usernames` | empty (no admins) | empty; set it with user-secrets to try the admin tools, e.g. `dotnet user-secrets set "Admin:Usernames" "MyHero" --project 3.BackendAPI/Game.Api` | no; set by the Azure deployment from `ADMIN_USERNAMES` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none (no export) | `http://localhost:4317` (the dashboard container) | no |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | none (no export) | none | set by the Azure deployment |
 | `ForwardedHeaders:TrustAllProxies` | `false` | `false` | `true` only behind Container Apps' ingress |

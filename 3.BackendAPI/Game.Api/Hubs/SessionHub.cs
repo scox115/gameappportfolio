@@ -8,6 +8,9 @@ public interface ISessionClient
 {
     /// <summary>The account signed in on another browser, so this one has been signed out.</summary>
     Task SessionEnded();
+
+    /// <summary>An admin suspended the account, so every browser has been signed out.</summary>
+    Task Suspended();
 }
 
 /// <summary>

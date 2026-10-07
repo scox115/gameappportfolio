@@ -151,6 +151,10 @@
                                         <p style="color: #f87171; margin: 15px 0 0;">@statusMsg</p>
                                     }
                                     <AccountSettings />
+                                    @if (State.IsAdmin)
+                                    {
+                                        <a href="admin" style="display: block; color: #fbbf24; font-size: 0.8rem; margin-top: 10px;">🛡️ Admin tools</a>
+                                    }
                                 </div>
 
                             </div>
@@ -484,6 +488,11 @@
             {
                 await StartSession(res);
             }
+            else if (res.StatusCode == HttpStatusCode.Forbidden)
+            {
+                // Suspended by an admin: the API says until when and why.
+                statusMsg = await ReadProblemDetail(res) ?? "This hero is suspended.";
+            }
             else statusMsg = res.StatusCode switch
             {
                 HttpStatusCode.Unauthorized => "Wrong character name or password.",
@@ -522,6 +531,16 @@
         State.UpdateClass(auth.player.@class);
         State.SetPlayerSession(new SessionTokens(auth.accessToken, auth.expiresAt, auth.refreshToken), auth.player.id, auth.player.username, auth.player.gold, auth.player.level, auth.player.avatarUrl);
         State.UpdateCosmetics(auth.player.frame, auth.player.cardSkin);
+        State.UpdateRoles(auth.roles);
+    }
+
+    private static async Task<string?> ReadProblemDetail(HttpResponseMessage res)
+    {
+        try
+        {
+            return (await res.Content.ReadFromJsonAsync<ProblemDto>())?.detail;
+        }
+        catch (System.Text.Json.JsonException) { return null; }
     }
 
     // Turns an ASP.NET Core validation problem (e.g. password rules) into one readable line.
@@ -939,6 +958,12 @@
         public DateTimeOffset expiresAt { get; set; }
         public string refreshToken { get; set; } = "";
         public PlayerProfileDto? player { get; set; }
+        public List<string>? roles { get; set; }
+    }
+
+    public class ProblemDto
+    {
+        public string? detail { get; set; }
     }
 
     public class ValidationProblemDto

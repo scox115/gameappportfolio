@@ -5,8 +5,8 @@
 @inject TokenRefresher Tokens
 @implements IAsyncDisposable
 
-@* Keeps a connection open while signed in, so signing in on another browser signs this one out
-   straight away instead of on its next click. *@
+@* Keeps a connection open while signed in, so signing in on another browser (or being suspended by
+   an admin) signs this one out straight away instead of on its next click. *@
 
 @code {
     private HubConnection? hub;
@@ -35,6 +35,7 @@
                 .Build();
 
             hub.On("SessionEnded", () => InvokeAsync(() => State.SignOut(GameState.SignedInElsewhereMessage)));
+            hub.On("Suspended", () => InvokeAsync(() => State.SignOut(GameState.SuspendedMessage)));
 
             try
             {

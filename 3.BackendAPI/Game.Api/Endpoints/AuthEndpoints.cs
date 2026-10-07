@@ -1,3 +1,4 @@
+using Game.Api.Admin;
 using Game.Api.Auth;
 using Game.Api.Hubs;
 using Game.Api.Models;
@@ -25,7 +26,8 @@ public static class AuthEndpoints
             AppDbContext dbContext,
             TokenService tokenService,
             RefreshTokenService refreshTokens,
-            SessionNotifier notifier) =>
+            SessionNotifier notifier,
+            AdminRoleSync roleSync) =>
         {
             var username = request.Username?.Trim() ?? string.Empty;
             if (username.Length is < 3 or > 50)
@@ -65,7 +67,7 @@ public static class AuthEndpoints
                     : Results.ValidationProblem(ToValidationErrors(result));
             }
 
-            var session = await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier);
+            var session = await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier, roleSync);
             return Results.Created("/players/me", session);
         }).RequireRateLimiting(RateLimits.Registration);
 
@@ -76,7 +78,9 @@ public static class AuthEndpoints
             AppDbContext dbContext,
             TokenService tokenService,
             RefreshTokenService refreshTokens,
-            SessionNotifier notifier) =>
+            SessionNotifier notifier,
+            AdminRoleSync roleSync,
+            TimeProvider timeProvider) =>
         {
             var user = string.IsNullOrWhiteSpace(request.Username)
                 ? null
@@ -99,13 +103,20 @@ public static class AuthEndpoints
                 return Results.Unauthorized();
             }
 
+            // Only said once the password is right, so the reason isn't shown to anyone who knows the name.
+            if (user.IsSuspended(timeProvider.GetUtcNow()))
+            {
+                return Results.Problem(SuspendedMessage(user), statusCode: StatusCodes.Status403Forbidden, title: "Suspended",
+                    extensions: new Dictionary<string, object?> { ["suspendedUntil"] = user.SuspendedUntil });
+            }
+
             var player = await dbContext.Players.FindAsync(user.Id);
             if (player is null)
             {
                 return Results.Problem("This account has no player profile.", statusCode: StatusCodes.Status409Conflict);
             }
 
-            return Results.Ok(await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier));
+            return Results.Ok(await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier, roleSync));
         }).RequireRateLimiting(RateLimits.SignIn);
 
         // Trades a refresh token for a new access token and a new refresh token.
@@ -115,7 +126,8 @@ public static class AuthEndpoints
             UserManager<ApplicationUser> userManager,
             AppDbContext dbContext,
             TokenService tokenService,
-            RefreshTokenService refreshTokens) =>
+            RefreshTokenService refreshTokens,
+            ActiveSessionValidator sessions) =>
         {
             if (await refreshTokens.RotateAsync(request.RefreshToken) is not { } rotated)
             {
@@ -125,7 +137,7 @@ public static class AuthEndpoints
             if (rotated.Replacement is null)
             {
                 // Tell the browser why, so it can say so instead of "your session expired".
-                httpContext.Response.Headers[SessionClaims.EndedHeader] = SessionClaims.SignedInElsewhere;
+                httpContext.Response.Headers[SessionClaims.EndedHeader] = await sessions.EndReasonAsync(rotated.UserId);
                 return Results.Unauthorized();
             }
 
@@ -137,9 +149,10 @@ public static class AuthEndpoints
             }
 
             await dbContext.SaveChangesAsync();
-            var access = tokenService.CreateAccessToken(user);
+            var roles = await userManager.GetRolesAsync(user);
+            var access = tokenService.CreateAccessToken(user, roles);
             return Results.Ok(new AuthResponse(access.Token, access.ExpiresAt,
-                rotated.Replacement.Token, rotated.Replacement.ExpiresAt, PlayerProfileResponse.From(player)));
+                rotated.Replacement.Token, rotated.Replacement.ExpiresAt, PlayerProfileResponse.From(player), roles.ToList()));
         });
 
         // Signing out revokes the refresh token so it can't be used again.
@@ -156,16 +169,27 @@ public static class AuthEndpoints
         TokenService tokenService,
         RefreshTokenService refreshTokens,
         AppDbContext dbContext,
-        SessionNotifier notifier)
+        SessionNotifier notifier,
+        AdminRoleSync roleSync)
     {
+        var roles = await roleSync.SyncAsync(user);
+
         // One browser at a time: a new sign-in retires every earlier session's tokens.
         user.CurrentSessionId = Guid.NewGuid();
         await refreshTokens.RevokeAllAsync(user.Id);
         var refresh = refreshTokens.Issue(user.Id);
         await dbContext.SaveChangesAsync();
         await notifier.EndOtherSessionsAsync(user.Id);
-        var access = tokenService.CreateAccessToken(user);
-        return new AuthResponse(access.Token, access.ExpiresAt, refresh.Token, refresh.ExpiresAt, PlayerProfileResponse.From(player));
+        var access = tokenService.CreateAccessToken(user, roles);
+        return new AuthResponse(access.Token, access.ExpiresAt, refresh.Token, refresh.ExpiresAt, PlayerProfileResponse.From(player), roles.ToList());
+    }
+
+    private static string SuspendedMessage(ApplicationUser user)
+    {
+        var until = user.SuspendedUntil == DateTimeOffset.MaxValue
+            ? "until an admin reinstates it"
+            : $"until {AdminService.Describe(user.SuspendedUntil!.Value)}";
+        return $"This hero is suspended {until}. Reason: {user.SuspensionReason}";
     }
 
     private static Dictionary<string, string[]> ToValidationErrors(IdentityResult result) =>

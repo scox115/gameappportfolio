@@ -151,6 +151,25 @@ public class Player
         Version = Guid.NewGuid();
     }
 
+    /// <summary>The most gold an admin can add or take away in one correction.</summary>
+    public const int MaxGoldCorrection = 100_000;
+
+    /// <summary>
+    /// An admin's correction: adds gold (positive) or takes it away (negative), such as to make good
+    /// a bug or undo an exploit. Gold never goes below zero.
+    /// </summary>
+    public void CorrectGold(int change)
+    {
+        if (change == 0) throw new ArgumentException("A correction must change the gold.", nameof(change));
+        if (Math.Abs((long)change) > MaxGoldCorrection)
+            throw new ArgumentOutOfRangeException(nameof(change), $"Corrections are limited to {MaxGoldCorrection:N0} gold at a time.");
+        if (Gold + change < 0)
+            throw new InvalidOperationException($"{Username} has {Gold} gold, so at most {Gold} can be taken away.");
+
+        Gold += change;
+        Version = Guid.NewGuid();
+    }
+
     /// <param name="playedAs">The class the hero dueled as; defaults to their current class.</param>
     public void RecordPvpWin(int ratingGained, HeroClass? playedAs = null)
     {

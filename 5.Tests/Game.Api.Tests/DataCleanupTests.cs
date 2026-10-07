@@ -1,5 +1,6 @@
 using Game.Api.Options;
 using Game.Api.Workers;
+using Game.Core.Admin;
 using Game.Core.Battles;
 using Game.Infrastructure.Data;
 using Game.Infrastructure.Identity;
@@ -67,6 +68,20 @@ public sealed class DataCleanupTests : IDisposable
     }
 
     [Fact]
+    public async Task AuditLogEntries_AreKeptForAYear()
+    {
+        var old = AuditEntry(daysAgo: 400);
+        var recent = AuditEntry(daysAgo: 300);
+        await SaveAsync(old, recent);
+
+        var result = await RunCleanupAsync();
+
+        Assert.Equal(1, result.OldAuditEntries);
+        await using var db = NewContext();
+        Assert.Equal([recent.Id], await db.AuditLog.Select(e => e.Id).ToListAsync());
+    }
+
+    [Fact]
     public async Task ABigBacklog_IsDeletedInBatches()
     {
         await SaveAsync(Enumerable.Range(0, 25).Select(_ => (object)Token(createdDaysAgo: 60, livesForDays: 7)).ToArray());
@@ -122,6 +137,9 @@ public sealed class DataCleanupTests : IDisposable
         }
         return battle;
     }
+
+    private AuditLogEntry AuditEntry(int daysAgo) =>
+        new(Now.AddDays(-daysAgo), AdminAction.AdjustGold, Guid.NewGuid(), "admin", _userId, "cleaner", "Refund for a bug.", "+10 gold");
 
     private PvpBattle FinishedDuel(int daysAgo)
     {

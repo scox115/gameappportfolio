@@ -1,3 +1,4 @@
+using Game.Core.Admin;
 using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Core.History;
@@ -25,6 +26,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<MatchHistoryEntry> MatchHistory => Set<MatchHistoryEntry>();
     public DbSet<DailyArenaStats> DailyArenaStats => Set<DailyArenaStats>();
     public DbSet<OperationsEvent> OperationsEvents => Set<OperationsEvent>();
+    public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
