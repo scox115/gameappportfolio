@@ -65,8 +65,6 @@ jobs:
             -p:ContainerImageTags="\"$tag;latest\"" \
             -p:ContainerFamily=noble-chiseled-extra \
             -p:Version="1.0.${GITHUB_RUN_NUMBER}" -p:SourceRevisionId="$HEAD_SHA"
-          # Fill in the Content Security Policy: the API, the avatar storage and this build's import map hash.
-          python3 infra/set-client-csp.py out/client/wwwroot "${{ steps.infra.outputs.api }}" "${{ steps.infra.outputs.avatars }}"
           echo "name=ghcr.io/$repository:$tag" >> "$GITHUB_OUTPUT"
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
