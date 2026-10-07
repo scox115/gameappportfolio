@@ -15,7 +15,10 @@ public class TelemetryTests(ArenaFixture arena) : BrowserTest(arena)
         await page.GetByRole(AriaRole.Button, new() { Name = "Leaderboards" }).ClickAsync();
         await Assertions.Expect(page.GetByText("GLOBAL HERO RANKINGS")).ToBeVisibleAsync();
 
-        var items = await SentAsync(page, sent => Views(sent).Contains("Leaderboard"));
+        // The screen view is sent on arrival, but the leaderboard call is recorded only when its answer comes
+        // back, which can be after the next flush; wait for both.
+        var items = await SentAsync(page, sent => Views(sent).Contains("Leaderboard") && sent.Any(item =>
+            item.Kind() == "RemoteDependencyData" && Name(item).Contains("/api/v1/players/leaderboard")));
 
         Assert.Equal(["Sign in", "Town", "Leaderboard"], Views(items));
         Assert.Contains(items, item => item.Kind() == "PageviewPerformanceData");
