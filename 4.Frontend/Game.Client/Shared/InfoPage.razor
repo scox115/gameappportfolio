@@ -1,0 +1,23 @@
+@* The shell for the game's plain text pages (terms, privacy): the dark backdrop, a header and a way back. *@
+<div class="info-shell">
+    <div class="info-page">
+        <header class="info-header">
+            <a href="" class="info-home">⚔️ Kings of the Card Arena</a>
+            <h1>@Title</h1>
+            @if (!string.IsNullOrEmpty(Updated))
+            {
+                <p class="info-updated">Last updated @Updated</p>
+            }
+        </header>
+        <article class="info-body">
+            @ChildContent
+        </article>
+        <p class="info-back"><a href="">Back to the game</a></p>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Updated { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -75,6 +75,10 @@
                     {
                         <!-- ONLY NEW HEROES PICK A CLASS; RETURNING HEROES KEEP THEIRS -->
                         <ClassPicker @bind-Selected="chosenClass" Heading="Choose your class:" />
+                        <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 12px;">
+                            By creating a hero you agree to the <a href="terms" style="color: #a5b4fc;">Terms of Service</a>
+                            and <a href="privacy" style="color: #a5b4fc;">Privacy Policy</a>.
+                        </p>
                         <button type="submit" disabled="@(!CredentialsEntered)"
                                 style="width: 100%; background: #047857; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: @(CredentialsEntered ? "pointer" : "not-allowed"); opacity: @(CredentialsEntered ? "1" : "0.5");">Create Hero</button>
                     }

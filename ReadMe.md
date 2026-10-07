@@ -117,3 +117,7 @@ The k6 load test is described in [docs/load-testing.md](docs/load-testing.md).
 - [Azure deployment](docs/azure-deployment.md): costs, security choices, one-time setup, troubleshooting
 - [API versioning](docs/api-versioning.md)
 - [Load testing](docs/load-testing.md): method and results
+
+## License
+
+© 2026 Scott Cox. The code is released under the [MIT License](LICENSE); third-party components are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Playing the hosted game is covered by its [Terms of Service](https://play.scottcoxdev.com/terms) and [Privacy Policy](https://play.scottcoxdev.com/privacy).

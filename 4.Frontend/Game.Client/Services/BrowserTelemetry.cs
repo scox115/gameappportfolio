@@ -42,6 +42,8 @@ public sealed class BrowserTelemetry(IJSRuntime js, GameState state, NavigationM
                 _ => screen.ToString(),
             },
             "status" => "Status",
+            "terms" => "Terms",
+            "privacy" => "Privacy",
             _ => "Not found",
         };
 

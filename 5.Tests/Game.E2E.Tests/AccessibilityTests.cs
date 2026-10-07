@@ -148,6 +148,17 @@ public class AccessibilityTests(ArenaFixture arena) : BrowserTest(arena)
         await Assertions.Expect(dialog).ToBeHiddenAsync();
     });
 
+    [Theory]
+    [InlineData("terms", "Terms of Service")]
+    [InlineData("privacy", "Privacy Policy")]
+    public Task TheLegalPages_HaveNoViolations(string path, string heading) => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var page = await NewBrowserAsync();
+        await page.GotoAsync($"{Arena.ClientUrl}/{path}");
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = heading, Level = 1 })).ToBeVisibleAsync();
+        await AssertNoViolationsAsync(page, heading);
+    });
+
     private static async Task TabToAsync(IPage page, ILocator target, int maxPresses = 60)
     {
         await Assertions.Expect(target).ToBeVisibleAsync();
