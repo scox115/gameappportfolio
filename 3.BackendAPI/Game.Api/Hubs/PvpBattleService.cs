@@ -334,11 +334,17 @@ public class PvpBattleService(
 
         await BroadcastAsync(battle, lastTurn, rewards, (client, update) => client.BattleUpdated(update));
 
+        if (battle.IsFinished)
+        {
+            // Practice duels count too, so the ops dashboard shows how much the Arena Bot is played.
+            GameTelemetry.DuelCompleted(battle.EndReason?.ToString() ?? "Unknown",
+                battle.IsParticipant(ArenaBot.Id) ? "bot" : "player", counted: completed is not null);
+        }
+
         if (completed is not null)
         {
             var winnerId = completed.WinnerId;
             outbox.Notify();
-            GameTelemetry.BattleCompleted("pvp", battle.EndReason?.ToString() ?? "Unknown");
             logger.LogInformation("PvP battle {BattleId} won by {WinnerId} ({Reason})", battle.Id, winnerId, battle.EndReason);
         }
     }

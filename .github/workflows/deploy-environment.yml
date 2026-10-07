@@ -105,7 +105,7 @@ jobs:
       - name: Check whether the infrastructure changed
         id: plan
         run: |
-          fingerprint=$( { cat infra/main.bicep; printf '%s\n' "$INFRA_INPUTS"; } | sha256sum | cut -c1-12)
+          fingerprint=$( { cat infra/main.bicep infra/ops-dashboard/workbook.json; printf '%s\n' "$INFRA_INPUTS"; } | sha256sum | cut -c1-12)
           last=$(az deployment group list --resource-group "$RESOURCE_GROUP" \
             --query "sort_by([?starts_with(name, 'card-arena-') && properties.provisioningState == 'Succeeded'], &properties.timestamp)[-1].name" \
             --output tsv)
@@ -206,6 +206,7 @@ jobs:
             echo "swa=$(jq -r .staticWebAppName.value outputs.json)"
             echo "avatars=https://$(jq -r .storageAccount.value outputs.json).blob.core.windows.net"
             echo "telemetry=$(jq -r '.appInsightsConnectionString.value // ""' outputs.json)"
+            echo "dashboard=$(jq -r '.opsDashboardUrl.value // ""' outputs.json)"
           } >> "$GITHUB_OUTPUT"
 
       # Lets publishing rebuild the WebAssembly runtime with only what the client uses, which roughly
@@ -271,6 +272,7 @@ jobs:
             echo "- Game: ${{ steps.infra.outputs.game }}"
             echo "- API health: $status ($api/health/ready)"
             echo "- API revision: ${{ steps.release.outputs.revision }} (standby for rollback: ${{ steps.live.outputs.revision || 'none' }})"
+            if [ -n "${{ steps.infra.outputs.dashboard }}" ]; then echo "- Ops dashboard: ${{ steps.infra.outputs.dashboard }}"; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Keep GitHub Container Registry tidy (and inside the free storage allowance).

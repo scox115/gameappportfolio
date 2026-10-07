@@ -2,7 +2,7 @@
 
 A real-time card battler built as if it were a production service: a .NET 10 API and a Blazor WebAssembly client, live in Azure, deployed on every merge, and run for close to nothing. This page is the five-minute tour: what it is, how it's built, the decisions that shaped it and the numbers behind them. Each decision links to its full Architecture Decision Record (ADR).
 
-**▶ [Play it](https://play.scottcoxdev.com)** (one click as a guest) · [Source and setup](../ReadMe.md) · [All 32 ADRs](adr/README.md)
+**▶ [Play it](https://play.scottcoxdev.com)** (one click as a guest) · [Source and setup](../ReadMe.md) · [All 33 ADRs](adr/README.md)
 
 ![Two browsers playing a live duel against each other](images/duel.gif)
 
@@ -90,6 +90,7 @@ flowchart LR
 - **Problem:** a bad deploy to a live game is visible to every player at once.
 - **Choice:** every merge deploys to a full staging copy built from the same Bicep template, then promotes the exact image staging tested. In production the new build starts as its own Container Apps revision with no traffic, is smoke-tested against the real database, and only then takes over. The previous revision stays deployed (scaled to zero) for a one-click rollback. Pull requests get their own preview site.
 - **Trade-off:** a second copy of the infrastructure, which on free tiers costs almost nothing. ([ADR 0026](adr/0026-staging-and-previews.md), [ADR 0016](adr/0016-blue-green-deploys.md))
+- **Afterwards:** an ops dashboard, deployed from the same template, shows each release taking over its traffic next to errors, response times and player activity, and emails go out when errors, slow requests or browser crashes climb. ([ADR 0033](adr/0033-ops-dashboard.md))
 
 ### 6. Testing the parts that break under load
 
@@ -136,5 +137,6 @@ The fix was one query instead of two. The lasting change was making sure it can'
 | Passing SignalR messages between replicas | [`3.BackendAPI/Game.Api/ScaleOut`](../3.BackendAPI/Game.Api/ScaleOut) |
 | The outbox relay | [`3.BackendAPI/Game.Api/Messaging`](../3.BackendAPI/Game.Api/Messaging) |
 | All of the Azure infrastructure | [`infra/main.bicep`](../infra/main.bicep) |
+| The ops dashboard and the check that runs its queries in CI | [`infra/ops-dashboard`](../infra/ops-dashboard) |
 | The release pipeline | [`.github/workflows`](../.github/workflows) |
 | Tests that run two replicas against one database | [`5.Tests/Game.Api.Tests/ScaleOutTests.cs`](../5.Tests/Game.Api.Tests/ScaleOutTests.cs) |

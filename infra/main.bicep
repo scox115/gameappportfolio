@@ -553,8 +553,30 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
+// --- Ops dashboard ---
+// An Azure Monitor workbook (free) with the live game's traffic, errors, speed, players, battles,
+// releases and resources. It's kept as JSON next to this file, checked by check-workbook.cs in CI, and
+// pointed at this environment's resources here. See docs/adr/0033-ops-dashboard.md.
+
+resource opsDashboard 'Microsoft.Insights/workbooks@2023-06-01' = {
+  // A workbook's name must be a GUID; this one is the same on every deploy, so the deploy updates it.
+  name: guid(resourceGroup().id, 'ops-dashboard')
+  location: location
+  tags: tags
+  kind: 'shared'
+  properties: {
+    displayName: 'Card Arena operations (${environmentName})'
+    category: 'workbook'
+    sourceId: appInsights.id
+    serializedData: replace(replace(replace(loadTextContent('ops-dashboard/workbook.json'),
+      '__APP_INSIGHTS_ID__', appInsights.id),
+      '__API_ID__', api.id),
+      '__DATABASE_ID__', database.id)
+  }
+}
+
 // --- Alerts ---
-// Email is free up to 1,000 a month. The log alert runs every 15 minutes (about $0.50 a month) and the
+// Email is free up to 1,000 a month. Each log alert runs every 15 minutes (about $0.50 a month) and the
 // metric alert costs about $0.10 a month.
 
 var alertsEnabled = !empty(alertEmail)
@@ -596,6 +618,77 @@ resource serverErrorsAlert 'Microsoft.Insights/scheduledQueryRules@2023-03-15-pr
           timeAggregation: 'Count'
           operator: 'GreaterThanOrEqual'
           threshold: 5
+          failingPeriods: {
+            numberOfEvaluationPeriods: 1
+            minFailingPeriodsToAlert: 1
+          }
+        }
+      ]
+    }
+    autoMitigate: true
+    actions: {
+      actionGroups: [alertEmails.id]
+    }
+  }
+}
+
+// Slow answers are the first sign of a struggling database or an API at its replica limit. SignalR
+// connections stay open for a whole visit, so they aren't response times; quiet periods are skipped
+// because a handful of cold starts would trip it.
+resource slowRequestsAlert 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' = if (alertsEnabled) {
+  name: 'alert-${appName}-slow-requests'
+  location: location
+  tags: tags
+  properties: {
+    displayName: 'Card Arena API is slow'
+    description: 'The slowest 5% of player requests took over 2 seconds in the last 15 minutes. Open the ops dashboard (Endpoints, slowest first) and the Azure resources section.'
+    severity: 2
+    enabled: true
+    scopes: [appInsights.id]
+    evaluationFrequency: 'PT15M'
+    windowSize: 'PT15M'
+    criteria: {
+      allOf: [
+        {
+          query: 'requests | where url !contains "/hubs/" | summarize Requests = count(), SlowestFivePercent = percentile(duration, 95) | where Requests >= 20'
+          timeAggregation: 'Maximum'
+          metricMeasureColumn: 'SlowestFivePercent'
+          operator: 'GreaterThan'
+          threshold: 2000
+          failingPeriods: {
+            numberOfEvaluationPeriods: 1
+            minFailingPeriodsToAlert: 1
+          }
+        }
+      ]
+    }
+    autoMitigate: true
+    actions: {
+      actionGroups: [alertEmails.id]
+    }
+  }
+}
+
+// The server can be fine while the game is broken in the browser, for example after a client release.
+resource browserErrorsAlert 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' = if (alertsEnabled) {
+  name: 'alert-${appName}-browser-errors'
+  location: location
+  tags: tags
+  properties: {
+    displayName: 'Card Arena is failing in players\' browsers'
+    description: 'Players\' browsers reported 10 or more errors in the last 15 minutes. Open the ops dashboard (Errors in the API and in players\' browsers).'
+    severity: 2
+    enabled: true
+    scopes: [appInsights.id]
+    evaluationFrequency: 'PT15M'
+    windowSize: 'PT15M'
+    criteria: {
+      allOf: [
+        {
+          query: 'exceptions | where client_Type == "Browser"'
+          timeAggregation: 'Count'
+          operator: 'GreaterThanOrEqual'
+          threshold: 10
           failingPeriods: {
             numberOfEvaluationPeriods: 1
             minFailingPeriodsToAlert: 1
@@ -655,3 +748,4 @@ output storageAccount string = storage.name
 // Browser telemetry (wwwroot/js/telemetry.js). Not a secret: a connection string only lets a browser
 // send telemetry, and every page using the Application Insights JavaScript SDK carries one.
 output appInsightsConnectionString string = appInsights.properties.ConnectionString
+output opsDashboardUrl string = 'https://portal.azure.com/#@${tenant().tenantId}/resource${opsDashboard.id}/workbook'
