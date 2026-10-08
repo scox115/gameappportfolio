@@ -8,9 +8,10 @@ namespace Game.Api.ScaleOut;
 /// from other replicas are delivered here through the base class, to this replica's connections only.
 /// </summary>
 /// <remarks>
-/// The game only sends to users (Clients.User and Clients.Users) and never uses groups, so those are the
-/// calls passed on. Groups and single connections stay local, as connection ids only mean something on
-/// the replica that holds them.
+/// The game sends to users (Clients.User and Clients.Users), to everyone, and to a group (the spectators
+/// of one duel), so those are the calls passed on. Each replica knows only its own group members, so a
+/// group message is delivered by every replica to the members it holds. Single connections stay local,
+/// as connection ids only mean something on the replica that holds them.
 /// </remarks>
 public class SqlBackplaneHubLifetimeManager<THub> : DefaultHubLifetimeManager<THub> where THub : Hub
 {
@@ -54,9 +55,15 @@ public class SqlBackplaneHubLifetimeManager<THub> : DefaultHubLifetimeManager<TH
         await _backplane.PublishAsync(HubName, methodName, null, args, cancellationToken);
     }
 
+    public override async Task SendGroupAsync(string groupName, string methodName, object?[] args, CancellationToken cancellationToken = default)
+    {
+        await base.SendGroupAsync(groupName, methodName, args, cancellationToken);
+        await _backplane.PublishAsync(HubName, methodName, null, args, cancellationToken, groupName);
+    }
+
     // A message from another replica: deliver it here only, never pass it on again.
-    private Task DeliverAsync(string methodName, IReadOnlyList<string>? userIds, object?[] args, CancellationToken cancellationToken) =>
-        userIds is null
-            ? base.SendAllAsync(methodName, args, cancellationToken)
-            : base.SendUsersAsync(userIds, methodName, args, cancellationToken);
+    private Task DeliverAsync(string methodName, IReadOnlyList<string>? userIds, string? group, object?[] args, CancellationToken cancellationToken) =>
+        group is not null ? base.SendGroupAsync(group, methodName, args, cancellationToken)
+        : userIds is null ? base.SendAllAsync(methodName, args, cancellationToken)
+        : base.SendUsersAsync(userIds, methodName, args, cancellationToken);
 }

@@ -13,6 +13,7 @@ public class HubMessageConfiguration : IEntityTypeConfiguration<HubMessage>
         builder.HasKey(m => m.Id);
         builder.Property(m => m.Hub).HasMaxLength(HubMessage.HubMaxLength).IsRequired();
         builder.Property(m => m.Method).HasMaxLength(HubMessage.MethodMaxLength).IsRequired();
+        builder.Property(m => m.Group).HasMaxLength(HubMessage.GroupMaxLength);
         builder.Property(m => m.Arguments).IsRequired();
         builder.Ignore(m => m.Recipients);
 

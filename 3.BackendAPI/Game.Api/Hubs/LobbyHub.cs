@@ -1,3 +1,5 @@
+using Game.Api.Models;
+using Game.Core.Battles;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -13,16 +15,43 @@ public record ArenaPulseView(int PlayersOnline, int WaitingForDuel, int DuelsUnd
 public interface ILobbyClient
 {
     Task PulseUpdated(ArenaPulseView pulse);
+
+    /// <summary>A card was played, a turn timed out or someone forfeited in a duel this connection is watching.</summary>
+    Task DuelUpdated(DuelWatchUpdate update);
 }
 
 /// <summary>
 /// Streams <see cref="ArenaPulseView"/> to every open copy of the game, signed in or not, so a visitor
-/// can see the arena is alive before they play. It only sends: there is nothing to call.
+/// can see the arena is alive before they play, and lets anyone watch a duel under way turn by turn
+/// (see docs/adr/0036-spectating.md).
 /// </summary>
 [AllowAnonymous]
-public class LobbyHub(ArenaPulse pulse) : Hub<ILobbyClient>
+public class LobbyHub(ArenaPulse pulse, PvpBattleService battles) : Hub<ILobbyClient>
 {
     public const string Path = "/hubs/lobby";
+
+    /// <summary>The SignalR group of everyone watching one duel.</summary>
+    public static string DuelGroup(Guid duelId) => $"duel-{duelId:N}";
+
+    /// <summary>
+    /// Starts sending this connection the duel's moves. Returns the duel as it stands, or null if there
+    /// is no such duel. A finished duel is returned too, so a spectator who arrives late sees the result.
+    /// </summary>
+    public async Task<DuelWatchView?> WatchDuel(Guid duelId)
+    {
+        // Joined first, so a move made while the duel is read isn't missed.
+        await Groups.AddToGroupAsync(Context.ConnectionId, DuelGroup(duelId), Context.ConnectionAborted);
+        var duel = await battles.GetWatchViewAsync(duelId);
+        if (duel is null || duel.Status != PvpBattleStatus.InProgress)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, DuelGroup(duelId), Context.ConnectionAborted);
+        }
+        return duel;
+    }
+
+    /// <summary>Stops sending this connection the duel's moves.</summary>
+    public Task StopWatching(Guid duelId) =>
+        Groups.RemoveFromGroupAsync(Context.ConnectionId, DuelGroup(duelId), Context.ConnectionAborted);
 
     // Later changes are broadcast; a new connection gets the current numbers straight away.
     public override async Task OnConnectedAsync()

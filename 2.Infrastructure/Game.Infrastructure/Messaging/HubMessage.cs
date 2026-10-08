@@ -10,6 +10,7 @@ public class HubMessage
 {
     public const int HubMaxLength = 100;
     public const int MethodMaxLength = 100;
+    public const int GroupMaxLength = 100;
 
     public long Id { get; private set; }
 
@@ -22,6 +23,9 @@ public class HubMessage
     /// <summary>The user ids to send to, comma-separated, or null for everyone connected to the hub.</summary>
     public string? UserIds { get; private set; }
 
+    /// <summary>The group to send to, such as the spectators of one duel; when set, <see cref="UserIds"/> is null.</summary>
+    public string? Group { get; private set; }
+
     /// <summary>The method's arguments, as a JSON array.</summary>
     public string Arguments { get; private set; } = string.Empty;
 
@@ -32,11 +36,12 @@ public class HubMessage
 
     private HubMessage() { }
 
-    public HubMessage(string hub, string method, IReadOnlyList<string>? userIds, string arguments, Guid origin, DateTime createdAt)
+    public HubMessage(string hub, string method, IReadOnlyList<string>? userIds, string arguments, Guid origin, DateTime createdAt, string? group = null)
     {
         Hub = hub;
         Method = method;
         UserIds = userIds is null ? null : string.Join(',', userIds);
+        Group = group;
         Arguments = arguments;
         Origin = origin;
         CreatedAt = createdAt;

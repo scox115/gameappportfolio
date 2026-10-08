@@ -24,6 +24,7 @@ public static class OutputCaching
         public const string ArenaStats = "arena-stats";
         public const string Classes = "classes";
         public const string Status = "status";
+        public const string LiveDuels = "live-duels";
     }
 
     public static class Tags
@@ -65,6 +66,11 @@ public static class OutputCaching
             options.AddPolicy(Policies.Status, policy => policy
                 .AddPolicy<SameForEveryonePolicy>()
                 .Expire(TimeSpan.FromSeconds(30)), excludeDefaultPolicy: true);
+
+            // The duels under way: a page of spectators asks again every few seconds, which this keeps to one query.
+            options.AddPolicy(Policies.LiveDuels, policy => policy
+                .AddPolicy<SameForEveryonePolicy>()
+                .Expire(TimeSpan.FromSeconds(2)), excludeDefaultPolicy: true);
         });
 
         if (configuration.GetConnectionString("Redis") is { Length: > 0 } redis)
