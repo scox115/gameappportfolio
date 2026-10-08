@@ -9,7 +9,7 @@ A turn-based card battler built with **ASP.NET Core, Blazor WebAssembly, SignalR
 
 It's a portfolio project, built the way a production service would be: clean architecture, server-authoritative game rules, passwordless cloud access, health checks, OpenTelemetry, a test pyramid from unit to browser to load tests, and an Architecture Decision Record for each significant decision.
 
-**▶ Play it: https://play.scottcoxdev.com** · [System status](https://play.scottcoxdev.com/status)
+**▶ Play it: https://play.scottcoxdev.com** · [System status](https://play.scottcoxdev.com/status) · [More of my work](https://scottcoxdev.com)
 
 **New here?** The [five-minute case study](docs/case-study.md) covers the architecture, the key decisions and the numbers, with a live duel recorded in two browsers.
 
