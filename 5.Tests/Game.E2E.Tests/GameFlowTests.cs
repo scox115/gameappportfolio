@@ -159,6 +159,28 @@ public class GameFlowTests(ArenaFixture arena) : BrowserTest(arena)
         }
     }
 
+    [Fact]
+    public Task TheNextCard_PlaysWithoutWaitingForTheBossTurnToFinish() => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var page = await CreateHeroAsync(NewHeroName("Quick"), heroClass: "Sorcerer");
+        await page.GetByRole(AriaRole.Button, new() { Name = "LAUNCH BATTLE ARENA" }).ClickAsync();
+        await Assertions.Expect(page.GetByText("Next boss move")).ToBeVisibleAsync();
+
+        await Fireball(page).ClickAsync();
+        await Assertions.Expect(page.GetByText(new Regex("Turn 1: "))).ToBeVisibleAsync();
+
+        // Straight away, while the boss's counter-attack is still to be told: the click counts.
+        await Fireball(page).ClickAsync();
+        await Assertions.Expect(page.GetByText(new Regex("Turn 2: "))).ToBeVisibleAsync(new() { Timeout = 3_000 });
+
+        // The rest of turn 1 was told first; the log lists the newest line at the top.
+        var log = await page.GetByRole(AriaRole.Log).InnerTextAsync();
+        var bossTurnOne = Regex.Match(log, "(hits you for|blocks the)");
+        Assert.True(bossTurnOne.Success, "The boss's first counter-attack was never told.");
+        Assert.True(log.LastIndexOf("Turn 2: ", StringComparison.Ordinal) < log.LastIndexOf(bossTurnOne.Value, StringComparison.Ordinal),
+            "The boss's first counter-attack should be told before turn 2.");
+    });
+
     private static ILocator Fireball(IPage page) =>
         page.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("Fireball") });
 }

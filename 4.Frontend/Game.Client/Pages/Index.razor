@@ -736,7 +736,8 @@
     {
         if (!isPlayerTurn || matchConcluding || enemyHp <= 0 || playerHp <= 0) return;
 
-        isPlayerTurn = false; // Freeze spam-clicking path blocks
+        isPlayerTurn = false; // One card at a time: the next can be played once the server has answered
+        FinishBossTurn();     // Playing on before the boss's turn has been told tells the rest of it at once
 
         PlayCardResponseDto? result;
         try
@@ -764,64 +765,103 @@
         if (turn.cardFailed)
         {
             logs.Add($"🌀 Turn {turn.turn}: Your {turn.cardName} was {turn.cardFailedReason} by {bossName}!");
-            await Sounds.PlayAsync(Sound.Miss);
+            _ = Sounds.PlayAsync(Sound.Miss);
         }
         else if (turn.damageDealt > 0)
         {
             enemyHp = Math.Max(0, enemyHp - turn.damageDealt);
             logs.Add($"» Turn {turn.turn}: You cast {turn.cardName} dealing {turn.damageDealt} DMG.");
-            await Sounds.PlayAsync(SoundEffects.ForCard(turn.cardName));
+            _ = Sounds.PlayAsync(SoundEffects.ForCard(turn.cardName));
         }
         else if (card == "HolyShield")
         {
             playerHp += turn.healthRestored;
             logs.Add($"» Turn {turn.turn}: You raise {turn.cardName} and recover {turn.healthRestored} HP.");
-            await Sounds.PlayAsync(Sound.Shield);
+            _ = Sounds.PlayAsync(Sound.Shield);
         }
 
-        // 2. SHOW THE BOSS'S COUNTER-ATTACK WITH A SHORT DRAMATIC PAUSE
+        // 2. THE BOSS'S COUNTER-ATTACK, TOLD AFTER A SHORT DRAMATIC PAUSE
         if (turn.bossDamage is int bossDamage)
         {
-            StateHasChanged();
             logs.Add($"⏳ {bossName} winds up a {turn.bossMoveName}...");
-            await Task.Delay(1000);
-            if (turn.attackBlocked)
-            {
-                logs.Add($"🛡️ Your shield blocks the {turn.bossMoveName}! No damage taken.");
-                await Sounds.PlayAsync(Sound.Block);
-            }
-            else
-            {
-                logs.Add($"💥 {turn.bossMoveName} hits you for {bossDamage} damage!");
-                await Sounds.PlayAsync(Sound.Hit);
-            }
+            bossTurn.Enqueue(turn.attackBlocked
+                ? new($"🛡️ Your shield blocks the {turn.bossMoveName}! No damage taken.", Sound.Block)
+                : new($"💥 {turn.bossMoveName} hits you for {bossDamage} damage!", Sound.Hit));
             if (turn.bossHealed > 0)
             {
-                logs.Add($"🩸 {bossName} drains {turn.bossHealed} HP back.");
-                await Sounds.PlayAsync(Sound.Drain);
+                bossTurn.Enqueue(new($"🩸 {bossName} drains {turn.bossHealed} HP back.", Sound.Drain));
             }
         }
 
+        // 3. THE SERVER'S VERDICT: NEW HEALTH, THE BOSS'S NEXT MOVE, OR THE END OF THE FIGHT
         var wasEnraged = bossEnraged;
-        ApplyBattleState(result.battle);
-        if (bossEnraged && !wasEnraged && result.battle.status == "InProgress")
+        bossTurn.Enqueue(new(null, Apply: quietly =>
         {
-            logs.Add($"😡 {bossName} is badly hurt and flies into a rage! Its attacks now hit 50% harder.");
-            await Sounds.PlayAsync(Sound.Drain);
-        }
+            ApplyBattleState(result.battle);
+            if (result.battle.status != "InProgress")
+            {
+                HandleMatchResolution(result);
+                return;
+            }
+            if (bossEnraged && !wasEnraged)
+            {
+                logs.Add($"😡 {bossName} is badly hurt and flies into a rage! Its attacks now hit 50% harder.");
+                if (!quietly) _ = Sounds.PlayAsync(Sound.Drain);
+            }
+            logs.Add($"⚠️ {bossName} prepares {bossNextMoveName} for {enemyIntentAttack} DMG.");
+        }));
 
-        // 3. THE SERVER SAYS WHETHER THE FIGHT IS OVER
-        if (result.battle.status != "InProgress")
+        // 4. UNLOCK CONTROLS STRAIGHT AWAY: the card just played recharges, and any other can be played
+        // while the boss's turn is still being told.
+        rechargingCard = result.battle.rechargingCard;
+        isPlayerTurn = result.battle.status == "InProgress";
+        if (turn.bossDamage is null)
         {
-            HandleMatchResolution(result);
+            FinishBossTurn();
             return;
         }
+        StateHasChanged(); // show the unlocked cards now, not when the pause is over
+        await TellBossTurnAsync();
+    }
 
-        logs.Add($"⚠️ {bossName} prepares {bossNextMoveName} for {enemyIntentAttack} DMG.");
+    /// <summary>A line of the boss's turn, told after the pause; Apply runs first and is told whether sounds are skipped.</summary>
+    private sealed record BossBeat(string? Log, Sound? Sound = null, Action<bool>? Apply = null);
 
-        // 4. UNLOCK CONTROLS
-        isPlayerTurn = true;
+    private static readonly TimeSpan BossTurnPause = TimeSpan.FromMilliseconds(900);
+    private readonly Queue<BossBeat> bossTurn = new();
+    private CancellationTokenSource? bossTurnPause;
+
+    private async Task TellBossTurnAsync()
+    {
+        bossTurnPause = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(BossTurnPause, bossTurnPause.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return; // the player played on; FinishBossTurn told the rest
+        }
+        TellBossTurn(quietly: false);
         StateHasChanged();
+    }
+
+    /// <summary>Tells whatever is left of the boss's turn at once, without its sounds.</summary>
+    private void FinishBossTurn()
+    {
+        bossTurnPause?.Cancel();
+        bossTurnPause = null;
+        TellBossTurn(quietly: true);
+    }
+
+    private void TellBossTurn(bool quietly)
+    {
+        while (bossTurn.TryDequeue(out var beat))
+        {
+            beat.Apply?.Invoke(quietly);
+            if (beat.Log is not null) logs.Add(beat.Log);
+            if (!quietly && beat.Sound is { } sound) _ = Sounds.PlayAsync(sound);
+        }
     }
 
     private void ApplyBattleState(BattleStateDto battle)
@@ -925,6 +965,9 @@
 
     private void ResetMatch() 
     { 
+        bossTurnPause?.Cancel();
+        bossTurnPause = null;
+        bossTurn.Clear();
         battleId = Guid.Empty;
         playerHp = 100; 
         enemyHp = 160;
