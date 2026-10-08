@@ -32,6 +32,10 @@
                     }
                     <span style="color: #fbbf24; font-weight: bold;">🪙 @Signed(m.goldEarned + m.wagerResult)</span>
                     <span style="color: #94a3b8; min-width: 70px; text-align: right;" title="@DateTime.SpecifyKind(m.playedAt, DateTimeKind.Utc).ToLocalTime().ToString("g")">@Ago(m.playedAt)</span>
+                    @if (m.replayId is { } replay)
+                    {
+                        <a href="replay/@replay" class="match-replay" aria-label="Replay the duel against @m.opponentName">▶ Replay</a>
+                    }
                 </div>
             }
         </div>
@@ -77,6 +81,7 @@
     private class MatchDto
     {
         public string kind { get; set; } = "";
+        public Guid? replayId { get; set; }
         public bool won { get; set; }
         [System.Text.Json.Serialization.JsonPropertyName("class")]
         public string heroClass { get; set; } = "";

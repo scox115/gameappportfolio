@@ -166,9 +166,10 @@
                     <RewardBonuses WagerResult="reward.WagerResult" StreakBonus="reward.StreakBonus"
                                    Bounties="@(reward.BountiesCompleted?.Select(b => new RewardBonuses.BountyLine(b.Name, b.Reward)).ToList() ?? [])" />
                 }
-                <div class="result-actions" style="display: flex; justify-content: center; gap: 15px;">
+                <div class="result-actions" style="display: flex; justify-content: center; flex-wrap: wrap; gap: 15px;">
                     <button @onclick="LeaveLobby" style="background: #334155; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🏰 Return to Town</button>
                     <button @onclick="FindAnother" style="background: #0e7490; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🆚 Find Another Opponent</button>
+                    <a href="replay/@battle.Id" style="background: #4f46e5; color: white; padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; text-align: center;">▶ Watch the replay</a>
                     @if (battle.AgainstBot)
                     {
                         <button @onclick="SparAgain" style="background: #7c3aed; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🤖 Spar Again</button>

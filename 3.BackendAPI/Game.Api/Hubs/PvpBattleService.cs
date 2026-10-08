@@ -85,6 +85,26 @@ public class PvpBattleService(
             .ToList();
     }
 
+    /// <summary>
+    /// A finished duel's replay: both heroes as they started, then every card played in order with the
+    /// health after it. Null when there's no such duel, or it isn't over yet.
+    /// </summary>
+    public async Task<DuelReplayView?> GetReplayAsync(Guid battleId)
+    {
+        var battle = await dbContext.PvpBattles.AsNoTracking().FirstOrDefaultAsync(b => b.Id == battleId);
+        if (battle is null || !battle.IsFinished) return null;
+
+        var playerOne = await dbContext.Players.FindAsync(battle.PlayerOneId);
+        var playerTwo = await dbContext.Players.FindAsync(battle.PlayerTwoId);
+        if (playerOne is null || playerTwo is null) return null;
+
+        var moves = await dbContext.DuelMoves.AsNoTracking()
+            .Where(m => m.BattleId == battleId)
+            .OrderBy(m => m.Turn)
+            .ToListAsync();
+        return DuelReplayView.For(battle, playerOne, playerTwo, moves);
+    }
+
     /// <summary>One duel as a spectator sees it, finished or not, or null if there is no such duel.</summary>
     public async Task<DuelWatchView?> GetWatchViewAsync(Guid battleId)
     {
@@ -481,6 +501,9 @@ public class PvpBattleService(
     // then tells both players.
     private async Task SaveAndBroadcastAsync(PvpBattle battle, PvpTurnResult? lastTurn)
     {
+        // Every card is kept, in the same save as the move, for the duel's replay.
+        if (lastTurn is not null) dbContext.DuelMoves.Add(DuelMove.Record(battle, lastTurn, Now));
+
         Dictionary<Guid, BattleRewardResponse>? rewards = null;
         MatchCompletedEvent? completed = null;
         if (battle.IsFinished)

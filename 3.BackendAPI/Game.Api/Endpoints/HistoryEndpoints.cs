@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Game.Api.Auth;
 using Game.Api.Caching;
 using Game.Api.Models;
+using Game.Core.Events;
 using Game.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,7 +29,14 @@ public static class HistoryEndpoints
                 .Take(take)
                 .ToListAsync();
 
-            return Results.Ok(entries.Select(MatchHistoryItemResponse.From));
+            // Duels whose moves were recorded can be replayed (duels from before replays existed can't).
+            var matchIds = entries.Where(e => e.Kind == MatchKind.Duel).Select(e => (Guid?)e.MatchId).ToList();
+            var replays = await dbContext.PvpBattles
+                .Where(b => matchIds.Contains(b.MatchId) && dbContext.DuelMoves.Any(m => m.BattleId == b.Id))
+                .Select(b => new { MatchId = b.MatchId!.Value, b.Id })
+                .ToDictionaryAsync(b => b.MatchId, b => b.Id);
+
+            return Results.Ok(entries.Select(e => MatchHistoryItemResponse.From(e, replays.TryGetValue(e.MatchId, out var id) ? id : null)));
         })
         .WithTags("Players")
         .RequireAuthorization();

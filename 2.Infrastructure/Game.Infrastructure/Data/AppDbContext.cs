@@ -40,6 +40,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<HubMessage> HubMessages => Set<HubMessage>();
     public DbSet<Friendship> Friendships => Set<Friendship>();
     public DbSet<DuelChallenge> DuelChallenges => Set<DuelChallenge>();
+    public DbSet<DuelMove> DuelMoves => Set<DuelMove>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
