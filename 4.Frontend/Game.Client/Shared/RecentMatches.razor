@@ -4,34 +4,34 @@
 
 @* The hero's latest matches. The server builds this list in the background from RabbitMQ match
    events, so a battle that just ended can take a moment to appear. *@
-<div class="arena-panel" style="max-width: 1100px; margin: 25px auto 0; background: #1e293b; padding: 20px 30px; border-radius: 16px; border: 1px solid #334155;">
-    <h4 style="margin: 0 0 12px; color: #f1f5f9; font-size: 1.2rem;">📖 Recent Matches</h4>
+<div class="arena-panel matches-panel">
+    <h4 class="matches-title">📖 Recent Matches</h4>
 
     @if (matches is null)
     {
-        <p style="color: #94a3b8; margin: 0;">@(loadFailed ? "Match history is unavailable right now." : "Loading your matches...")</p>
+        <p class="matches-empty">@(loadFailed ? "Match history is unavailable right now." : "Loading your matches...")</p>
     }
     else if (matches.Count == 0)
     {
-        <p style="color: #94a3b8; margin: 0;">No matches yet. Your battles show up here a moment after they end.</p>
+        <p class="matches-empty">No matches yet. Your battles show up here a moment after they end.</p>
     }
     else
     {
-        <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div class="matches-list">
             @foreach (var m in matches)
             {
-                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: #0f172a; border-left: 4px solid @(m.won ? "#22c55e" : "#ef4444"); border-radius: 8px; padding: 8px 14px; font-size: 0.9rem;">
-                    <span style="font-weight: bold; color: @(m.won ? "#4ade80" : "#f87171"); min-width: 40px;">@(m.won ? "WIN" : "LOSS")</span>
-                    <span style="color: #f1f5f9; flex: 1; min-width: 180px;">
+                <div class="match-row @(m.won ? "is-win" : "")">
+                    <span class="match-result @(m.won ? "is-win" : "")">@(m.won ? "WIN" : "LOSS")</span>
+                    <span class="match-summary">
                         @(m.kind == "Duel" ? "🆚" : m.difficulty == "Heroic" ? "👑" : "😈") @m.opponentName @(m.opponentClass is null ? "" : HeroClassIcons.For(m.opponentClass))
-                        <span style="color: #94a3b8;"> · you as @HeroClassIcons.For(m.heroClass) @m.heroClass · @Describe(m)</span>
+                        <span class="match-detail"> · you as @HeroClassIcons.For(m.heroClass) @m.heroClass · @Describe(m)</span>
                     </span>
                     @if (m.ratingChange is { } rating && rating != 0)
                     {
-                        <span style="color: @(rating > 0 ? "#22d3ee" : "#f87171"); font-weight: bold;">🏅 @(rating > 0 ? "+" : "")@rating</span>
+                        <span class="match-rating @(rating > 0 ? "is-up" : "")">🏅 @(rating > 0 ? "+" : "")@rating</span>
                     }
-                    <span style="color: #fbbf24; font-weight: bold;">🪙 @Signed(m.goldEarned + m.wagerResult)</span>
-                    <span style="color: #94a3b8; min-width: 70px; text-align: right;" title="@DateTime.SpecifyKind(m.playedAt, DateTimeKind.Utc).ToLocalTime().ToString("g")">@Ago(m.playedAt)</span>
+                    <span class="match-gold">🪙 @Signed(m.goldEarned + m.wagerResult)</span>
+                    <span class="match-when" title="@DateTime.SpecifyKind(m.playedAt, DateTimeKind.Utc).ToLocalTime().ToString("g")">@Ago(m.playedAt)</span>
                     @if (m.replayId is { } replay)
                     {
                         <a href="replay/@replay" class="match-replay" aria-label="Replay the duel against @m.opponentName">▶ Replay</a>

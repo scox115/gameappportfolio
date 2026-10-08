@@ -1,0 +1,7 @@
+/* The "are you still there?" warning over a dimmed screen. */
+.idle-backdrop { position: fixed; inset: 0; background: rgba(2,6,23,0.75); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.idle-dialog { background: var(--color-surface); border: 1px solid #f59e0b; border-radius: 16px; padding: 30px; max-width: 420px; text-align: center; color: var(--color-text-bright); }
+.idle-icon { font-size: 2.5rem; }
+.idle-title { margin: 10px 0; color: var(--color-gold); }
+.idle-text { color: var(--color-text-dim); }
+.idle-stay { background: var(--color-accent); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }

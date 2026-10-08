@@ -1,0 +1,120 @@
+/* The shop's panel. */
+.shop-panel {
+    max-width: 1000px;
+    margin: 0 auto;
+    background: var(--color-surface);
+    padding: 30px;
+    border-radius: 16px;
+    border: 1px solid var(--color-border);
+}
+
+/* The header stays pinned while the shelves scroll; its negative margins reach the panel's edges. */
+.shop-head {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--color-surface);
+    margin: -30px -30px 10px;
+    padding: 20px 30px 15px;
+    border-radius: 16px 16px 0 0;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.shop-title { margin: 0; color: var(--color-gold); }
+.shop-head-actions { display: flex; align-items: center; gap: 20px; }
+.shop-gold { color: var(--color-gold); font-weight: bold; font-size: 1.2rem; }
+
+.shop-back-button {
+    background: var(--color-border);
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* The second way back, under the shelves. */
+.shop-back-button.shop-back-bottom { margin-top: 25px; padding: 12px 24px; }
+
+.shop-intro { color: var(--color-text-muted); margin: 0 0 20px; }
+.shop-loading { color: var(--color-text-muted); }
+
+/* The result of a purchase: green when it worked, red when it didn't. */
+.shop-message {
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-weight: bold;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid #166534;
+    color: #86efac;
+}
+
+.shop-message.is-error {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid #7f1d1d;
+    color: #fca5a5;
+}
+
+/* Shelves of offers. --look-color is the item's own color, set on each offer. */
+.shop-shelf-heading { color: var(--color-text); margin: 20px 0 10px; font-size: 1.05rem; }
+.shop-shelf { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 15px; }
+
+.shop-offer {
+    background: var(--color-page);
+    border: 1px solid var(--look-color);
+    border-radius: 12px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.shop-offer.is-sold-out { border-color: var(--color-border); }
+
+.shop-offer-icon { font-size: 2rem; }
+
+/* Previews of the prestige cosmetics; the frame's border and glow come from CosmeticStyles inline. */
+.shop-frame-preview { width: 48px; height: 48px; border-radius: 50%; background: var(--color-surface); object-fit: cover; }
+.shop-skin-preview { display: flex; gap: 6px; }
+
+.shop-skin-card {
+    width: 38px;
+    height: 50px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--skin-background);
+}
+
+.shop-offer-name { font-weight: bold; color: var(--color-text); }
+.shop-offer-description { color: var(--color-text-muted); font-size: 0.9rem; flex: 1; }
+.shop-offer-status { color: var(--color-text-dim); font-size: 0.9rem; }
+
+.shop-offer-button {
+    background: var(--look-color);
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.shop-offer-button.is-equipped { background: var(--color-border); }
+.shop-offer-button.is-locked { background: var(--color-border-strong); cursor: not-allowed; }
+
+/* Phones: the panel loses its wide padding and the header's actions share the width. */
+@media (max-width: 600px) {
+    .shop-panel { padding: 16px; }
+    .shop-head { margin: -16px -16px 10px; padding: 14px 16px 12px; }
+    .shop-title { font-size: 1.3rem; }
+    .shop-head-actions { width: 100%; justify-content: space-between; gap: 10px; }
+}

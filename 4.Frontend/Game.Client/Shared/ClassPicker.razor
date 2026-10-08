@@ -5,23 +5,23 @@
 @* Lets a hero pick one of the playable classes. The class list and its rules come from the server. *@
 @if (classes is { Count: > 0 })
 {
-    <div style="margin-bottom: 20px;">
+    <div class="class-picker">
         @if (!string.IsNullOrEmpty(Heading))
         {
-            <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">@Heading</label>
+            <label class="class-picker-heading">@Heading</label>
         }
-        <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="class-options">
             @foreach (var option in classes.Where(c => c.id != Exclude))
             {
                 var selected = option.id == Selected;
                 var (ability, effect) = SplitAbility(option.description);
                 <button type="button" @onclick="() => Pick(option.id)"
                         aria-pressed="@(selected ? "true" : "false")"
-                        style="display: flex; align-items: center; gap: 12px; text-align: left; background: @(selected ? "#312e81" : "#0f172a"); color: white; padding: 10px 12px; border: 2px solid @(selected ? "#818cf8" : "#334155"); border-radius: 10px; cursor: pointer;">
-                    <span style="font-size: 1.6rem;">@HeroClassIcons.For(option.id)</span>
+                        class="class-option @(selected ? "is-selected" : "")">
+                    <span class="class-option-icon">@HeroClassIcons.For(option.id)</span>
                     <span>
-                        <span style="display: block; font-weight: bold;">@option.name@(string.IsNullOrEmpty(ability) ? "" : $" · {ability}")</span>
-                        <span style="display: block; color: #cbd5e1; font-size: 0.85rem;">@effect</span>
+                        <span class="class-option-name">@option.name@(string.IsNullOrEmpty(ability) ? "" : $" · {ability}")</span>
+                        <span class="class-option-effect">@effect</span>
                     </span>
                 </button>
             }

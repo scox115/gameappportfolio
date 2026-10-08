@@ -2,17 +2,17 @@
    daily bounties the battle completed. Their gold is already included in the total shown above. *@
 @if (WagerResult is { } wager)
 {
-    <div style="font-weight: bold; margin-bottom: 8px; color: @(wager > 0 ? "#4ade80" : "#f87171");">
+    <div class="reward-wager @(wager > 0 ? "is-won" : "")">
         🎲 @(wager > 0 ? $"Wager won: +{wager} gold (after the 10% arena fee)" : $"Wager lost: {wager} gold")
     </div>
 }
 @if (StreakBonus > 0)
 {
-    <div style="color: #fb923c; font-weight: bold; margin-bottom: 8px;">🔥 Win streak bonus: +@StreakBonus gold</div>
+    <div class="reward-streak">🔥 Win streak bonus: +@StreakBonus gold</div>
 }
 @foreach (var bounty in Bounties)
 {
-    <div style="color: #fbbf24; font-weight: bold; margin-bottom: 8px;">📜 Bounty complete: @bounty.Name (+@bounty.Reward gold)</div>
+    <div class="reward-bounty">📜 Bounty complete: @bounty.Name (+@bounty.Reward gold)</div>
 }
 
 @code {

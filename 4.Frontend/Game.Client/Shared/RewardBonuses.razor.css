@@ -1,0 +1,5 @@
+/* The extra reward lines: a wager (green won, red lost), the streak bonus and completed bounties. */
+.reward-wager { font-weight: bold; margin-bottom: 8px; color: var(--color-danger); }
+.reward-wager.is-won { color: var(--color-success); }
+.reward-streak { color: #fb923c; font-weight: bold; margin-bottom: 8px; }
+.reward-bounty { color: var(--color-gold); font-weight: bold; margin-bottom: 8px; }

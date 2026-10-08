@@ -1,0 +1,76 @@
+/* The small "Report" button next to another hero. */
+.report-hero-button {
+    background: none;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 6px;
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.report-hero-button:hover, .report-hero-button:focus-visible { color: #fca5a5; border-color: #fca5a5; }
+
+/* The dialog over a dimmed screen. */
+.report-hero-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+}
+.report-hero-dialog {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 420px;
+    color: var(--color-text);
+    text-align: left;
+    font-weight: normal;
+}
+.report-hero-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.report-hero-title { margin: 0; font-size: 1.1rem; }
+.report-hero-close { background: none; border: none; color: var(--color-text-muted); font-size: 1.3rem; cursor: pointer; }
+
+/* The form: the reason, an optional note, and send. */
+.report-hero-intro { color: var(--color-text-muted); font-size: 0.85rem; margin: 12px 0; }
+.report-hero-reasons { border: none; padding: 0; margin: 0; }
+.report-hero-legend { color: var(--color-text-dim); font-size: 0.85rem; margin-bottom: 6px; }
+.report-hero-choice { display: flex; align-items: center; gap: 8px; color: var(--color-text-soft); margin: 4px 0; cursor: pointer; }
+.report-hero-note-label { display: block; color: var(--color-text-dim); font-size: 0.85rem; margin: 12px 0 4px; }
+.report-hero-note {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-page);
+    color: var(--color-text);
+    font-family: inherit;
+}
+.report-hero-submit {
+    width: 100%;
+    background: #b91c1c;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    margin-top: 10px;
+    cursor: pointer;
+}
+.report-hero-done { margin-top: 16px; }
+.report-hero-error { color: var(--color-danger); font-size: 0.85rem; margin: 10px 0 0; }
+
+/* Once it's sent. */
+.report-hero-sent { color: #86efac; margin: 16px 0 0; }
+
+/* Phones: just the flag, without the word. */
+@media (max-width: 600px) {
+    .report-hero-label { display: none; }
+}

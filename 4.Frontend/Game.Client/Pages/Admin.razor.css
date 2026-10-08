@@ -209,3 +209,12 @@
     font-style: italic;
     margin-top: 4px;
 }
+
+/* Spacing for a message that sits flush in its box, and a short lead-in above a form. */
+.admin-flush {
+    margin: 0;
+}
+
+.admin-lead-in {
+    margin: 0 0 6px;
+}

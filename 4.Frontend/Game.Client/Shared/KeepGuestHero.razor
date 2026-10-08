@@ -3,38 +3,36 @@
 @inject GameState State
 
 @* A guest hero lasts as long as this tab; keeping it gives it a name and password of the player's own. *@
-<div role="region" aria-labelledby="keep-hero-title"
-     style="background: rgba(79,70,229,0.12); border: 1px solid #4f46e5; border-radius: 12px; padding: 14px; margin: 14px 0 4px; text-align: left;">
-    <h3 id="keep-hero-title" style="margin: 0 0 4px; font-size: 0.95rem; color: #c7d2fe;">You're playing as a guest</h3>
-    <p style="color: #94a3b8; font-size: 0.8rem; margin: 0 0 10px;">
+<div role="region" aria-labelledby="keep-hero-title" class="keep-hero">
+    <h3 id="keep-hero-title" class="keep-hero-title">You're playing as a guest</h3>
+    <p class="keep-hero-note">
         Choose a name and password to keep this hero, with its gold and upgrades. Guests can't wager gold or
         appear on the leaderboards, and a guest hero ends when you close this tab or sign out.
     </p>
     @if (open)
     {
-        <form @onsubmit="KeepAsync">
-            <label for="keep-name" style="display: block; color: #cbd5e1; font-size: 0.8rem; margin-bottom: 4px;">Hero name</label>
+        <form @onsubmit="KeepAsync" class="keep-hero-form">
+            <label for="keep-name" class="keep-hero-label">Hero name</label>
             <input id="keep-name" @bind="name" @bind:event="oninput" autocomplete="username"
-                   style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9; box-sizing: border-box;" />
-            <label for="keep-password" style="display: block; color: #cbd5e1; font-size: 0.8rem; margin: 8px 0 4px;">Password (at least 8 characters)</label>
+                   class="keep-hero-input" />
+            <label for="keep-password" class="keep-hero-label keep-hero-password-label">Password (at least 8 characters)</label>
             <PasswordInput id="keep-password" @bind-Value="password" autocomplete="new-password"
-                   style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9; box-sizing: border-box;" />
+                   class="keep-hero-input" />
             <button type="submit" disabled="@(saving || string.IsNullOrWhiteSpace(name) || string.IsNullOrEmpty(password))"
-                    style="width: 100%; background: #047857; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer;">
+                    class="keep-hero-save">
                 @(saving ? "Saving..." : "Keep my hero")
             </button>
         </form>
     }
     else
     {
-        <button @onclick="() => open = true"
-                style="width: 100%; background: #4f46e5; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+        <button @onclick="() => open = true" class="keep-hero-open">
             💾 Keep this hero
         </button>
     }
     @if (!string.IsNullOrEmpty(message))
     {
-        <p role="alert" style="color: #f87171; font-size: 0.8rem; margin: 8px 0 0;">@message</p>
+        <p role="alert" class="keep-hero-error">@message</p>
     }
 </div>
 

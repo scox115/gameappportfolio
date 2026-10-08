@@ -1,0 +1,2 @@
+/* Staging and pull request previews: a strip across the top. */
+.environment-banner { background: var(--color-gold); color: #1c1917; text-align: center; font-size: 0.85rem; padding: 6px 12px; }

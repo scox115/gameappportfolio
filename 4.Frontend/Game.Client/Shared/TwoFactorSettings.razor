@@ -4,14 +4,14 @@
 @inject HttpClient Http
 
 @* "Two-factor sign-in" in the account dialog: set up an authenticator app, keep recovery codes, or turn it off. *@
-<h5 style="margin: 22px 0 6px; font-size: 0.95rem; color: #c7d2fe;">Two-factor sign-in</h5>
+<h5 class="two-factor-title">Two-factor sign-in</h5>
 @if (status is null)
 {
-    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0;">Loading…</p>
+    <p class="two-factor-loading">Loading…</p>
 }
 else if (newCodes is not null)
 {
-    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 8px;">
+    <p class="two-factor-note two-factor-note-tight">
         Save these recovery codes somewhere safe, such as a password manager. Each one signs you in once if you lose
         your phone. This is the only time they're shown.
     </p>
@@ -25,7 +25,7 @@ else if (newCodes is not null)
 }
 else if (setup is not null)
 {
-    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 8px;">
+    <p class="two-factor-note two-factor-note-tight">
         Scan this with an authenticator app such as Google Authenticator, Microsoft Authenticator or 1Password,
         then type the 6-digit code it shows.
     </p>
@@ -33,45 +33,45 @@ else if (setup is not null)
         <rect width="100%" height="100%" fill="#ffffff" />
         <path d="@qrPath" fill="#000000" />
     </svg>
-    <p style="color: #94a3b8; font-size: 0.8rem; margin: 6px 0 10px;">
+    <p class="two-factor-key-note">
         Can't scan it? Enter this key: <code class="two-factor-key">@setup.sharedKey</code>
     </p>
     <label for="two-factor-code" class="two-factor-label">6-digit code from the app</label>
-    <input id="two-factor-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" @bind="enteredCode" @bind:event="oninput" class="two-factor-input" />
-    <div style="display: flex; gap: 8px; margin-top: 10px;">
-        <button @onclick="EnableAsync" disabled="@(busy || string.IsNullOrWhiteSpace(enteredCode))" class="two-factor-primary" style="flex: 1;">Turn on</button>
+    <input id="two-factor-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" @bind="enteredCode" @bind:event="oninput" class="dialog-input" />
+    <div class="two-factor-actions">
+        <button @onclick="EnableAsync" disabled="@(busy || string.IsNullOrWhiteSpace(enteredCode))" class="two-factor-primary two-factor-grow">Turn on</button>
         <button @onclick="CancelSetup" class="two-factor-secondary">Cancel</button>
     </div>
 }
 else if (!status.enabled)
 {
-    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 10px;">
+    <p class="two-factor-note">
         Add a second step to signing in: a code from an app on your phone, so your password alone isn't enough.
     </p>
     <label for="two-factor-password" class="two-factor-label">Your password, to start</label>
-    <PasswordInput id="two-factor-password" autocomplete="current-password" @bind-Value="password" class="two-factor-input" />
-    <button @onclick="BeginSetupAsync" disabled="@(busy || string.IsNullOrEmpty(password))" class="two-factor-primary" style="width: 100%; margin-top: 10px;">
+    <PasswordInput id="two-factor-password" autocomplete="current-password" @bind-Value="password" class="dialog-input" />
+    <button @onclick="BeginSetupAsync" disabled="@(busy || string.IsNullOrEmpty(password))" class="two-factor-primary two-factor-wide">
         Set up two-factor sign-in
     </button>
 }
 else
 {
-    <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 10px;">
-        <b style="color: #86efac;">On.</b> Signing in asks for a code from your app.
+    <p class="two-factor-note">
+        <b class="two-factor-on">On.</b> Signing in asks for a code from your app.
         You have @status.recoveryCodesLeft recovery @(status.recoveryCodesLeft == 1 ? "code" : "codes") left.
     </p>
     <label for="two-factor-code" class="two-factor-label">Code from your app, or a recovery code</label>
-    <input id="two-factor-code" autocomplete="one-time-code" @bind="enteredCode" @bind:event="oninput" class="two-factor-input" />
-    <label for="two-factor-password" class="two-factor-label" style="margin-top: 8px;">Your password (to turn it off)</label>
-    <PasswordInput id="two-factor-password" autocomplete="current-password" @bind-Value="password" class="two-factor-input" />
-    <div style="display: flex; gap: 8px; margin-top: 10px;">
-        <button @onclick="NewCodesAsync" disabled="@(busy || string.IsNullOrWhiteSpace(enteredCode))" class="two-factor-primary" style="flex: 1;">New recovery codes</button>
+    <input id="two-factor-code" autocomplete="one-time-code" @bind="enteredCode" @bind:event="oninput" class="dialog-input" />
+    <label for="two-factor-password" class="two-factor-label two-factor-label-spaced">Your password (to turn it off)</label>
+    <PasswordInput id="two-factor-password" autocomplete="current-password" @bind-Value="password" class="dialog-input" />
+    <div class="two-factor-actions">
+        <button @onclick="NewCodesAsync" disabled="@(busy || string.IsNullOrWhiteSpace(enteredCode))" class="two-factor-primary two-factor-grow">New recovery codes</button>
         <button @onclick="TurnOffAsync" disabled="@(busy || string.IsNullOrWhiteSpace(enteredCode) || string.IsNullOrEmpty(password))" class="two-factor-secondary">Turn off</button>
     </div>
 }
 @if (!string.IsNullOrEmpty(message))
 {
-    <p role="@(failed ? "alert" : "status")" style="color: @(failed ? "#f87171" : "#86efac"); font-size: 0.85rem; margin: 8px 0 0;">@message</p>
+    <p role="@(failed ? "alert" : "status")" class="two-factor-message @(failed ? "is-failed" : "")">@message</p>
 }
 
 @code {

@@ -8,20 +8,19 @@
     var week = days.Take(7).ToList();
     var bossFights = today.bossFights + today.heroicFights;
     var bossWins = today.bossWins + today.heroicWins;
-    <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; font-size: 0.85rem;">
-        <span style="@Chip">📊 Today: <b>@bossFights</b> boss fight@(bossFights == 1 ? "" : "s")@(bossFights > 0 ? $" ({bossWins * 100 / bossFights}% won)" : "")</span>
+    <div class="arena-stats">
+        <span class="arena-stat-chip">📊 Today: <b>@bossFights</b> boss fight@(bossFights == 1 ? "" : "s")@(bossFights > 0 ? $" ({bossWins * 100 / bossFights}% won)" : "")</span>
         @if (today.heroicFights > 0)
         {
-            <span style="@Chip">👑 Heroic: <b>@today.heroicWins</b> of @today.heroicFights won</span>
+            <span class="arena-stat-chip">👑 Heroic: <b>@today.heroicWins</b> of @today.heroicFights won</span>
         }
-        <span style="@Chip">🆚 Duels: <b>@today.duels</b></span>
-        <span style="@Chip">🪙 Paid today: <b>@today.goldPaid.ToString("N0")</b></span>
-        <span style="@Chip">📅 This week: <b>@week.Sum(d => d.bossFights + d.heroicFights + d.duels)</b> matches</span>
+        <span class="arena-stat-chip">🆚 Duels: <b>@today.duels</b></span>
+        <span class="arena-stat-chip">🪙 Paid today: <b>@today.goldPaid.ToString("N0")</b></span>
+        <span class="arena-stat-chip">📅 This week: <b>@week.Sum(d => d.bossFights + d.heroicFights + d.duels)</b> matches</span>
     </div>
 }
 
 @code {
-    private const string Chip = "background: #0f172a; border: 1px solid #334155; border-radius: 20px; padding: 6px 12px; color: #cbd5e1;";
     private List<DayDto>? days;
 
     protected override async Task OnInitializedAsync()

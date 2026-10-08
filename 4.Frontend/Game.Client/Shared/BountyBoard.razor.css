@@ -1,0 +1,38 @@
+/* The bounty board's panel. */
+.bounty-panel {
+    max-width: 1100px;
+    margin: 25px auto 0;
+    background: var(--color-surface);
+    padding: 25px 30px;
+    border-radius: 16px;
+    border: 1px solid var(--color-border);
+}
+
+.bounty-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px; }
+.bounty-title { margin: 0; color: var(--color-text); font-size: 1.2rem; }
+.bounty-reset { color: var(--color-text-muted); font-size: 0.9rem; }
+.bounty-loading { color: var(--color-text-muted); }
+
+/* One card per bounty, green-edged once it's done. */
+.bounty-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px; margin-top: 15px; }
+.bounty-card { background: var(--color-page); border: 1px solid var(--color-border); border-radius: 12px; padding: 15px; }
+.bounty-card.is-completed { border-color: #166534; }
+.bounty-name { font-weight: bold; color: var(--color-text); }
+
+/* Progress bar; --progress is the share done, set inline. */
+.bounty-bar { background: var(--color-border); border-radius: 6px; height: 8px; margin: 10px 0 6px; overflow: hidden; }
+.bounty-bar-fill { background: var(--color-gold); height: 100%; width: var(--progress); }
+.bounty-bar-fill.is-completed { background: #22c55e; }
+
+.bounty-numbers { display: flex; justify-content: space-between; font-size: 0.85rem; }
+.bounty-progress { color: var(--color-text-muted); }
+.bounty-reward { color: var(--color-gold); font-weight: bold; }
+
+/* Win streak and boss reward lines under the cards. */
+.bounty-note { color: var(--color-text-dim); margin: 15px 0 0; font-size: 0.95rem; }
+.bounty-note.bounty-note-next { margin: 8px 0 0; }
+
+/* Phones: the panel loses its wide padding. */
+@media (max-width: 600px) {
+    .bounty-panel { padding: 16px; }
+}

@@ -1,0 +1,19 @@
+/* The Heroic boss button, once unlocked. */
+.heroic-button {
+    width: 100%;
+    background: linear-gradient(135deg, #b45309, #7c2d12);
+    color: #fef3c7;
+    padding: 15px;
+    border: 2px solid #f59e0b;
+    border-radius: 12px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-top: 15px;
+    cursor: pointer;
+    box-shadow: 0 10px 15px -3px rgba(245,158,11,0.3);
+}
+
+.heroic-reward { color: var(--color-gold); font-size: 0.85rem; margin: 8px 0 0; }
+
+/* How to unlock it, while it's still locked. */
+.heroic-locked { color: var(--color-text-muted); font-size: 0.85rem; margin: 15px 0 0; }

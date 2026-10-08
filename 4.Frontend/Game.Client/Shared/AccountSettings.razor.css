@@ -1,0 +1,23 @@
+/* The link-style button that opens the dialog. */
+.account-open { background: none; border: none; color: var(--color-text-muted); font-size: 0.8rem; cursor: pointer; text-decoration: underline; margin-top: 18px; }
+
+/* The dialog over a dimmed screen. */
+.account-backdrop { position: fixed; inset: 0; background: rgba(2,6,23,0.75); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.account-dialog { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; padding: 24px; width: 100%; max-width: 420px; max-height: calc(100vh - 32px); overflow-y: auto; color: var(--color-text); text-align: left; }
+.account-head { display: flex; justify-content: space-between; align-items: center; }
+.account-title { margin: 0; font-size: 1.1rem; }
+.account-close { background: none; border: none; color: var(--color-text-muted); font-size: 1.3rem; cursor: pointer; }
+
+/* Sections: your data, and deleting the hero. */
+.account-section { margin: 18px 0 6px; font-size: 0.95rem; color: #c7d2fe; }
+.account-danger-section { margin: 22px 0 6px; font-size: 0.95rem; color: #fca5a5; }
+.account-note { color: var(--color-text-muted); font-size: 0.85rem; margin: 0 0 10px; }
+.account-download { width: 100%; background: var(--color-accent); color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+.account-label { display: block; color: var(--color-text-dim); font-size: 0.85rem; margin-bottom: 4px; }
+
+/* The input is rendered by PasswordInput, so it is reached through ::deep. */
+.account-dialog ::deep .account-password { width: 100%; padding: 9px; border-radius: 8px; border: 1px solid var(--color-border-strong); background: var(--color-page); color: var(--color-text); }
+
+.account-delete { width: 100%; background: #b91c1c; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; opacity: 1; }
+.account-delete.is-disabled { opacity: 0.5; }
+.account-error { color: var(--color-danger); font-size: 0.85rem; margin: 10px 0 0; }

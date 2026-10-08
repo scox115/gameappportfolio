@@ -3,43 +3,43 @@
 
 @* Today's bounties and the player's win streak. The server tracks progress and pays rewards
    automatically after each battle; this panel only shows where the player stands. *@
-<div class="arena-panel" style="max-width: 1100px; margin: 25px auto 0; background: #1e293b; padding: 25px 30px; border-radius: 16px; border: 1px solid #334155;">
-    <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px;">
-        <h4 style="margin: 0; color: #f1f5f9; font-size: 1.2rem;">📜 Daily Bounties</h4>
+<div class="arena-panel bounty-panel">
+    <div class="bounty-head">
+        <h4 class="bounty-title">📜 Daily Bounties</h4>
         @if (board is not null)
         {
-            <span style="color: #94a3b8; font-size: 0.9rem;">New bounties in @UntilReset()</span>
+            <span class="bounty-reset">New bounties in @UntilReset()</span>
         }
     </div>
 
     @if (board is null)
     {
-        <p style="color: #94a3b8;">@(loadFailed ? "The bounty board is unavailable right now." : "Reading the bounty board...")</p>
+        <p class="bounty-loading">@(loadFailed ? "The bounty board is unavailable right now." : "Reading the bounty board...")</p>
     }
     else
     {
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 15px; margin-top: 15px;">
+        <div class="bounty-grid">
             @foreach (var bounty in board.bounties)
             {
-                <div style="background: #0f172a; border: 1px solid @(bounty.completed ? "#166534" : "#334155"); border-radius: 12px; padding: 15px;">
-                    <div style="font-weight: bold; color: #f1f5f9;">@(bounty.completed ? "✅ " : "")@bounty.name</div>
-                    <div style="background: #334155; border-radius: 6px; height: 8px; margin: 10px 0 6px; overflow: hidden;">
-                        <div style="background: @(bounty.completed ? "#22c55e" : "#fbbf24"); height: 100%; width: @(bounty.progress * 100 / Math.Max(1, bounty.goal))%;"></div>
+                <div class="bounty-card @(bounty.completed ? "is-completed" : "")">
+                    <div class="bounty-name">@(bounty.completed ? "✅ " : "")@bounty.name</div>
+                    <div class="bounty-bar">
+                        <div class="bounty-bar-fill @(bounty.completed ? "is-completed" : "")" style="--progress: @(bounty.progress * 100 / Math.Max(1, bounty.goal))%"></div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem;">
-                        <span style="color: #94a3b8;">@bounty.progress / @bounty.goal</span>
-                        <span style="color: #fbbf24; font-weight: bold;">@(bounty.completed ? "Paid" : "Reward") 🪙 @bounty.reward</span>
+                    <div class="bounty-numbers">
+                        <span class="bounty-progress">@bounty.progress / @bounty.goal</span>
+                        <span class="bounty-reward">@(bounty.completed ? "Paid" : "Reward") 🪙 @bounty.reward</span>
                     </div>
                 </div>
             }
         </div>
-        <p style="color: #cbd5e1; margin: 15px 0 0; font-size: 0.95rem;">
+        <p class="bounty-note">
             🔥 Win streak: <b>@board.winStreak</b>.
             @(board.streakBonus > 0
                 ? $"Your next win pays +{board.streakBonus} bonus gold."
                 : "Win battles in a row for up to +50 bonus gold per win.")
         </p>
-        <p style="color: #cbd5e1; margin: 8px 0 0; font-size: 0.95rem;">
+        <p class="bounty-note bounty-note-next">
             ⚔️ Boss rewards: <b>@board.fullRewardBossWinsLeft of @board.fullRewardBossWinsPerDay</b> full-reward wins left today.
             @(board.fullRewardBossWinsLeft == 0 ? "Boss wins pay 25 gold until tomorrow." : "")
         </p>

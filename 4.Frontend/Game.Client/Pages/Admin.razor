@@ -109,7 +109,7 @@
                     <img src="@Avatars.For(selected.avatarUrl, selected.username)" alt="@(selected.avatarUrl is null ? "" : $"{selected.username}'s portrait")" class="admin-portrait" />
                     @if (OpenReports.Count > 0)
                     {
-                        <p class="admin-warning" style="margin: 0;">Waiting for an answer: @string.Join(" and ", OpenReports.Select(r => $"{r.reports} {(r.reason == "Portrait" ? "portrait" : "name")} report{(r.reports == 1 ? "" : "s")}")).</p>
+                        <p class="admin-warning admin-flush">Waiting for an answer: @string.Join(" and ", OpenReports.Select(r => $"{r.reports} {(r.reason == "Portrait" ? "portrait" : "name")} report{(r.reports == 1 ? "" : "s")}")).</p>
                     }
                 </div>
 
@@ -161,7 +161,7 @@
                     {
                         <form @onsubmit="TurnOffTwoFactorAsync">
                             <h3>Turn off two-factor</h3>
-                            <p class="admin-muted" style="margin: 0 0 6px;">For a player who lost their phone and recovery codes. Check it's really them first, such as through their recovery email.</p>
+                            <p class="admin-muted admin-lead-in">For a player who lost their phone and recovery codes. Check it's really them first, such as through their recovery email.</p>
                             <label for="two-factor-reason">How you checked it's them</label>
                             <textarea id="two-factor-reason" rows="2" maxlength="500" @bind="twoFactorReason" @bind:event="oninput"></textarea>
                             <button type="submit" class="admin-button admin-danger" disabled="@(busy || string.IsNullOrWhiteSpace(twoFactorReason))">Turn off two-factor</button>

@@ -233,7 +233,7 @@
                 <div class="watch-panel-title">👑 @hero.Title</div>
             }
             <div class="watch-hp" role="meter" aria-label="@hero.Username's health" aria-valuemin="0" aria-valuemax="@hero.MaxHp" aria-valuenow="@hp">
-                <div style="width: @(hp * 100 / Math.Max(1, hero.MaxHp))%;"></div>
+                <div class="watch-hp-fill" style="--hp: @(hp * 100 / Math.Max(1, hero.MaxHp))%;"></div>
             </div>
             <div class="watch-hp-text">@hp / @hero.MaxHp HP</div>
         </div>

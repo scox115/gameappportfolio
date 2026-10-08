@@ -1,0 +1,43 @@
+/* The town's friends list. */
+.friends-panel { max-width: 1100px; margin: 25px auto 0; background: var(--color-surface); padding: 22px 30px; border-radius: 16px; border: 1px solid var(--color-border); color: var(--color-text-dim); }
+.friends-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px; }
+.friends-panel h4 { margin: 0; color: var(--color-text); font-size: 1.2rem; }
+.friends-panel h5 { margin: 16px 0 6px; color: #c7d2fe; font-size: 0.9rem; }
+.friends-count, .friends-note { color: var(--color-text-muted); font-size: 0.9rem; }
+.friends-note { margin: 12px 0 0; }
+
+/* Adding a friend by hero name. */
+.friends-add { display: flex; gap: 8px; margin-top: 14px; }
+.friends-add input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--color-border-strong); background: var(--color-page); color: var(--color-text); }
+.friends-add button { background: var(--color-accent); color: white; border: none; border-radius: 8px; padding: 9px 14px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+.friends-add button:disabled { opacity: 0.5; cursor: not-allowed; }
+.friends-message { margin: 8px 0 0; font-size: 0.85rem; color: #86efac; }
+.friends-failed { color: var(--color-danger); }
+
+/* One row per hero, with an online dot on the portrait (the frame comes from the hero's cosmetic, inline). */
+.friends-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
+.friends-list > li { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: var(--color-page); border: 1px solid var(--color-border); border-radius: 12px; padding: 8px 12px; }
+.friends-hero { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.friends-hero b { display: block; color: var(--color-text); overflow-wrap: anywhere; }
+.friends-hero small { color: var(--color-text-muted); }
+.friends-avatar { position: relative; flex-shrink: 0; }
+.friends-avatar img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: var(--color-surface); }
+.friends-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 50%; background: #64748b; border: 2px solid var(--color-page); }
+.friends-dot-on { background: #22c55e; }
+.friends-dot-duel { background: #f59e0b; }
+
+/* The row's buttons. The colored ones name .friends-actions too, so they beat the plain button look without !important. */
+.friends-actions { display: flex; gap: 6px; align-items: center; }
+.friends-actions button, .friends-actions a { border: none; border-radius: 8px; padding: 7px 12px; font-weight: bold; font-size: 0.85rem; cursor: pointer; text-decoration: none; background: var(--color-border); color: var(--color-text-soft); }
+.friends-actions .friends-challenge { background: #0e7490; color: white; }
+.friends-actions .friends-yes { background: #047857; color: white; }
+.friends-actions .friends-watch { background: #b45309; color: white; }
+.friends-actions .friends-no { background: transparent; color: var(--color-text-muted); border: 1px solid var(--color-border-strong); }
+/* "Remove this friend?" row */
+.friends-list > .friends-confirm { background: rgba(239,68,68,0.08); border-color: #7f1d1d; font-size: 0.9rem; }
+
+/* Phones: less padding. */
+@media (max-width: 600px) {
+    .friends-panel { padding: 18px 16px; }
+    .friends-list > li { padding: 8px 10px; }
+}
