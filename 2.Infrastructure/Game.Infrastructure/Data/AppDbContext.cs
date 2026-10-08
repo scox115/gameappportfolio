@@ -5,6 +5,7 @@ using Game.Core.History;
 using Game.Core.Moderation;
 using Game.Core.Operations;
 using Game.Core.Seasons;
+using Game.Core.Social;
 using Game.Infrastructure.Identity;
 using Game.Infrastructure.Messaging;
 using Microsoft.AspNetCore.Identity;
@@ -37,6 +38,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<OnlinePresence> OnlinePresence => Set<OnlinePresence>();
     public DbSet<ClosedSeason> ClosedSeasons => Set<ClosedSeason>();
     public DbSet<HubMessage> HubMessages => Set<HubMessage>();
+    public DbSet<Friendship> Friendships => Set<Friendship>();
+    public DbSet<DuelChallenge> DuelChallenges => Set<DuelChallenge>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -12,6 +12,17 @@ public enum GameScreen
 
 public record SessionTokens(string AccessToken, DateTimeOffset ExpiresAt, string RefreshToken);
 
+/// <summary>A friend's invitation to a duel, as the API's ChallengeView pushes it.</summary>
+public record ChallengeInvite(Guid Id, Guid FromId, string FromName, string? FromTitle, string FromClass, string? FromAvatarUrl,
+    string? FromFrame, int FromRating, int SecondsLeft)
+{
+    /// <summary>When it runs out, by this browser's clock.</summary>
+    public DateTime ExpiresAt { get; init; } = DateTime.UtcNow.AddSeconds(SecondsLeft);
+}
+
+/// <summary>A friend the player chose to challenge from the friends list, for the duel screen to send.</summary>
+public record ChallengeTarget(Guid Id, string Name);
+
 public class GameState
 {
     /// <summary>Shown when signing in on another browser ended this one's session.</summary>
@@ -150,8 +161,70 @@ public class GameState
         AvatarUrl = string.Empty;
         Frame = null;
         CardSkin = null;
+        Invite = null;
+        ChallengeToAccept = null;
+        FriendToChallenge = null;
         CurrentScreen = GameScreen.LoginMenu;
         NotifyStateChanged();
+    }
+
+    // --- Friends and challenges (docs/adr/0037-friends-and-challenges.md) ---
+
+    /// <summary>A friend has asked or answered: open friends lists reload.</summary>
+    public event Action? FriendsChanged;
+
+    /// <summary>A friend's challenge waiting for an answer, shown wherever the player is.</summary>
+    public ChallengeInvite? Invite { get; private set; }
+
+    /// <summary>A challenge the player accepted, for the duel screen to accept over the arena connection.</summary>
+    public Guid? ChallengeToAccept { get; private set; }
+
+    /// <summary>A friend the player wants to challenge, for the duel screen to send.</summary>
+    public ChallengeTarget? FriendToChallenge { get; private set; }
+
+    public void NotifyFriendsChanged() => FriendsChanged?.Invoke();
+
+    public void ReceiveInvite(ChallengeInvite invite)
+    {
+        Invite = invite;
+        NotifyStateChanged();
+    }
+
+    /// <summary>Stops showing the invite (it was withdrawn, answered elsewhere, ran out, or turned down).</summary>
+    public void CloseInvite(Guid challengeId)
+    {
+        if (Invite?.Id != challengeId) return;
+        Invite = null;
+        NotifyStateChanged();
+    }
+
+    public void AcceptInvite()
+    {
+        if (Invite is null) return;
+        ChallengeToAccept = Invite.Id;
+        Invite = null;
+        ChangeScreen(GameScreen.PvpArena);
+    }
+
+    public void Challenge(Guid friendId, string friendName)
+    {
+        FriendToChallenge = new ChallengeTarget(friendId, friendName);
+        ChangeScreen(GameScreen.PvpArena);
+    }
+
+    /// <summary>Hands over the accepted challenge once; null when there isn't one.</summary>
+    public Guid? TakeChallengeToAccept()
+    {
+        var id = ChallengeToAccept;
+        ChallengeToAccept = null;
+        return id;
+    }
+
+    public ChallengeTarget? TakeFriendToChallenge()
+    {
+        var target = FriendToChallenge;
+        FriendToChallenge = null;
+        return target;
     }
 
     private void NotifyStateChanged() => OnStateChanged?.Invoke();

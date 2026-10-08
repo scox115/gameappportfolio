@@ -26,7 +26,14 @@
             {
                 <p style="color: #f87171;">@errorMsg</p>
             }
-            @if (searching)
+            @if (challenge is { } sent)
+            {
+                <p style="color: #cbd5e1;">⚔️ You challenged <b>@sent.FriendName</b>. Waiting for them to accept... <span style="color: #fbbf24; font-weight: bold;">@challengeSecondsLeft s</span></p>
+                <p style="color: #94a3b8; font-size: 0.9rem;">A friendly duel: no gold at stake. They see your challenge wherever they are in the game.</p>
+                <button @onclick="WithdrawChallenge"
+                        style="background: transparent; color: #94a3b8; border: 1px solid #475569; padding: 8px 16px; border-radius: 8px; cursor: pointer; margin-top: 5px;">Take back the challenge</button>
+            }
+            else if (searching)
             {
                 <p style="color: #cbd5e1;">@(stake > 0 ? $"Searching for an opponent who also wagers {stake} gold..." : "Searching for an opponent...")</p>
                 <p style="color: #94a3b8; font-size: 0.9rem;">Nobody around? Practice against the Arena Bot while you wait, or sign in as another hero in a second browser window to battle yourself.</p>
@@ -185,6 +192,8 @@
     private static readonly int[] Stakes = [0, 50, 100, 250, 500];
     private int secondsLeft;
     private System.Threading.Timer? countdown;
+    private ChallengeSentDto? challenge; // sent to a friend, waiting for their answer
+    private int challengeSecondsLeft;
 
     protected override async Task OnInitializedAsync()
     {
@@ -202,6 +211,13 @@
 
         hub.On<PvpUpdateDto>("MatchFound", update => InvokeAsync(() => OnMatchFound(update)));
         hub.On<PvpUpdateDto>("BattleUpdated", update => InvokeAsync(() => OnBattleUpdated(update)));
+        hub.On<string>("ChallengeDeclined", reason => InvokeAsync(() =>
+        {
+            challenge = null;
+            picking = battle is null;
+            errorMsg = reason;
+            StateHasChanged();
+        }));
         hub.On<string>("SearchCancelled", reason => InvokeAsync(() =>
         {
             searching = false;
@@ -211,14 +227,24 @@
         }));
 
         // After a dropped connection comes back, rejoin the lobby or pick up an unfinished battle.
-        hub.Reconnected += _ => InvokeAsync(() => searching ? Search(stake) : ResumeOrPick());
+        // A challenge is taken back when its connection drops, so the player chooses again.
+        hub.Reconnected += _ => InvokeAsync(() =>
+        {
+            if (challenge is not null)
+            {
+                challenge = null;
+                errorMsg = "The connection dropped, so your challenge was taken back. Send it again from town.";
+            }
+            return searching ? Search(stake) : ResumeOrPick();
+        });
+        State.OnStateChanged += OnStateChanged;
 
         countdown = new System.Threading.Timer(_ => InvokeAsync(Tick), null, 1000, 1000);
 
         try
         {
             await hub.StartAsync();
-            await ResumeOrPick();
+            if (!await AnswerFriendsAsync()) await ResumeOrPick();
         }
         catch (Exception ex)
         {
@@ -287,6 +313,81 @@
         StateHasChanged();
     }
 
+    // A challenge accepted, or a friend picked to challenge, from another screen (see docs/adr/0037-friends-and-challenges.md).
+    // Returns false when there was neither.
+    private async Task<bool> AnswerFriendsAsync()
+    {
+        if (hub?.State != HubConnectionState.Connected) return false;
+        if (State.TakeChallengeToAccept() is { } accepted)
+        {
+            await AcceptChallenge(accepted);
+            return true;
+        }
+        if (State.TakeFriendToChallenge() is { } friend)
+        {
+            await ChallengeFriend(friend);
+            return true;
+        }
+        return false;
+    }
+
+    // Accepting an invite while already on this screen.
+    private void OnStateChanged()
+    {
+        if (State.ChallengeToAccept is not null || State.FriendToChallenge is not null) _ = InvokeAsync(AnswerFriendsAsync);
+    }
+
+    private async Task AcceptChallenge(Guid challengeId)
+    {
+        if (hub is null) return;
+        try
+        {
+            errorMsg = null;
+            if (searching) await hub.InvokeAsync("CancelSearch");
+            searching = false;
+            picking = false;
+            await hub.InvokeAsync("AcceptChallenge", challengeId); // MatchFound brings the duel
+        }
+        catch (Exception ex)
+        {
+            errorMsg = HubError(ex);
+            picking = battle is null;
+        }
+        StateHasChanged();
+    }
+
+    private async Task ChallengeFriend(ChallengeTarget friend)
+    {
+        if (hub is null) return;
+        try
+        {
+            errorMsg = null;
+            searching = false;
+            picking = false;
+            challenge = await hub.InvokeAsync<ChallengeSentDto?>("ChallengeFriend", friend.Id);
+            challengeSecondsLeft = challenge?.SecondsLeft ?? 0;
+        }
+        catch (Exception ex)
+        {
+            errorMsg = HubError(ex);
+            picking = battle is null;
+        }
+        StateHasChanged();
+    }
+
+    private async Task WithdrawChallenge()
+    {
+        challenge = null;
+        picking = true;
+        if (hub is not null)
+        {
+            try { await hub.InvokeAsync("WithdrawChallenge"); } catch { /* it runs out anyway */ }
+        }
+    }
+
+    private static string HubError(Exception ex) =>
+        ex.Message.Contains("HubException: ") ? ex.Message[(ex.Message.IndexOf("HubException: ") + 14)..] : ex.Message;
+
     private async Task CancelSearch()
     {
         if (hub is not null)
@@ -302,6 +403,7 @@
     private void OnMatchFound(PvpUpdateDto update)
     {
         searching = false;
+        challenge = null;
         reward = null;
         logs = new() { $"⚔️ Battle on! You face {update.Battle.Opponent.Username}." };
         _ = Sounds.PlayAsync(update.Battle.YourTurn ? Sound.YourTurn : Sound.MatchFound);
@@ -377,6 +479,12 @@
 
     private void Tick()
     {
+        if (challenge is { } sent && --challengeSecondsLeft <= 0)
+        {
+            errorMsg = $"{sent.FriendName} didn't answer in time.";
+            _ = WithdrawChallenge();
+            StateHasChanged();
+        }
         if (battle?.Status != "InProgress" || secondsLeft <= 0) return;
         secondsLeft--;
         StateHasChanged();
@@ -438,6 +546,7 @@
 
     private async Task LeaveLobby()
     {
+        if (challenge is not null) await WithdrawChallenge();
         if (hub is not null && searching)
         {
             try { await hub.InvokeAsync("CancelSearch"); } catch { /* leaving anyway */ }
@@ -491,6 +600,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        State.OnStateChanged -= OnStateChanged;
         countdown?.Dispose();
         if (hub is not null)
         {
@@ -510,5 +620,6 @@
     private record PvpRewardDto(int GoldEarned, int ExperienceEarned, PvpProfileDto Player, int? RatingChange,
         int StreakBonus, List<PvpBountyDto>? BountiesCompleted, int? WagerResult, string? NoRewardReason = null);
     private record PvpBountyDto(string Name, int Reward);
+    private record ChallengeSentDto(Guid Id, string FriendName, int SecondsLeft);
     private record PvpUpdateDto(PvpBattleDto Battle, PvpTurnDto? LastTurn, PvpRewardDto? Reward);
 }

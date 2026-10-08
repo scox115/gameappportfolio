@@ -331,3 +331,49 @@ button:focus-visible, input:focus-visible, a:focus-visible, [tabindex]:focus-vis
 /* The live numbers' "duels under way" opens the spectator list. */
 .live-pulse a { color: inherit; text-decoration: none; }
 .live-pulse a:hover b, .live-pulse a:focus-visible b { text-decoration: underline; }
+
+/* Friends (Shared/FriendsPanel.razor) */
+.friends-panel { max-width: 1100px; margin: 25px auto 0; background: #1e293b; padding: 22px 30px; border-radius: 16px; border: 1px solid #334155; color: #cbd5e1; }
+.friends-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px; }
+.friends-panel h4 { margin: 0; color: #f1f5f9; font-size: 1.2rem; }
+.friends-panel h5 { margin: 16px 0 6px; color: #c7d2fe; font-size: 0.9rem; }
+.friends-count, .friends-note { color: #94a3b8; font-size: 0.9rem; }
+.friends-note { margin: 12px 0 0; }
+.friends-add { display: flex; gap: 8px; margin-top: 14px; }
+.friends-add input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9; }
+.friends-add button { background: #4f46e5; color: white; border: none; border-radius: 8px; padding: 9px 14px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+.friends-add button:disabled { opacity: 0.5; cursor: not-allowed; }
+.friends-message { margin: 8px 0 0; font-size: 0.85rem; color: #86efac; }
+.friends-failed { color: #f87171; }
+.friends-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
+.friends-list > li { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 8px 12px; }
+.friends-hero { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.friends-hero b { display: block; color: #f1f5f9; overflow-wrap: anywhere; }
+.friends-hero small { color: #94a3b8; }
+.friends-avatar { position: relative; flex-shrink: 0; }
+.friends-avatar img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: #1e293b; }
+.friends-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 50%; background: #64748b; border: 2px solid #0f172a; }
+.friends-dot-on { background: #22c55e; }
+.friends-dot-duel { background: #f59e0b; }
+.friends-actions { display: flex; gap: 6px; align-items: center; }
+.friends-actions button, .friends-actions a { border: none; border-radius: 8px; padding: 7px 12px; font-weight: bold; font-size: 0.85rem; cursor: pointer; text-decoration: none; background: #334155; color: #e2e8f0; }
+.friends-challenge { background: #0e7490 !important; color: white !important; }
+.friends-yes { background: #047857 !important; color: white !important; }
+.friends-watch { background: #b45309 !important; color: white !important; }
+.friends-no { background: transparent !important; color: #94a3b8 !important; border: 1px solid #475569 !important; }
+.friends-confirm { background: rgba(239,68,68,0.08) !important; border-color: #7f1d1d !important; font-size: 0.9rem; }
+
+/* A friend's duel challenge (Shared/ChallengeInviteDialog.razor), over whatever screen is open. */
+.challenge-invite { position: fixed; z-index: 1100; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(460px, calc(100vw - 32px));
+    display: flex; gap: 14px; align-items: flex-start; background: #1e1b4b; border: 2px solid #818cf8; border-radius: 16px; padding: 16px;
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.7); color: #e2e8f0; animation: challenge-in 0.25s ease-out; }
+.challenge-invite img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: #0f172a; flex-shrink: 0; }
+.challenge-invite h2 { margin: 0 0 4px; font-size: 1.05rem; color: #f8fafc; overflow-wrap: anywhere; }
+.challenge-invite p { margin: 0 0 10px; font-size: 0.85rem; color: #c7d2fe; }
+.challenge-invite-clock { color: #fbbf24; font-weight: bold; }
+.challenge-invite-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.challenge-invite-actions button { border: none; border-radius: 8px; padding: 9px 16px; font-weight: bold; cursor: pointer; }
+.challenge-accept { background: #dc2626; color: white; }
+.challenge-decline { background: #334155; color: #e2e8f0; }
+@keyframes challenge-in { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .challenge-invite { animation: none; } }

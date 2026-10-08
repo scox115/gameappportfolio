@@ -7,14 +7,15 @@ using Microsoft.Extensions.Options;
 
 namespace Game.Api.Workers;
 
-public record CleanupResult(int ExpiredRefreshTokens, int FinishedBossFights, int FinishedDuels, int OldAuditEntries = 0, int ExpiredEmailLinks = 0, int ClosedReports = 0)
+public record CleanupResult(int ExpiredRefreshTokens, int FinishedBossFights, int FinishedDuels, int OldAuditEntries = 0, int ExpiredEmailLinks = 0, int ClosedReports = 0,
+    int ExpiredChallenges = 0)
 {
-    public int Total => ExpiredRefreshTokens + FinishedBossFights + FinishedDuels + OldAuditEntries + ExpiredEmailLinks + ClosedReports;
+    public int Total => ExpiredRefreshTokens + FinishedBossFights + FinishedDuels + OldAuditEntries + ExpiredEmailLinks + ClosedReports + ExpiredChallenges;
 }
 
 /// <summary>
 /// Deletes rows that are no longer needed: refresh tokens long past their expiry, the working
-/// state of battles that finished long ago, expired email links, reports an admin closed long ago, and
+/// state of battles that finished long ago, expired email links, duel challenges nobody answered, reports an admin closed long ago, and
 /// admin audit log entries older than a year. Battles still in progress are never touched: an
 /// unfinished boss fight waits for its player to come back, and duels are settled by
 /// <see cref="PvpTurnTimeoutWorker"/>.
@@ -55,7 +56,11 @@ public class DataCleanupService(AppDbContext dbContext, TimeProvider timeProvide
         var reports = await DeleteInBatchesAsync(
             dbContext.PlayerReports.Where(r => r.ResolvedAt < reportCutoff).OrderBy(r => r.ResolvedAt), "player_report", cancellationToken);
 
-        return new CleanupResult(tokens, bossFights, duels, auditEntries, emailLinks, reports);
+        // A challenge is withdrawn when its challenger leaves; this catches one a stopped replica left behind.
+        var challenges = await DeleteInBatchesAsync(
+            dbContext.DuelChallenges.Where(c => c.ExpiresAt < now).OrderBy(c => c.ExpiresAt), "duel_challenge", cancellationToken);
+
+        return new CleanupResult(tokens, bossFights, duels, auditEntries, emailLinks, reports, challenges);
     }
 
     // Each batch is its own DELETE TOP (n) statement and transaction, so a large backlog is cleared

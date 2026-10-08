@@ -1,3 +1,4 @@
+using Game.Api.Social;
 using Game.Api.Health;
 using Game.Api.Observability;
 using Game.Api.Endpoints; // Add this using statement at the top!
@@ -300,6 +301,7 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(RateLimits.Recovery, context => PerAddress(context, limits => limits.RecoveryRequestsPerHour, TimeSpan.FromHours(1)));
     options.AddPolicy(RateLimits.AvatarUpload, context => PerPlayer(context, limits => limits.AvatarUploadsPerHour, TimeSpan.FromHours(1)));
     options.AddPolicy(RateLimits.Report, context => PerPlayer(context, limits => limits.ReportsPerHour, TimeSpan.FromHours(1)));
+    options.AddPolicy(RateLimits.FriendRequest, context => PerPlayer(context, limits => limits.FriendRequestsPerHour, TimeSpan.FromHours(1)));
     options.OnRejected = async (context, cancellationToken) =>
         await context.HttpContext.Response.WriteAsJsonAsync(
             new { message = "Too many attempts from your network. Please wait a little and try again." }, cancellationToken);
@@ -360,6 +362,7 @@ builder.Services.AddSingleton<PvpMatchmaker>();
 builder.Services.AddSingleton<ArenaPulse>();
 builder.Services.AddHostedService<ArenaPulseWorker>();
 builder.Services.AddScoped<PvpBattleService>();
+builder.Services.AddScoped<FriendService>();
 builder.Services.AddScoped<Game.Api.Accounts.AccountService>();
 builder.Services.AddScoped<MatchHistoryProjector>();
 builder.Services.AddScoped<Game.Api.Moderation.ModerationService>();

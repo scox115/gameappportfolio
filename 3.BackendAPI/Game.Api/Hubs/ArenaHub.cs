@@ -1,5 +1,6 @@
 using Game.Api.Auth;
 using Game.Api.Features;
+using Game.Api.Models;
 using Game.Core.Battles;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -51,6 +52,27 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatu
         }
     }
 
+    /// <summary>Challenges a friend to a friendly duel. Returns null when an unfinished battle was resumed instead.</summary>
+    public async Task<ChallengeSent?> ChallengeFriend(Guid friendId)
+    {
+        await EnsureDuelsAreOnAsync();
+        var sent = await battles.ChallengeAsync(PlayerId, friendId, Network);
+        pulse.Changed(); // out of the lobby, if they were in it
+        return sent;
+    }
+
+    public Task WithdrawChallenge() => battles.WithdrawChallengeAsync(PlayerId);
+
+    /// <summary>Accepts a friend's challenge; MatchFound brings the duel to both of them.</summary>
+    public async Task AcceptChallenge(Guid challengeId)
+    {
+        await EnsureDuelsAreOnAsync();
+        await battles.AcceptChallengeAsync(PlayerId, challengeId, Network);
+        pulse.Changed();
+    }
+
+    public Task DeclineChallenge(Guid challengeId) => battles.DeclineChallengeAsync(PlayerId, challengeId);
+
     public async Task CancelSearch()
     {
         await matchmaker.LeaveAsync(PlayerId);
@@ -66,6 +88,7 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatu
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         await matchmaker.LeaveAsync(PlayerId);
+        await battles.WithdrawChallengeAsync(PlayerId); // nobody is left waiting for the answer
         pulse.Changed();
         await base.OnDisconnectedAsync(exception);
     }

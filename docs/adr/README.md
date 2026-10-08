@@ -40,5 +40,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0034](0034-live-lobby.md) | A live lobby: who is online, waiting and duelling | Accepted |
 | [0035](0035-ranked-seasons.md) | Ranked seasons: monthly standings, rewards and a soft reset | Accepted |
 | [0036](0036-spectating.md) | Let anyone watch a duel under way | Accepted |
+| [0037](0037-friends-and-challenges.md) | Friends, and challenging a friend to a duel | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.

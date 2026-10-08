@@ -13,4 +13,7 @@ public interface IArenaClient
 
     /// <summary>The player was taken out of the lobby, for example because they can no longer cover their wager.</summary>
     Task SearchCancelled(string reason);
+
+    /// <summary>The friend this player challenged turned the duel down.</summary>
+    Task ChallengeDeclined(string reason);
 }

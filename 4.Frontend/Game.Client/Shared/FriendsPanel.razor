@@ -1,0 +1,236 @@
+@using System.Net
+@using Game.Client.Services
+@inject GameState State
+@inject HttpClient Http
+@implements IDisposable
+
+@* The town's friends list: add a hero by name, answer requests, see who's online, challenge a friend to a
+   duel or watch the one they're in (see docs/adr/0037-friends-and-challenges.md). *@
+<section class="friends-panel" aria-labelledby="friends-title">
+    <div class="friends-head">
+        <h4 id="friends-title">🤝 Friends</h4>
+        @if (list is { Friends.Count: > 0 } loaded)
+        {
+            <span class="friends-count">@loaded.Friends.Count(f => f.Online) of @loaded.Friends.Count online</span>
+        }
+    </div>
+
+    @if (State.IsGuest)
+    {
+        <p class="friends-note">Keep your hero to add friends and challenge them to duels.</p>
+    }
+    else
+    {
+        <form class="friends-add" @onsubmit="AddAsync">
+            <label for="friend-name" class="visually-hidden">Hero name</label>
+            <input id="friend-name" @bind="newFriend" @bind:event="oninput" placeholder="Add a friend by hero name" autocomplete="off" maxlength="40" />
+            <button type="submit" disabled="@(busy || string.IsNullOrWhiteSpace(newFriend))">➕ Add</button>
+        </form>
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <p class="friends-message @(failed ? "friends-failed" : "")" role="@(failed ? "alert" : "status")">@message</p>
+        }
+
+        @if (list is null)
+        {
+            <p class="friends-note">@(loadError ?? "Loading your friends…")</p>
+        }
+        else
+        {
+            @if (list.Incoming.Count > 0)
+            {
+                <h5>Asking to be your friend</h5>
+                <ul class="friends-list">
+                    @foreach (var hero in list.Incoming)
+                    {
+                        <li>
+                            @Hero(hero)
+                            <span class="friends-actions">
+                                <button class="friends-yes" @onclick="() => AcceptAsync(hero)" aria-label="Accept @hero.Username">✓ Accept</button>
+                                <button class="friends-no" @onclick="() => DeclineAsync(hero)" aria-label="Turn down @hero.Username">✕</button>
+                            </span>
+                        </li>
+                    }
+                </ul>
+            }
+
+            @if (list.Friends.Count == 0 && list.Incoming.Count == 0 && list.Outgoing.Count == 0)
+            {
+                <p class="friends-note">No friends yet. Add a hero by name, and once they accept you can challenge them to a duel.</p>
+            }
+            else if (list.Friends.Count > 0)
+            {
+                <ul class="friends-list">
+                    @foreach (var hero in list.Friends)
+                    {
+                        <li>
+                            @Hero(hero)
+                            <span class="friends-actions">
+                                @if (hero.DuelId is { } duelId)
+                                {
+                                    <a class="friends-watch" href="watch/@duelId" aria-label="Watch @hero.Username's duel">👁️ Watch</a>
+                                }
+                                else if (hero.Online)
+                                {
+                                    <button class="friends-challenge" @onclick="() => State.Challenge(hero.Id, hero.Username)" aria-label="Challenge @hero.Username">⚔️ Challenge</button>
+                                }
+                                <button class="friends-no" @onclick="() => ConfirmRemove(hero)" aria-label="Remove @hero.Username">✕</button>
+                            </span>
+                        </li>
+                        @if (removing == hero.Id)
+                        {
+                            <li class="friends-confirm" role="group" aria-label="Remove @hero.Username?">
+                                Remove @hero.Username from your friends?
+                                <span class="friends-actions">
+                                    <button class="friends-no" @onclick="() => UnfriendAsync(hero)">Remove</button>
+                                    <button @onclick="() => removing = null">Keep</button>
+                                </span>
+                            </li>
+                        }
+                    }
+                </ul>
+            }
+
+            @if (list.Outgoing.Count > 0)
+            {
+                <h5>Waiting for an answer</h5>
+                <ul class="friends-list">
+                    @foreach (var hero in list.Outgoing)
+                    {
+                        <li>
+                            @Hero(hero)
+                            <span class="friends-actions">
+                                <button class="friends-no" @onclick="() => WithdrawAsync(hero)" aria-label="Take back your request to @hero.Username">Cancel</button>
+                            </span>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+    }
+</section>
+
+@code {
+    private static readonly TimeSpan Refresh = TimeSpan.FromSeconds(20);
+
+    private FriendsDto? list;
+    private string? loadError;
+    private string newFriend = string.Empty;
+    private string? message;
+    private bool failed;
+    private bool busy;
+    private Guid? removing;
+    private Timer? refresher;
+
+    protected override async Task OnInitializedAsync()
+    {
+        State.FriendsChanged += OnFriendsChanged;
+        if (State.IsGuest) return;
+
+        // Requests and answers arrive at once; who's online and in a duel is checked every so often.
+        refresher = new Timer(_ => InvokeAsync(ReloadAsync), null, Refresh, Refresh);
+        await LoadAsync();
+    }
+
+    private void OnFriendsChanged() => _ = InvokeAsync(ReloadAsync);
+
+    private async Task ReloadAsync()
+    {
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            list = await Http.GetFromJsonAsync<FriendsDto>("/api/v1/friends");
+            loadError = null;
+        }
+        catch (Exception)
+        {
+            loadError ??= "Your friends couldn't be loaded. Trying again soon.";
+        }
+    }
+
+    private async Task AddAsync()
+    {
+        var name = newFriend.Trim();
+        if (name.Length == 0) return;
+        busy = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/v1/friends", new { Username = name });
+            (failed, message) = response.StatusCode switch
+            {
+                HttpStatusCode.Created => (false, $"Friend request sent to {name}."),
+                HttpStatusCode.OK => (false, $"You and {name} are now friends."),
+                HttpStatusCode.TooManyRequests => (true, "That's a lot of requests. Please wait a while and try again."),
+                _ => (true, await ProblemText.ReadAsync(response) ?? "That didn't work. Please try again."),
+            };
+            if (!failed) newFriend = string.Empty;
+            await LoadAsync();
+        }
+        catch (HttpRequestException)
+        {
+            (failed, message) = (true, "The game server couldn't be reached. Please try again.");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task AcceptAsync(FriendDto hero)
+    {
+        var response = await Http.PostAsync($"/api/v1/friends/{hero.Id}/accept", null);
+        (failed, message) = response.IsSuccessStatusCode
+            ? (false, $"You and {hero.Username} are now friends.")
+            : (true, $"{hero.Username}'s request is no longer open.");
+        await LoadAsync();
+    }
+
+    private void ConfirmRemove(FriendDto hero) => removing = hero.Id;
+
+    private Task DeclineAsync(FriendDto hero) => RemoveAsync(hero, $"You turned down {hero.Username}.");
+
+    private Task UnfriendAsync(FriendDto hero) => RemoveAsync(hero, $"{hero.Username} is no longer on your list.");
+
+    private Task WithdrawAsync(FriendDto hero) => RemoveAsync(hero, $"You took back your request to {hero.Username}.");
+
+    private async Task RemoveAsync(FriendDto hero, string done)
+    {
+        removing = null;
+        var response = await Http.DeleteAsync($"/api/v1/friends/{hero.Id}");
+        (failed, message) = response.IsSuccessStatusCode ? (false, done) : (true, "That didn't work. Please try again.");
+        await LoadAsync();
+    }
+
+    private static RenderFragment Hero(FriendDto hero) => __builder =>
+    {
+        <span class="friends-hero">
+            <span class="friends-avatar">
+                <img src="@Avatars.For(hero.AvatarUrl, hero.Username)" alt="" style="@CosmeticStyles.Frame(hero.Frame)" />
+                <span class="friends-dot @(hero.DuelId is not null ? "friends-dot-duel" : hero.Online ? "friends-dot-on" : "")"
+                      title="@(hero.DuelId is not null ? "In a duel" : hero.Online ? "Online" : "Offline")"></span>
+            </span>
+            <span>
+                <b>@hero.Username</b>
+                <small>
+                    @HeroClassIcons.For(hero.Class) @hero.Class · 🏅 @hero.Rating ·
+                    @(hero.DuelId is not null ? "⚔️ in a duel" : hero.Online ? "online" : "offline")
+                </small>
+            </span>
+        </span>
+    };
+
+    public void Dispose()
+    {
+        State.FriendsChanged -= OnFriendsChanged;
+        refresher?.Dispose();
+    }
+
+    // Shapes of the API's FriendsResponse and FriendView.
+    private record FriendDto(Guid Id, string Username, string? Title, string Class, string? AvatarUrl, string? Frame, int Rating, bool Online, Guid? DuelId);
+    private record FriendsDto(List<FriendDto> Friends, List<FriendDto> Incoming, List<FriendDto> Outgoing, int MaxFriends);
+}

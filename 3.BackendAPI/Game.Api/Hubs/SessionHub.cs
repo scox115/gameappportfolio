@@ -11,12 +11,22 @@ public interface ISessionClient
 
     /// <summary>An admin suspended the account, so every browser has been signed out.</summary>
     Task Suspended();
+
+    /// <summary>Someone sent, accepted or withdrew a friend request, or removed this hero as a friend: reload the list.</summary>
+    Task FriendsChanged();
+
+    /// <summary>A friend challenged this hero to a duel.</summary>
+    Task ChallengeReceived(Models.ChallengeView challenge);
+
+    /// <summary>The challenge was withdrawn, answered in another tab, or ran out of time: stop showing it.</summary>
+    Task ChallengeClosed(Guid challengeId);
 }
 
 /// <summary>
 /// Every signed-in browser stays connected here, so the server can tell it straight away when
 /// the account signs in somewhere else. The client only listens; there is nothing to call.
-/// The same connections tell the live lobby who is online (see <see cref="ArenaPulse"/>).
+/// The same connections tell the live lobby who is online (see <see cref="ArenaPulse"/>), and bring
+/// friend requests and duel challenges wherever the hero is in the game.
 /// </summary>
 [Authorize]
 public class SessionHub(ArenaPulse pulse) : Hub<ISessionClient>

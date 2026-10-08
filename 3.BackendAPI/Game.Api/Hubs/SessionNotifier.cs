@@ -2,7 +2,10 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Game.Api.Hubs;
 
-/// <summary>Tells a player's browsers that their session has ended: a newer sign-in replaced it, or an admin suspended them.</summary>
+/// <summary>
+/// Tells a player's browsers about their session (a newer sign-in replaced it, or an admin suspended
+/// them) and about friends (a request or a duel challenge).
+/// </summary>
 public class SessionNotifier(
     IHubContext<SessionHub, ISessionClient> sessionHub,
     PvpMatchmaker matchmaker,
@@ -40,6 +43,28 @@ public class SessionNotifier(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Could not tell suspended user {UserId}'s browsers.", userId);
+        }
+    }
+
+    /// <summary>Asks the player's browsers to reload their friends list. Best effort: the list is right on the next load anyway.</summary>
+    public Task FriendsChangedAsync(Guid userId) =>
+        TellAsync(userId, client => client.FriendsChanged(), "a friends list change");
+
+    public Task ChallengeReceivedAsync(Guid userId, Models.ChallengeView challenge) =>
+        TellAsync(userId, client => client.ChallengeReceived(challenge), "a duel challenge");
+
+    public Task ChallengeClosedAsync(Guid userId, Guid challengeId) =>
+        TellAsync(userId, client => client.ChallengeClosed(challengeId), "a closed duel challenge");
+
+    private async Task TellAsync(Guid userId, Func<ISessionClient, Task> send, string what)
+    {
+        try
+        {
+            await send(sessionHub.Clients.User(userId.ToString()));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not tell user {UserId} about {What}.", userId, what);
         }
     }
 }
