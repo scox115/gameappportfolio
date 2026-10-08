@@ -1,5 +1,6 @@
 using Game.Core.Bounties;
 using Game.Core.Entities;
+using Game.Core.Seasons;
 using Game.Core.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -111,6 +112,21 @@ public class PlayerConfiguration : IEntityTypeConfiguration<Player>
                 .HasConversion<string>()
                 .HasMaxLength(20);
             records.HasKey("PlayerId", nameof(ClassRecord.Class));
+        });
+
+        // The season worker finds heroes whose rating still belongs to a finished season (docs/adr/0035-ranked-seasons.md).
+        builder.HasIndex(p => p.SeasonStart);
+
+        // How the hero finished each past season, one row per season they dueled in.
+        builder.OwnsMany(p => p.SeasonRecords, records =>
+        {
+            records.ToTable("PlayerSeasonRecords");
+            records.WithOwner().HasForeignKey("PlayerId");
+            records.HasKey("PlayerId", nameof(SeasonRecord.SeasonStart));
+            records.Ignore(r => r.Season);
+            records.Ignore(r => r.Duels);
+            // For a past season's standings.
+            records.HasIndex(nameof(SeasonRecord.SeasonStart), nameof(SeasonRecord.Rank));
         });
 
         // Optimizes lookups by indexing the username field uniquely

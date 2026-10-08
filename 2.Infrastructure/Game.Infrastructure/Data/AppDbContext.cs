@@ -4,6 +4,7 @@ using Game.Core.Entities;
 using Game.Core.History;
 using Game.Core.Moderation;
 using Game.Core.Operations;
+using Game.Core.Seasons;
 using Game.Infrastructure.Identity;
 using Game.Infrastructure.Messaging;
 using Microsoft.AspNetCore.Identity;
@@ -34,6 +35,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<PlayerReport> PlayerReports => Set<PlayerReport>();
     public DbSet<PvpLobbyEntry> PvpLobby => Set<PvpLobbyEntry>();
     public DbSet<OnlinePresence> OnlinePresence => Set<OnlinePresence>();
+    public DbSet<ClosedSeason> ClosedSeasons => Set<ClosedSeason>();
     public DbSet<HubMessage> HubMessages => Set<HubMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

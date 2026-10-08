@@ -5,6 +5,7 @@ using Game.Core.Entities;
 using Game.Core.Events;
 using Game.Core.History;
 using Game.Core.Moderation;
+using Game.Core.Seasons;
 
 namespace Game.Api.Accounts;
 
@@ -60,7 +61,11 @@ public record AccountExport(
         List<string> Cosmetics,
         string? EquippedFrame,
         string? EquippedCardSkin,
-        List<BountyProgress> Bounties)
+        List<BountyProgress> Bounties,
+        DateOnly? SeasonStart = null,
+        int SeasonWins = 0,
+        int SeasonLosses = 0,
+        List<SeasonRecord>? PastSeasons = null)
     {
         public static HeroProfile From(Player p) => new(
             p.Username, p.Class, p.Level, p.ExperiencePoints, p.Gold, p.Rating, p.PvpWins, p.PvpLosses, p.WinStreak,
@@ -72,7 +77,9 @@ public record AccountExport(
             p.Cosmetics.Select(c => c.Cosmetic.ToString()).ToList(),
             p.EquippedFrame?.ToString(),
             p.EquippedCardSkin?.ToString(),
-            p.Bounties.ToList());
+            p.Bounties.ToList(),
+            p.SeasonStart, p.SeasonWins, p.SeasonLosses,
+            p.SeasonRecords.OrderBy(r => r.SeasonStart).ToList());
     }
 
     public record Match(

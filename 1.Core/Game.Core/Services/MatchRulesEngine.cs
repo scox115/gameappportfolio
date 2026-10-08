@@ -1,6 +1,7 @@
 using Game.Core.Battles;
 using Game.Core.Bounties;
 using Game.Core.Entities;
+using Game.Core.Seasons;
 
 namespace Game.Core.Services;
 
@@ -52,6 +53,11 @@ public class MatchRulesEngine(TimeProvider timeProvider)
             throw new ArgumentOutOfRangeException(nameof(wager), wager, "That isn't one of the wager amounts.");
 
         match.CompleteMatch(winner.Id);
+
+        // A duel counts in the season it ends in; a hero's first duel of a new season resets their rating first.
+        var season = Season.At(timeProvider.GetUtcNow().UtcDateTime);
+        winner.EnterSeason(season);
+        loser.EnterSeason(season);
 
         var ratingChange = EloRating.PointsForWin(winner.Rating, loser.Rating);
         var payout = DuelWagers.Payout(wager);

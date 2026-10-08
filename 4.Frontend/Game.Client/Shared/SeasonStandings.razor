@@ -1,0 +1,183 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject GameState State
+
+@* The ranked season leaderboard: the season under way, live, or a past season's final standings
+   and what each place earned (docs/adr/0035-ranked-seasons.md). *@
+<section class="season-standings" aria-labelledby="season-standings-title">
+    <div class="season-standings-head">
+        <h4 id="season-standings-title">🗓️ Ranked seasons</h4>
+        @if (seasons is not null)
+        {
+            <label>
+                <span class="visually-hidden">Season</span>
+                <select @onchange="PickSeason" value="@selectedKey" aria-label="Season">
+                    <option value="@seasons.current.key">@seasons.current.name (now)</option>
+                    @foreach (var past in seasons.past)
+                    {
+                        <option value="@past.key">@past.name</option>
+                    }
+                </select>
+            </label>
+        }
+    </div>
+
+    @if (seasons is not null)
+    {
+        <p class="season-standings-note">
+            @if (standings?.final == true)
+            {
+                <span>Final standings. Each hero's reward was paid when the season ended.</span>
+            }
+            else
+            {
+                <span>Ends in @SeasonCard.Until(seasons.current.endsAt). Fight @seasons.duelsToBeRanked duels to be ranked.
+                    Rewards: @string.Join(", ", seasons.rewards.Select(r => $"{r.ranks} {r.gold:N0} gold")).
+                    Ratings then move halfway back to 1000.</span>
+            }
+        </p>
+    }
+
+    @if (loadFailed)
+    {
+        <p class="season-standings-empty">The season standings are unavailable right now.</p>
+    }
+    else if (standings is null)
+    {
+        <p class="season-standings-empty">Loading the season standings...</p>
+    }
+    else if (standings.standings.Count == 0)
+    {
+        <p class="season-standings-empty">@(standings.final ? "Nobody fought enough duels to be ranked that season." : "Nobody has fought enough duels to be ranked yet. Be the first!")</p>
+    }
+    else
+    {
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Hero</th>
+                        <th class="num">Rating</th>
+                        <th class="num">Season W-L</th>
+                        <th class="num">@(standings.final ? "Earned" : "Reward now")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in standings.standings)
+                    {
+                        var isMe = row.id == State.PlayerId;
+                        <tr class="@(isMe ? "me" : "")">
+                            <td class="rank">@row.rank @(row.rank == 1 ? "👑" : "")</td>
+                            <td>
+                                <span class="hero">
+                                    <img src="@Avatars.For(row.avatarUrl, row.username)" alt="" style="@CosmeticStyles.Frame(row.frame, 2, "1px solid #475569")" />
+                                    <span>@row.username@(isMe ? " (You)" : "")</span>
+                                    <span title="Plays @row.heroClass now">@HeroClassIcons.For(row.heroClass)</span>
+                                    @if (!string.IsNullOrEmpty(row.title))
+                                    {
+                                        <span class="title">@row.title</span>
+                                    }
+                                </span>
+                            </td>
+                            <td class="num rating">🏅 @row.rating</td>
+                            <td class="num">⚔️ @row.wins-@row.losses</td>
+                            <td class="num gold">🪙 @row.rewardGold.ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    /// <summary>When the leaderboards last moved; a change reloads the season under way.</summary>
+    [Parameter] public DateTime? RefreshedAt { get; set; }
+
+    private SeasonsDto? seasons;
+    private StandingsDto? standings;
+    private string? selectedKey;
+    private DateTime? shownFor;
+    private bool loadFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            seasons = await Http.GetFromJsonAsync<SeasonsDto>("/api/v1/seasons");
+            shownFor = RefreshedAt;
+            await ShowAsync(seasons!.current.key);
+        }
+        catch (Exception)
+        {
+            loadFailed = true;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (seasons is null || RefreshedAt == shownFor) return;
+        shownFor = RefreshedAt;
+        if (selectedKey == seasons.current.key) await ShowAsync(selectedKey, quietly: true);
+    }
+
+    private Task PickSeason(ChangeEventArgs e) => ShowAsync(e.Value?.ToString() ?? seasons!.current.key);
+
+    private async Task ShowAsync(string key, bool quietly = false)
+    {
+        selectedKey = key;
+        if (!quietly) standings = null;
+        try
+        {
+            var loaded = await Http.GetFromJsonAsync<StandingsDto>($"/api/v1/seasons/{key}/standings");
+            if (selectedKey == key) standings = loaded; // another season may have been picked meanwhile
+            loadFailed = false;
+        }
+        catch (Exception)
+        {
+            loadFailed = true;
+        }
+    }
+
+    private class SeasonsDto
+    {
+        public SeasonCard.SeasonDto current { get; set; } = new();
+        public int duelsToBeRanked { get; set; }
+        public List<RewardDto> rewards { get; set; } = new();
+        public List<PastDto> past { get; set; } = new();
+    }
+
+    private class RewardDto
+    {
+        public string ranks { get; set; } = "";
+        public int gold { get; set; }
+    }
+
+    private class PastDto
+    {
+        public string key { get; set; } = "";
+        public string name { get; set; } = "";
+    }
+
+    private class StandingsDto
+    {
+        public bool final { get; set; }
+        public List<RowDto> standings { get; set; } = new();
+    }
+
+    private class RowDto
+    {
+        public int rank { get; set; }
+        public Guid id { get; set; }
+        public string username { get; set; } = "";
+        public string? title { get; set; }
+        public string heroClass { get; set; } = "";
+        public string? avatarUrl { get; set; }
+        public string? frame { get; set; }
+        public int rating { get; set; }
+        public int wins { get; set; }
+        public int losses { get; set; }
+        public int rewardGold { get; set; }
+    }
+}

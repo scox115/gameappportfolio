@@ -1,0 +1,100 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+@* The hero's ranked season on the town screen: where they stand now, and how the last season ended
+   (docs/adr/0035-ranked-seasons.md). *@
+<section class="season-card" aria-labelledby="season-card-title">
+    <div class="season-card-head">
+        <h4 id="season-card-title">🗓️ Ranked season</h4>
+        @if (mine is not null)
+        {
+            <span class="season-card-ends">@mine.season.name · ends in @Until(mine.season.endsAt)</span>
+        }
+    </div>
+
+    @if (mine is null)
+    {
+        <p class="season-card-muted">@(loadFailed ? "The season standings are unavailable right now." : "Checking the season standings...")</p>
+    }
+    else
+    {
+        <p>
+            🏅 Season rating <b>@mine.rating</b> · ⚔️ <b>@mine.wins-@mine.losses</b>
+            @if (mine.rank is { } rank)
+            {
+                <span> · you're <b>#@rank</b></span>
+            }
+        </p>
+        @if (mine.rank is null)
+        {
+            var left = Math.Max(0, mine.duelsToBeRanked - mine.wins - mine.losses);
+            <p class="season-card-muted">Fight @left more duel@(left == 1 ? "" : "s") this season to be ranked. The top 10 earn up to 1,000 gold when it ends.</p>
+        }
+        @if (mine.lastSeason is { } last)
+        {
+            <p class="season-card-last">
+                @if (last.rank is { } finished)
+                {
+                    <span>Last season (@last.name): finished <b>#@finished</b> at @last.rating and earned <b>🪙 @last.rewardGold</b>.</span>
+                }
+                else
+                {
+                    <span>Last season (@last.name): @last.wins-@last.losses, too few duels to be ranked.</span>
+                }
+            </p>
+        }
+    }
+</section>
+
+@code {
+    private MySeasonDto? mine;
+    private bool loadFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            mine = await Http.GetFromJsonAsync<MySeasonDto>("/api/v1/seasons/me");
+        }
+        catch (Exception)
+        {
+            loadFailed = true;
+        }
+    }
+
+    internal static string Until(DateTime endsAt)
+    {
+        var left = endsAt.ToUniversalTime() - DateTime.UtcNow;
+        if (left <= TimeSpan.Zero) return "a moment";
+        if (left.TotalDays >= 2) return $"{(int)left.TotalDays} days";
+        return left.TotalHours >= 1 ? $"{(int)left.TotalHours}h {left.Minutes}m" : $"{Math.Max(1, left.Minutes)}m";
+    }
+
+    private class MySeasonDto
+    {
+        public SeasonDto season { get; set; } = new();
+        public int rating { get; set; }
+        public int wins { get; set; }
+        public int losses { get; set; }
+        public int duelsToBeRanked { get; set; }
+        public int? rank { get; set; }
+        public LastSeasonDto? lastSeason { get; set; }
+    }
+
+    internal class SeasonDto
+    {
+        public string key { get; set; } = "";
+        public string name { get; set; } = "";
+        public DateTime endsAt { get; set; }
+    }
+
+    private class LastSeasonDto
+    {
+        public string name { get; set; } = "";
+        public int? rank { get; set; }
+        public int rating { get; set; }
+        public int wins { get; set; }
+        public int losses { get; set; }
+        public int rewardGold { get; set; }
+    }
+}
