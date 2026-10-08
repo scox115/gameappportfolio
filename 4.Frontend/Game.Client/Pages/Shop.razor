@@ -6,9 +6,9 @@
 
 @* The Gold Shop: spend battle winnings on card upgrades, elixirs, titles and prestige cosmetics.
    The server sets every price and checks the player's gold; this page only shows the offers. *@
-<div style="max-width: 1000px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
+<div class="arena-panel" style="max-width: 1000px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
     @* The header stays pinned while the shelves scroll, so the way back to town is always in reach. *@
-    <div style="position: sticky; top: 0; z-index: 10; background: #1e293b; margin: -30px -30px 10px; padding: 20px 30px 15px; border-radius: 16px 16px 0 0; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
+    <div class="shop-head" style="position: sticky; top: 0; z-index: 10; background: #1e293b; margin: -30px -30px 10px; padding: 20px 30px 15px; border-radius: 16px 16px 0 0; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
         <h2 style="margin: 0; color: #fbbf24;">🪙 Gold Shop</h2>
         <div style="display: flex; align-items: center; gap: 20px;">
             <span style="color: #fbbf24; font-weight: bold; font-size: 1.2rem;">You have @State.Gold gold</span>

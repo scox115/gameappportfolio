@@ -1,5 +1,7 @@
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    /* The game's dark backdrop reaches the edges of the window, with no white strips beside it. */
+    background: #0f172a;
 }
 
 h1:focus {
@@ -377,3 +379,31 @@ button:focus-visible, input:focus-visible, a:focus-visible, [tabindex]:focus-vis
 .challenge-decline { background: #334155; color: #e2e8f0; }
 @keyframes challenge-in { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .challenge-invite { animation: none; } }
+
+/* Phones: the game fills the screen, panels lose their wide padding, and rows that sit side by side on a
+   computer stack or share the width. Most of the game's styles are inline, hence !important. */
+@media (max-width: 600px) {
+    article.content.px-4 { padding-left: 0 !important; padding-right: 0 !important; }
+    .game-client-shell { padding: 12px !important; }
+    .game-header { margin-bottom: 16px !important; padding-bottom: 12px !important; }
+    .game-title { font-size: 1.2rem; }
+    .game-status { width: 100%; justify-content: center; gap: 6px 14px !important; padding: 8px 12px !important; border-radius: 16px !important; }
+    .game-status button { margin-right: 0 !important; padding: 4px 2px; }
+    .arena-panel { padding: 16px !important; }
+    .arena-head { flex-direction: column; align-items: flex-start !important; gap: 8px; margin-bottom: 16px !important; }
+    .arena-hp { display: flex; flex-wrap: wrap; gap: 4px 14px; white-space: normal !important; font-size: 1rem !important; }
+    .arena-hp > span { margin-right: 0 !important; }
+    .duel-heroes { flex-direction: column; gap: 10px !important; }
+    .card-hand { gap: 8px !important; }
+    .hand-card { width: auto !important; flex: 1 1 0; min-width: 0; font-size: 0.85rem; padding: 8px 4px !important; }
+    .reward-line { flex-wrap: wrap; gap: 6px 18px !important; }
+    .result-actions { flex-wrap: wrap; gap: 10px !important; }
+    .result-actions button { flex: 1 1 140px; padding: 12px 10px !important; }
+    .shop-head { margin: -16px -16px 10px !important; padding: 14px 16px 12px !important; }
+    .shop-head h2 { font-size: 1.3rem; }
+    .shop-head > div { width: 100%; justify-content: space-between; gap: 10px !important; }
+    .leaderboard-table { font-size: 0.85rem !important; }
+    .leaderboard-table th, .leaderboard-table td { padding: 8px 6px !important; }
+    .season-card, .friends-panel { padding: 18px 16px; }
+    .friends-list > li { padding: 8px 10px; }
+}
