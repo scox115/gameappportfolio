@@ -1,0 +1,32 @@
+@* The end of a duel: victory or defeat, the rewards, and what to do next. *@
+<div class="result-panel @(Won ? "is-won" : "")">
+    <div class="result-icon">@(Won ? "🏆" : "💀")</div>
+    <h2 class="result-title @(Won ? "is-won" : "")">@(Won ? "VICTORY" : "DEFEAT")</h2>
+    <p class="result-text">@ResultText(Won)</p>
+    @if (Reward?.NoRewardReason is { } noReward)
+    {
+        <p class="no-reward">🤝 @noReward</p>
+    }
+    else if (Reward is not null)
+    {
+        <div class="reward-line">
+            <span class="reward-gold">🪙 +@Reward.GoldEarned Gold</span>
+            <span class="reward-xp">✨ +@Reward.ExperienceEarned XP</span>
+            @if (Reward.RatingChange is { } change)
+            {
+                <span class="reward-rating @(change >= 0 ? "" : "is-down")">🏅 Rating @Reward.Player.Rating (@(change >= 0 ? "+" : "")@change)</span>
+            }
+        </div>
+        <RewardBonuses WagerResult="Reward.WagerResult" StreakBonus="Reward.StreakBonus"
+                       Bounties="@(Reward.BountiesCompleted?.Select(b => new RewardBonuses.BountyLine(b.Name, b.Reward)).ToList() ?? [])" />
+    }
+    <div class="result-actions">
+        <button @onclick="OnReturnToTown" class="result-button">🏰 Return to Town</button>
+        <button @onclick="OnFindAnother" class="result-button is-find">🆚 Find Another Opponent</button>
+        <a href="replay/@Battle.Id" class="result-replay">▶ Watch the replay</a>
+        @if (Battle.AgainstBot)
+        {
+            <button @onclick="OnSparAgain" class="result-button is-spar">🤖 Spar Again</button>
+        }
+    </div>
+</div>

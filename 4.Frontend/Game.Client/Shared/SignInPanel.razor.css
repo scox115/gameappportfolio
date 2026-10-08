@@ -1,0 +1,99 @@
+/* Sign in / create a hero */
+.login-pulse { margin-top: 40px; }
+
+.login-panel {
+    max-width: 450px;
+    margin: 0 auto 60px;
+    background: var(--color-surface);
+    padding: 35px;
+    border-radius: 16px;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
+}
+
+.login-heading { text-align: center; margin-top: 0; color: var(--color-text); }
+
+.login-field { margin-bottom: 20px; }
+.login-field-first { margin-top: 25px; }
+
+.field-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+}
+
+/* The password box is rendered by PasswordInput, so it is reached through ::deep. */
+.login-input,
+.login-password ::deep input {
+    width: 100%;
+    padding: 12px;
+    background: var(--color-page);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 8px;
+    color: white;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.login-code-input { letter-spacing: 0.1em; }
+.code-hint { color: var(--color-text-muted); font-size: 0.8rem; margin: 6px 0 0; }
+.terms-note { color: var(--color-text-muted); font-size: 0.85rem; margin: 0 0 12px; }
+.soft-link { color: var(--color-accent-soft); }
+.forgot-line { text-align: center; margin: 12px 0 0; }
+.forgot-link { font-size: 0.9rem; }
+
+.login-submit {
+    width: 100%;
+    color: white;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.create-submit { background: #047857; }
+.play-submit { background: var(--color-accent); }
+/* Until both a name and a password are typed */
+.login-submit.is-waiting { cursor: not-allowed; opacity: 0.5; }
+
+.switch-line { text-align: center; color: var(--color-text-muted); font-size: 0.9rem; margin: 18px 0 0; }
+.switch-button { background: transparent; border: none; color: var(--color-accent-text); cursor: pointer; font-weight: bold; text-decoration: underline; font-size: 0.9rem; }
+
+.or-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: var(--color-text-muted); font-size: 0.8rem; }
+.or-rule { flex: 1; height: 1px; background: var(--color-border); }
+
+.guest-button {
+    width: 100%;
+    background: transparent;
+    color: var(--color-text-soft);
+    border: 1px solid var(--color-border-strong);
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.guest-note { text-align: center; color: var(--color-text-muted); font-size: 0.8rem; margin: 8px 0 0; }
+
+.login-error {
+    margin-top: 20px;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+    background: rgba(239,68,68,0.1);
+    color: var(--color-danger);
+    border: 1px solid rgba(239,68,68,0.2);
+}
+
+/* Phones: the panel loses its wide padding. */
+@media (max-width: 600px) {
+    .arena-panel { padding: 16px; }
+}

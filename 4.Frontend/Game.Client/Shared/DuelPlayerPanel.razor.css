@@ -1,0 +1,13 @@
+/* One hero's panel in the duel. */
+.duel-hero { flex: 1; min-width: 0; background: var(--color-page); border-radius: 12px; padding: 15px; border: 1px solid var(--color-border); }
+.duel-hero-head { display: flex; align-items: center; gap: 12px; }
+/* The frame's border and glow come from the hero's cosmetic, inline. */
+.duel-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--color-surface); object-fit: cover; }
+.duel-hero-class { color: var(--color-text-muted); font-size: 0.8rem; }
+.duel-hero-name { font-weight: bold; font-size: 1.1rem; color: var(--color-text); }
+.duel-hero-rating { color: #22d3ee; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.duel-hero-title { color: var(--color-gold); font-size: 0.85rem; font-style: italic; }
+/* --hero-color is the side's color (blue for you, red for the opponent); --hp is the health left. */
+.hp-track { background: var(--color-border); border-radius: 6px; height: 12px; margin-top: 8px; overflow: hidden; }
+.hp-fill { background: var(--hero-color); height: 100%; width: var(--hp); }
+.hp-text { color: var(--hero-color); font-weight: bold; margin-top: 4px; }

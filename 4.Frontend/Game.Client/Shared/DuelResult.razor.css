@@ -1,0 +1,43 @@
+/* The result: green for a win, red for a loss. */
+.result-panel { text-align: center; padding: 25px; border-radius: 12px; background: rgba(239,68,68,0.1); border: 2px solid #ef4444; }
+.result-panel.is-won { background: rgba(34,197,94,0.1); border: 2px solid #22c55e; }
+.result-icon { font-size: 3rem; line-height: 1; }
+.result-title { margin: 10px 0 5px; color: var(--color-danger); letter-spacing: 2px; }
+.result-title.is-won { color: var(--color-success); }
+.result-text { color: var(--color-text-dim); margin: 0 0 20px; }
+.no-reward { color: var(--color-text-muted); margin: 0 0 20px; }
+
+.reward-line { display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; font-weight: bold; }
+.reward-gold { color: var(--color-gold); }
+.reward-xp { color: #a78bfa; }
+.reward-rating { color: #22d3ee; }
+.reward-rating.is-down { color: var(--color-danger); }
+
+.result-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; }
+.result-button {
+    background: var(--color-border);
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.result-button.is-find { background: #0e7490; }
+.result-button.is-spar { background: #7c3aed; }
+.result-replay {
+    background: var(--color-accent);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: bold;
+    text-decoration: none;
+    text-align: center;
+}
+
+/* Phones: the rewards wrap and the buttons share the width. */
+@media (max-width: 600px) {
+    .reward-line { flex-wrap: wrap; gap: 6px 18px; }
+    .result-actions { gap: 10px; }
+    .result-actions button, .result-actions a { flex: 1 1 140px; padding: 12px 10px; }
+}

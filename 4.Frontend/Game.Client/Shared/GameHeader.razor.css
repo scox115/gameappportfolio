@@ -1,0 +1,46 @@
+/* Header: the game's name, and once signed in the hero's status pill */
+.game-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--color-border);
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+}
+
+.game-title { margin: 0; color: var(--color-accent-text); font-weight: 800; }
+.game-version { font-size: 0.8rem; font-weight: 600; color: var(--color-text-muted); }
+
+.game-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 20px;
+    background: var(--color-surface);
+    padding: 8px 20px;
+    border-radius: 30px;
+    border: 1px solid var(--color-border-strong);
+}
+
+/* The frame (border and glow) comes inline from CosmeticStyles.Frame. */
+.header-avatar { width: 35px; height: 35px; border-radius: 50%; object-fit: cover; }
+.header-name { font-weight: bold; color: var(--color-text); }
+.header-class { color: #c7d2fe; font-size: 0.9rem; white-space: nowrap; }
+.header-gold { color: var(--color-gold); font-weight: bold; }
+.header-level { background: var(--color-accent); padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; }
+
+.header-button { background: transparent; border: none; cursor: pointer; }
+.header-town { color: var(--color-accent-text); font-size: 0.9rem; font-weight: bold; margin-right: 10px; }
+.header-leaderboards { color: var(--color-gold); font-size: 0.9rem; font-weight: bold; margin-right: 10px; }
+.header-sound { font-size: 1.1rem; margin-right: 10px; }
+.header-logout { color: var(--color-text-muted); font-size: 0.9rem; font-weight: bold; }
+
+/* Phones: the header's rows stack and share the width. */
+@media (max-width: 600px) {
+    .game-header { margin-bottom: 16px; padding-bottom: 12px; }
+    .game-title { font-size: 1.2rem; }
+    .game-status { width: 100%; justify-content: center; gap: 6px 14px; padding: 8px 12px; border-radius: 16px; }
+    .game-status button { margin-right: 0; padding: 4px 2px; }
+}

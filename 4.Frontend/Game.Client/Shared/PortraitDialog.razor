@@ -1,0 +1,22 @@
+@* The change-portrait popup *@
+<div role="dialog" aria-modal="true" aria-labelledby="portrait-title" @onclick="ClosePortraitPopup" @onkeydown="PortraitPopupKeyDown"
+     class="portrait-backdrop">
+    <div @onclick:stopPropagation="true"
+         class="portrait-dialog">
+        <div class="portrait-dialog-head">
+            <h4 id="portrait-title" class="portrait-title">🛡️ Change portrait</h4>
+            <button aria-label="Close" @onclick="ClosePortraitPopup" @ref="portraitCloseButton"
+                    class="portrait-close">✕</button>
+        </div>
+        <p class="portrait-hint">PNG or JPG, up to 4 MB.</p>
+        <InputFile OnChange="HandleFileSelected" accept=".png,.jpg,.jpeg" aria-label="Portrait image (PNG or JPG)" />
+        @if (!string.IsNullOrEmpty(uploadError))
+        {
+            <p class="upload-error">@uploadError</p>
+        }
+        <button @onclick="ExecuteAvatarUpload" disabled="@(selectedFile == null || uploading)"
+                class="upload-button @(selectedFile == null || uploading ? "is-waiting" : "")">
+            @(uploading ? "Uploading..." : "Save portrait")
+        </button>
+    </div>
+</div>

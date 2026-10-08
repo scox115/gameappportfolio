@@ -1,0 +1,103 @@
+@* The interactive turn-based boss fight *@
+<div class="arena-panel battle-panel">
+    <div class="arena-head">
+        <h3 class="boss-name @(heroic ? "is-heroic" : "")">@(heroic ? "👑" : "😈") Boss: @bossName</h3>
+        <div class="arena-hp">
+            @if (bossEnraged)
+            {
+                <span title="Below @enrageBelowPercent% health the boss's attacks hit 50% harder." class="enraged-badge">😡 ENRAGED</span>
+            }
+            <span class="boss-hp">Boss HP: @enemyHp / @enemyMaxHp</span>
+            <span class="player-hp">@HeroClassIcons.For(State.HeroClass) Your HP: @playerHp / @playerMaxHp</span>
+        </div>
+    </div>
+
+    @if (battleResult is null)
+    {
+        @* The boss announces its next move so the player can plan around it *@
+        <div class="boss-intent">
+            @BossMoveIcon(bossNextMove) Next boss move: <strong>@bossNextMoveName</strong> for <strong>@enemyIntentAttack DMG</strong>
+            @if (bossNextMove == "LifeDrain")
+            {
+                <span> (heals the boss)</span>
+            }
+        </div>
+    }
+
+    @* The battle log (column-reverse keeps the scroll pinned to the newest line, so the lines are rendered in reverse) *@
+    <div role="log" aria-label="Battle log" tabindex="0"
+        class="battle-log">
+        @foreach (var log in Enumerable.Reverse(logs))
+        {
+            <div>@log</div>
+        }
+    </div>
+
+    @if (battleResult is null)
+    {
+    @* The hand of cards to play *@
+    <div class="card-hand">
+        @foreach (var card in ArenaCards.Hand)
+        {
+            var recharging = rechargingCard == card.Id;
+            var held = heldCards.FirstOrDefault(c => c.card == card.Id);
+            var signature = HeroClassIcons.SignatureCard(State.HeroClass) == card.Id;
+            <button class="hand-card @(signature ? "is-signature" : "") @(recharging ? "is-recharging" : "")" @onclick="() => PlayTurn(card.Id)" disabled="@recharging"
+                    title="@(signature ? $"{State.HeroClass} signature card. {card.Hint}" : card.Hint)"
+                    style="--card-bg: @CosmeticStyles.CardBackground(State.CardSkin, card.Color)">
+                @if (signature)
+                {
+                    <span class="signature-badge">@HeroClassIcons.For(State.HeroClass)</span>
+                }
+                @card.Icon @card.Label@(held is { level: > 1 } ? $" ★{held.level}" : "")<br /><small>@(held is null ? card.Effect : ArenaCards.EffectOf(held.damage, held.heal))</small><br />
+                <small class="card-risk">@(recharging ? "⏳ Recharging" : held is null ? card.Risk : ArenaCards.RiskOf(card.Id, held.failChance))</small>
+            </button>
+        }
+    </div>
+    }
+    else
+    {
+        @* The battle's result: the server's verdict and the rewards earned *@
+        <div class="battle-result @(battleResult.won ? "is-won" : "is-lost")">
+            <div class="result-icon">@(battleResult.won ? "🏆" : "💀")</div>
+            <h2 class="result-title @(battleResult.won ? "is-won" : "is-lost")">@(battleResult.won ? "VICTORY" : "DEFEAT")</h2>
+            <p class="result-summary">
+                @(battleResult.won ? $"{bossName} has fallen!" : $"{bossName} prevails... this time.")
+            </p>
+
+            <div class="reward-line">
+                <span class="reward-gold">🪙 +@battleResult.goldEarned Gold</span>
+                <span class="reward-xp">✨ +@battleResult.experienceEarned XP</span>
+            </div>
+
+            <RewardBonuses StreakBonus="battleResult.streakBonus" Bounties="battleResult.bounties" />
+
+            @if (heroic && battleResult.won)
+            {
+                <div class="result-note">@(battleResult.reducedBossReward
+                    ? "You've already claimed today's Heroic reward, so this win paid 25 gold. It comes back tomorrow."
+                    : "👑 Heroic victory! That was today's Heroic reward; it comes back tomorrow.")</div>
+            }
+            else if (battleResult.reducedBossReward)
+            {
+                <div class="result-note">You've used today's 5 full-reward boss wins, so this one paid 25 gold. Full rewards come back tomorrow.</div>
+            }
+            else if (battleResult.won && battleResult.fullRewardWinsLeft is { } left)
+            {
+                <div class="result-note">@(left == 0 ? "That was your last full-reward boss win today." : $"{left} full-reward boss win{(left == 1 ? "" : "s")} left today.")</div>
+            }
+
+            @if (battleResult.leveledUp)
+            {
+                <div class="level-up">⬆️ LEVEL UP! You are now level @battleResult.newLevel.</div>
+            }
+
+            <div class="result-actions">
+                <button @onclick="ReturnToTown"
+                        class="result-button result-town">🏰 Return to Town</button>
+                <button @onclick="FightAgain"
+                        class="result-button result-again">⚔️ Fight Again</button>
+            </div>
+        </div>
+    }
+</div>

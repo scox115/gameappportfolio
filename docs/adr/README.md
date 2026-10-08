@@ -42,5 +42,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0036](0036-spectating.md) | Let anyone watch a duel under way | Accepted |
 | [0037](0037-friends-and-challenges.md) | Friends, and challenging a friend to a duel | Accepted |
 | [0038](0038-match-replays.md) | Match replays: every card recorded as it is played | Accepted |
+| [0039](0039-client-component-conventions.md) | Blazor client: scoped CSS, thin pages, code-behind | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.

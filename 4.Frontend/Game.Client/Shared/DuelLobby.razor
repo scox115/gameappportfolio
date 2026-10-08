@@ -1,0 +1,51 @@
+@* The PvP lobby: choose a wager, then wait for a second player (or for the friend you challenged). *@
+<div class="lobby">
+    <div class="lobby-icon">🆚</div>
+    <h2 class="lobby-title">PvP Lobby</h2>
+    @if (!string.IsNullOrEmpty(ErrorMsg))
+    {
+        <p class="lobby-error">@ErrorMsg</p>
+    }
+    @if (Challenge is { } sent)
+    {
+        <p class="lobby-text">⚔️ You challenged <b>@sent.FriendName</b>. Waiting for them to accept... <span class="challenge-clock">@ChallengeSecondsLeft s</span></p>
+        <p class="lobby-hint">A friendly duel: no gold at stake. They see your challenge wherever they are in the game.</p>
+        <button @onclick="OnWithdrawChallenge"
+                class="ghost-button">Take back the challenge</button>
+    }
+    else if (Searching)
+    {
+        <p class="lobby-text">@(Stake > 0 ? $"Searching for an opponent who also wagers {Stake} gold..." : "Searching for an opponent...")</p>
+        <p class="lobby-hint">Nobody around? Practice against the Arena Bot while you wait, or sign in as another hero in a second browser window to battle yourself.</p>
+        <button @onclick="OnDuelBot"
+                class="bot-button">🤖 Practice against the Arena Bot</button>
+        <button @onclick="OnCancelSearch"
+                class="ghost-button">Change wager</button>
+    }
+    else if (Picking)
+    {
+        <p class="wager-prompt">Stake gold on your next duel? You'll only meet someone who chose the same wager.</p>
+        <p class="wager-fee">The winner takes both stakes minus a 10% arena fee.</p>
+        <div class="wager-options">
+            @foreach (var option in Stakes)
+            {
+                var affordable = option <= Gold && (option == 0 || !IsGuest);
+                <button @onclick="() => OnSearch.InvokeAsync(option)" disabled="@(!affordable)"
+                        aria-label="@(option == 0 ? "Friendly duel" : $"Wager {option} gold")"
+                        class="wager-button @(affordable ? (option == 0 ? "" : "is-gold") : "is-locked")">
+                    @(option == 0 ? "🤝 Friendly duel" : $"🎲 {option} 🪙")
+                </button>
+            }
+        </div>
+        @if (IsGuest)
+        {
+            <p class="guest-hint">Save your hero in town to duel for gold.</p>
+        }
+    }
+    else if (string.IsNullOrEmpty(ErrorMsg))
+    {
+        <p class="lobby-text">Connecting to the arena...</p>
+    }
+    <button @onclick="OnLeaveLobby"
+            class="town-button">🏰 Back to Town</button>
+</div>
