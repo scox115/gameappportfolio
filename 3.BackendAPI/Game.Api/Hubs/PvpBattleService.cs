@@ -5,6 +5,7 @@ using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Core.Events;
 using Game.Core.Services;
+using Game.Core.Social;
 using Game.Infrastructure.Data;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +28,7 @@ public class PvpBattleService(
     IHubContext<LobbyHub, ILobbyClient> lobbyHub,
     IOptions<AntiCheatOptions> antiCheat,
     ArenaPulse pulse,
+    SessionNotifier notifier,
     ILogger<PvpBattleService> logger)
 {
     private DateTime Now => timeProvider.GetUtcNow().UtcDateTime;
@@ -152,6 +154,139 @@ public class PvpBattleService(
 
         return true;
     }
+
+    /// <summary>
+    /// Challenges a friend to a friendly duel. The friend is asked in every open browser and has
+    /// <see cref="DuelChallenge.OpenFor"/> to accept. Returns null when the challenger's own unfinished
+    /// battle was resumed instead (see docs/adr/0037-friends-and-challenges.md).
+    /// </summary>
+    public async Task<ChallengeSent?> ChallengeAsync(Guid challengerId, Guid friendId, string? network)
+    {
+        var challenger = await dbContext.Players.FindAsync(challengerId) ?? throw new HubException("Player profile not found.");
+        var friendship = Friendship.KeyFor(challengerId, friendId);
+        if (!await dbContext.Friendships.AnyAsync(f => f.PairKey == friendship && f.AcceptedAt != null))
+        {
+            throw new HubException("You can only challenge your friends.");
+        }
+
+        if (await GetActiveBattleAsync(challengerId) is { } existing)
+        {
+            var (you, opponent) = await LoadPlayersAsync(existing, challengerId);
+            await hub.Clients.User(challengerId.ToString())
+                .MatchFound(new PvpUpdate(PvpBattleView.For(challengerId, existing, you, opponent, Now), null, null));
+            return null;
+        }
+
+        var friend = await LoadPlayerAsync(friendId);
+        if (await GetActiveBattleAsync(friendId) is not null)
+        {
+            throw new HubException($"{friend.Username} is in a duel right now. Watch it, or challenge them when it's over.");
+        }
+
+        await matchmaker.LeaveAsync(challengerId);
+        await WithdrawChallengeAsync(challengerId); // one open challenge each
+
+        var challenge = new DuelChallenge(challengerId, friendId, network, Now);
+        dbContext.DuelChallenges.Add(challenge);
+        try
+        {
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            dbContext.ChangeTracker.Clear();
+            throw new HubException("Your challenge couldn't be sent. Please try again.");
+        }
+
+        await notifier.ChallengeReceivedAsync(friendId, new ChallengeView(challenge.Id, challenger.Id, challenger.Username, challenger.TitleName,
+            challenger.Class, challenger.AvatarUrl, challenger.EquippedFrame, challenger.Rating, challenge.SecondsLeft(Now)));
+        return new ChallengeSent(challenge.Id, friend.Username, challenge.SecondsLeft(Now));
+    }
+
+    /// <summary>Takes back the challenger's open challenge, if there is one, and tells the friend.</summary>
+    public async Task WithdrawChallengeAsync(Guid challengerId)
+    {
+        if (await dbContext.DuelChallenges.FindAsync(challengerId) is not { } open) return;
+
+        dbContext.DuelChallenges.Remove(open);
+        try
+        {
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            dbContext.ChangeTracker.Clear();
+            return; // accepted or turned down at the same moment
+        }
+        await notifier.ChallengeClosedAsync(open.ChallengedId, open.Id);
+    }
+
+    /// <summary>Accepts a friend's challenge, which starts the duel for both of them.</summary>
+    public async Task AcceptChallengeAsync(Guid playerId, Guid challengeId, string? network)
+    {
+        var challenge = await TakeChallengeAsync(playerId, challengeId);
+        if (challenge.IsExpired(Now))
+        {
+            throw new HubException("That challenge ran out of time. Challenge them back from your friends list.");
+        }
+
+        var challenger = await LoadPlayerAsync(challenge.ChallengerId);
+        if (await GetActiveBattleAsync(playerId) is not null)
+        {
+            await TellChallengerAsync(challenge, $"{(await LoadPlayerAsync(playerId)).Username} is in another duel.");
+            throw new HubException("Finish your duel first, then challenge them back.");
+        }
+        if (await GetActiveBattleAsync(challenge.ChallengerId) is not null)
+        {
+            throw new HubException($"{challenger.Username} has started another duel. Challenge them when it's over.");
+        }
+
+        await matchmaker.LeaveAsync(playerId);
+        await matchmaker.LeaveAsync(challenge.ChallengerId);
+
+        // Friendly: no wager. Between one person's own accounts it's practice, as in the lobby.
+        var practice = antiCheat.Value.SameNetworkDuelsArePractice && PvpMatchmaker.SameNetwork(challenge.ChallengerNetwork, network);
+        var (first, second) = random.Next(0, 2) == 0 ? (playerId, challenge.ChallengerId) : (challenge.ChallengerId, playerId);
+        var battle = await StartDuelAsync(first, second, wager: 0, practice);
+        await BroadcastAsync(battle, lastTurn: null, rewards: null, (client, update) => client.MatchFound(update));
+    }
+
+    /// <summary>Turns down a friend's challenge and tells them.</summary>
+    public async Task DeclineChallengeAsync(Guid playerId, Guid challengeId)
+    {
+        DuelChallenge challenge;
+        try
+        {
+            challenge = await TakeChallengeAsync(playerId, challengeId);
+        }
+        catch (HubException)
+        {
+            return; // already gone: nothing to turn down
+        }
+        await TellChallengerAsync(challenge, $"{(await LoadPlayerAsync(playerId)).Username} can't duel right now.");
+    }
+
+    // Removes the challenge so only one answer counts, and closes it in the hero's other tabs.
+    private async Task<DuelChallenge> TakeChallengeAsync(Guid playerId, Guid challengeId)
+    {
+        var challenge = await dbContext.DuelChallenges.FirstOrDefaultAsync(c => c.Id == challengeId && c.ChallengedId == playerId)
+            ?? throw new HubException("That challenge is no longer open.");
+        dbContext.DuelChallenges.Remove(challenge);
+        try
+        {
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            dbContext.ChangeTracker.Clear();
+            throw new HubException("That challenge is no longer open.");
+        }
+        await notifier.ChallengeClosedAsync(playerId, challenge.Id);
+        return challenge;
+    }
+
+    private Task TellChallengerAsync(DuelChallenge challenge, string reason) =>
+        hub.Clients.User(challenge.ChallengerId.ToString()).ChallengeDeclined(reason);
 
     /// <summary>
     /// Starts a practice duel against the Arena Bot, for a player who doesn't want to wait for someone

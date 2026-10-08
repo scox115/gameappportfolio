@@ -1,0 +1,73 @@
+@using Game.Client.Services
+@inject GameState State
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@* A friend's duel challenge, shown on top of whatever screen the player is on until they answer or it runs out
+   (see docs/adr/0037-friends-and-challenges.md). *@
+@if (State.Invite is { } invite)
+{
+    <div class="challenge-invite" role="alertdialog" aria-labelledby="challenge-title" aria-describedby="challenge-text">
+        <img src="@Avatars.For(invite.FromAvatarUrl, invite.FromName)" alt="" style="@CosmeticStyles.Frame(invite.FromFrame)" />
+        <div class="challenge-invite-body">
+            <h2 id="challenge-title">⚔️ @invite.FromName challenges you!</h2>
+            <p id="challenge-text">
+                @HeroClassIcons.For(invite.FromClass) @invite.FromClass · 🏅 @invite.FromRating@(invite.FromTitle is { } title ? $" · 👑 {title}" : "").
+                A friendly duel, no gold at stake. <span class="challenge-invite-clock">@SecondsLeft(invite) s</span> to answer.
+            </p>
+            <div class="challenge-invite-actions">
+                <button class="challenge-accept" @onclick="Accept">⚔️ Accept</button>
+                <button class="challenge-decline" @onclick="() => DeclineAsync(invite.Id)">Not now</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Timer? ticker;
+
+    protected override void OnInitialized()
+    {
+        State.OnStateChanged += OnChanged;
+        ticker = new Timer(_ => InvokeAsync(Tick), null, 1000, 1000);
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private static int SecondsLeft(ChallengeInvite invite) =>
+        (int)Math.Ceiling(Math.Max(0, (invite.ExpiresAt - DateTime.UtcNow).TotalSeconds));
+
+    private void Tick()
+    {
+        if (State.Invite is not { } invite) return;
+        if (SecondsLeft(invite) == 0) State.CloseInvite(invite.Id); // the challenger is told by their own timer
+        else StateHasChanged();
+    }
+
+    private void Accept()
+    {
+        // The duel screen lives on the game page; from the watch page or another page, go back to it first.
+        if (Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Length > 0) Navigation.NavigateTo("");
+        State.AcceptInvite();
+    }
+
+    private async Task DeclineAsync(Guid id)
+    {
+        State.CloseInvite(id);
+        try
+        {
+            await Http.PostAsync($"/api/v1/friends/challenges/{id}/decline", null);
+        }
+        catch (HttpRequestException)
+        {
+            // The challenger's timer runs out anyway.
+        }
+    }
+
+    public void Dispose()
+    {
+        State.OnStateChanged -= OnChanged;
+        ticker?.Dispose();
+    }
+}

@@ -23,8 +23,12 @@ public record AccountExport(
     List<AccountExport.BossFight> BossFights,
     List<AccountExport.Duel> Duels,
     List<AccountExport.AdminDecision> AdminDecisions,
-    List<AccountExport.ReportFiled> ReportsFiled)
+    List<AccountExport.ReportFiled> ReportsFiled,
+    List<AccountExport.Friend>? Friends = null)
 {
+    /// <summary>A friend, or an open friend request either way. Accepted is null while the request waits.</summary>
+    public record Friend(Guid HeroId, string? Username, bool YouAsked, DateTime RequestedAt, DateTime? Accepted);
+
     /// <param name="RecoveryEmail">The confirmed address reset links go to, if the player added one.</param>
     /// <param name="SuspendedUntil">Set while an admin has suspended the account; the year 9999 means until reinstated.</param>
     /// <param name="PreviousUsername">The name the hero had before an admin renamed it (in capitals, as stored); it still signs in.</param>

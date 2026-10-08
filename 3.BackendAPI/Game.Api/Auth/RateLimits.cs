@@ -9,4 +9,5 @@ public static class RateLimits
     public const string AvatarUpload = "avatar-upload";
     public const string Recovery = "recovery";
     public const string Report = "report";
+    public const string FriendRequest = "friend-request";
 }

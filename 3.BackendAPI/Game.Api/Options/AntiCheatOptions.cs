@@ -39,4 +39,8 @@ public class AntiCheatOptions
     /// <summary>Reports a player can file per hour, so the admin queue can't be flooded.</summary>
     [Range(1, int.MaxValue)]
     public int ReportsPerHour { get; set; } = 10;
+
+    /// <summary>Friend requests a player can send in an hour, so nobody can spam every hero in the arena.</summary>
+    [Range(1, int.MaxValue)]
+    public int FriendRequestsPerHour { get; set; } = 30;
 }

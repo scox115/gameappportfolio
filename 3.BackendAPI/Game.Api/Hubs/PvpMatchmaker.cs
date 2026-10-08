@@ -150,5 +150,5 @@ public class PvpMatchmaker(IServiceScopeFactory scopeFactory, TimeProvider timeP
     }
 
     // An unknown address never matches, so players are only treated as one network when we can tell.
-    private static bool SameNetwork(string? a, string? b) => a is not null && b is not null && a == b;
+    public static bool SameNetwork(string? a, string? b) => a is not null && b is not null && a == b;
 }

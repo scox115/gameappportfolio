@@ -70,6 +70,16 @@ public class AccountService(
             .Select(r => new AccountExport.ReportFiled(r.CreatedAt, r.TargetId, r.Reason, r.Note, r.Outcome))
             .ToListAsync(cancellationToken);
 
+        var friendships = await dbContext.Friendships.AsNoTracking()
+            .Where(f => f.RequesterId == playerId || f.AddresseeId == playerId)
+            .OrderBy(f => f.RequestedAt)
+            .ToListAsync(cancellationToken);
+        var friendIds = friendships.Select(f => f.OtherThan(playerId)).ToList();
+        var friendNames = await dbContext.Players.AsNoTracking().Where(p => friendIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Username, cancellationToken);
+        var friends = friendships.Select(f => new AccountExport.Friend(f.OtherThan(playerId), friendNames.GetValueOrDefault(f.OtherThan(playerId)),
+            f.RequesterId == playerId, f.RequestedAt, f.AcceptedAt)).ToList();
+
         return new AccountExport(
             ExportedAt: timeProvider.GetUtcNow(),
             Account: new AccountExport.SignInAccount(
@@ -82,7 +92,8 @@ public class AccountService(
             BossFights: bossFights,
             Duels: duels.Select(d => AccountExport.Duel.From(d, playerId)).ToList(),
             AdminDecisions: adminDecisions,
-            ReportsFiled: reportsFiled);
+            ReportsFiled: reportsFiled,
+            Friends: friends);
     }
 
     /// <summary>Deletes the account, the hero and everything recorded about them.</summary>
@@ -115,6 +126,12 @@ public class AccountService(
         // Reports they made and reports about them: neither means anything once the hero is gone.
         dbContext.PlayerReports.RemoveRange(await dbContext.PlayerReports
             .Where(r => r.ReporterId == playerId || r.TargetId == playerId).ToListAsync(cancellationToken));
+
+        // Friends lose them from their list; an open challenge either way goes too.
+        dbContext.Friendships.RemoveRange(await dbContext.Friendships
+            .Where(f => f.RequesterId == playerId || f.AddresseeId == playerId).ToListAsync(cancellationToken));
+        dbContext.DuelChallenges.RemoveRange(await dbContext.DuelChallenges
+            .Where(c => c.ChallengerId == playerId || c.ChallengedId == playerId).ToListAsync(cancellationToken));
 
         // Opponents keep their own record of the match, without this hero's name.
         foreach (var entry in await dbContext.MatchHistory.Where(e => e.OpponentId == playerId).ToListAsync(cancellationToken))
