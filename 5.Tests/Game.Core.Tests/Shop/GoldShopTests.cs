@@ -11,38 +11,38 @@ public class GoldShopTests
     [Fact]
     public void BuyingAnUpgrade_TakesTheGoldAndRaisesTheCardLevel()
     {
-        var player = PlayerWith(500);
+        var player = PlayerWith(2000);
 
         var offer = GoldShop.Buy(player, ShopItem.FireballUpgrade);
 
-        Assert.Equal(350, player.Gold);
+        Assert.Equal(1400, player.Gold);
         Assert.Equal(2, player.CardLevel(BattleCard.Fireball));
         Assert.Equal(2, offer.Owned);
-        Assert.Equal(300, offer.Price);
+        Assert.Equal(1200, offer.Price);
     }
 
     [Fact]
     public void ACardStopsAtItsTopLevel()
     {
-        var player = PlayerWith(1000);
+        var player = PlayerWith(2000);
         GoldShop.Buy(player, ShopItem.DragonClawUpgrade);
         GoldShop.Buy(player, ShopItem.DragonClawUpgrade);
 
         Assert.Null(GoldShop.OfferFor(player, ShopItem.DragonClawUpgrade).Price);
         var error = Assert.Throws<InvalidOperationException>(() => GoldShop.Buy(player, ShopItem.DragonClawUpgrade));
         Assert.Contains("top level", error.Message);
-        Assert.Equal(550, player.Gold);
+        Assert.Equal(200, player.Gold);
     }
 
     [Fact]
     public void YouCantBuyWhatYouCantAfford()
     {
-        var player = PlayerWith(100);
+        var player = PlayerWith(500);
 
         var error = Assert.Throws<InvalidOperationException>(() => GoldShop.Buy(player, ShopItem.HolyShieldUpgrade));
 
-        Assert.Contains("150 gold", error.Message);
-        Assert.Equal(100, player.Gold);
+        Assert.Contains("600 gold", error.Message);
+        Assert.Equal(500, player.Gold);
         Assert.Equal(1, player.CardLevel(BattleCard.HolyShield));
     }
 
@@ -109,25 +109,25 @@ public class GoldShopPvpTests
     [Fact]
     public void ATitleStaysLockedUntilThePlayerHasWonEnoughDuels()
     {
-        var player = PlayerWith(1000, pvpWins: 4);
+        var player = PlayerWith(5000, pvpWins: 24);
 
         var offer = GoldShop.OfferFor(player, ShopItem.TitleGladiator);
         var error = Assert.Throws<InvalidOperationException>(() => GoldShop.Buy(player, ShopItem.TitleGladiator));
 
         Assert.Equal("Win 1 more duel to unlock", offer.LockedReason);
         Assert.Contains("1 more duel", error.Message);
-        Assert.Equal(1000, player.Gold);
+        Assert.Equal(5000, player.Gold);
         Assert.False(player.OwnsTitle(PlayerTitle.Gladiator));
     }
 
     [Fact]
     public void BuyingATitleShowsItAfterTheName()
     {
-        var player = PlayerWith(1000, pvpWins: 5);
+        var player = PlayerWith(2000, pvpWins: 25);
 
         var offer = GoldShop.Buy(player, ShopItem.TitleGladiator);
 
-        Assert.Equal(700, player.Gold);
+        Assert.Equal(500, player.Gold);
         Assert.Equal(PlayerTitle.Gladiator, player.EquippedTitle);
         Assert.Equal("the Gladiator", player.TitleName);
         Assert.Null(offer.Price);
@@ -137,7 +137,7 @@ public class GoldShopPvpTests
     [Fact]
     public void APlayerCanOnlyShowATitleTheyOwn()
     {
-        var player = PlayerWith(1000, pvpWins: 1);
+        var player = PlayerWith(1000, pvpWins: 5);
         GoldShop.Buy(player, ShopItem.TitleDuelist);
 
         player.EquipTitle(null);
@@ -162,6 +162,6 @@ public class GoldShopPvpTests
         Assert.Equal(0, bossFight.BonusHp);
         Assert.Equal(new BattleLoadout(2, 1, 1, Player.DuelElixirBonusHp), duel);
         Assert.Equal(0, nextDuel.BonusHp);
-        Assert.Equal(1000 - GoldShop.DuelElixirPrice - 150, player.Gold);
+        Assert.Equal(1000 - GoldShop.DuelElixirPrice - 600, player.Gold);
     }
 }

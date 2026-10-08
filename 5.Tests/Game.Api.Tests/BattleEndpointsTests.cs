@@ -221,7 +221,7 @@ public class BattleEndpointsTests : IClassFixture<GameApiFactory>
     {
         var client = await SignedInClientAsync();
         var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
-        await _factory.GiveGoldAsync(me!.Id, 2000);
+        await _factory.GiveGoldAsync(me!.Id, 6000);
         foreach (var item in new[] { "FireballUpgrade", "HolyShieldUpgrade", "DragonClawUpgrade" })
         {
             for (var level = 1; level < BattleCards.MaxLevel; level++)

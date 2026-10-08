@@ -17,9 +17,9 @@ public static class PlayerTitles
     private static readonly IReadOnlyDictionary<PlayerTitle, PlayerTitleDefinition> Definitions =
         new Dictionary<PlayerTitle, PlayerTitleDefinition>
         {
-            [PlayerTitle.Duelist] = new(PlayerTitle.Duelist, "the Duelist", Price: 100, DuelWinsNeeded: 1),
-            [PlayerTitle.Gladiator] = new(PlayerTitle.Gladiator, "the Gladiator", Price: 300, DuelWinsNeeded: 5),
-            [PlayerTitle.ArenaChampion] = new(PlayerTitle.ArenaChampion, "Champion of the Arena", Price: 600, DuelWinsNeeded: 15)
+            [PlayerTitle.Duelist] = new(PlayerTitle.Duelist, "the Duelist", Price: 500, DuelWinsNeeded: 5),
+            [PlayerTitle.Gladiator] = new(PlayerTitle.Gladiator, "the Gladiator", Price: 1500, DuelWinsNeeded: 25),
+            [PlayerTitle.ArenaChampion] = new(PlayerTitle.ArenaChampion, "Champion of the Arena", Price: 3000, DuelWinsNeeded: 75)
         };
 
     public static IEnumerable<PlayerTitleDefinition> All => Definitions.Values;
