@@ -33,6 +33,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<PlayerReport> PlayerReports => Set<PlayerReport>();
     public DbSet<PvpLobbyEntry> PvpLobby => Set<PvpLobbyEntry>();
+    public DbSet<OnlinePresence> OnlinePresence => Set<OnlinePresence>();
     public DbSet<HubMessage> HubMessages => Set<HubMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

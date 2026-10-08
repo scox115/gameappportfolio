@@ -357,6 +357,8 @@ switch (builder.Configuration.GetSection(ScaleOutOptions.SectionName).GetValue<B
 }
 builder.Services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
 builder.Services.AddSingleton<PvpMatchmaker>();
+builder.Services.AddSingleton<ArenaPulse>();
+builder.Services.AddHostedService<ArenaPulseWorker>();
 builder.Services.AddScoped<PvpBattleService>();
 builder.Services.AddScoped<Game.Api.Accounts.AccountService>();
 builder.Services.AddScoped<MatchHistoryProjector>();
@@ -428,6 +430,7 @@ app.MapGameApi(); // /api/v1/..., plus the deprecated unversioned /api/... alias
 app.MapGameHealthChecks();
 app.MapHub<ArenaHub>(ArenaHub.Path);
 app.MapHub<SessionHub>(SessionHub.Path);
+app.MapHub<LobbyHub>(LobbyHub.Path);
 
 // --- AUTOMATIC RUNTIME DATABASE INITIALIZATION ---
 using (var scope = app.Services.CreateScope())

@@ -1,7 +1,9 @@
 using Game.Api.Caching;
+using Game.Api.Hubs;
 using Game.Api.Messaging;
 using Game.Api.Workers;
 using Game.Core.Battles;
+using Game.Core.Entities;
 using Game.Core.Interfaces;
 using Game.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
@@ -92,6 +94,21 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
         var player = await db.Players.SingleAsync(p => p.Username == username);
         db.Entry(player).Property(p => p.Rating).CurrentValue = rating;
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// As if the hero had just won a match worth this rating: the live lobby tells open leaderboards to
+    /// reload, the way it does after a real match.
+    /// </summary>
+    public async Task RecordMatchAsync(string username, int rating)
+    {
+        await SetRatingAsync(username, rating);
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.SingleAsync(p => p.Username == username);
+        db.Matches.Add(new GameMatch(player.Id, GameMatch.AiBossId));
+        await db.SaveChangesAsync();
+        Services.GetRequiredService<ArenaPulse>().Changed();
     }
 
     private static void RemoveAll<T>(IServiceCollection services)

@@ -16,9 +16,22 @@ public interface ISessionClient
 /// <summary>
 /// Every signed-in browser stays connected here, so the server can tell it straight away when
 /// the account signs in somewhere else. The client only listens; there is nothing to call.
+/// The same connections tell the live lobby who is online (see <see cref="ArenaPulse"/>).
 /// </summary>
 [Authorize]
-public class SessionHub : Hub<ISessionClient>
+public class SessionHub(ArenaPulse pulse) : Hub<ISessionClient>
 {
     public const string Path = "/hubs/session";
+
+    public override async Task OnConnectedAsync()
+    {
+        await pulse.PlayerConnectedAsync(Guid.Parse(Context.UserIdentifier!), Context.ConnectionId);
+        await base.OnConnectedAsync();
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        await pulse.PlayerDisconnectedAsync(Context.ConnectionId);
+        await base.OnDisconnectedAsync(exception);
+    }
 }

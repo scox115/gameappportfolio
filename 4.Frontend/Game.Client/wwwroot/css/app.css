@@ -239,3 +239,8 @@ button:focus-visible, input:focus-visible, a:focus-visible, [tabindex]:focus-vis
 .server-wake.awake { background: #065f46; color: #d1fae5; }
 .server-wake.unreachable { background: #7f1d1d; color: #fee2e2; }
 .server-wake a, .server-wake button { color: inherit; font: inherit; text-decoration: underline; background: none; border: none; padding: 0; cursor: pointer; }
+
+/* How busy the arena is right now (Shared/LivePulse.razor) */
+.live-pulse { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 18px; color: #cbd5e1; font-size: 0.85rem; }
+.live-pulse > span { background: #0f172a; border: 1px solid #334155; border-radius: 20px; padding: 5px 12px; white-space: nowrap; }
+.live-pulse b { color: #f1f5f9; }

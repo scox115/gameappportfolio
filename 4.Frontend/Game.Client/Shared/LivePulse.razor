@@ -1,0 +1,24 @@
+@inject LiveLobby Lobby
+@implements IDisposable
+
+@* How busy the arena is right now, kept up to date by the server. Hidden until the numbers arrive. *@
+@if (Lobby.Current is { } pulse)
+{
+    <p class="live-pulse">
+        <span title="Heroes with the game open, guests included"><span aria-hidden="true">🟢</span> <b>@pulse.PlayersOnline</b> @(pulse.PlayersOnline == 1 ? "hero" : "heroes") online</span>
+        <span title="Heroes in the duel lobby waiting for an opponent"><span aria-hidden="true">⏳</span> <b>@pulse.WaitingForDuel</b> waiting for a duel</span>
+        <span title="Duels being played right now, Arena Bot duels included"><span aria-hidden="true">⚔️</span> <b>@pulse.DuelsUnderWay</b> @(pulse.DuelsUnderWay == 1 ? "duel" : "duels") under way</span>
+    </p>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        Lobby.Changed += OnChanged;
+        Lobby.EnsureStarted();
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Lobby.Changed -= OnChanged;
+}

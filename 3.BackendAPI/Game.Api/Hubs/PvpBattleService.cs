@@ -25,6 +25,7 @@ public class PvpBattleService(
     MatchOutbox outbox,
     IHubContext<ArenaHub, IArenaClient> hub,
     IOptions<AntiCheatOptions> antiCheat,
+    ArenaPulse pulse,
     ILogger<PvpBattleService> logger)
 {
     private DateTime Now => timeProvider.GetUtcNow().UtcDateTime;
@@ -339,6 +340,7 @@ public class PvpBattleService(
             // Practice duels count too, so the ops dashboard shows how much the Arena Bot is played.
             GameTelemetry.DuelCompleted(battle.EndReason?.ToString() ?? "Unknown",
                 battle.IsParticipant(ArenaBot.Id) ? "bot" : "player", counted: completed is not null);
+            pulse.Changed(); // one fewer duel under way, and maybe a new leaderboard
         }
 
         if (completed is not null)
