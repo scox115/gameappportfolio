@@ -49,7 +49,7 @@ else if (!status.enabled)
         Add a second step to signing in: a code from an app on your phone, so your password alone isn't enough.
     </p>
     <label for="two-factor-password" class="two-factor-label">Your password, to start</label>
-    <input id="two-factor-password" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput" class="two-factor-input" />
+    <PasswordInput id="two-factor-password" autocomplete="current-password" @bind-Value="password" class="two-factor-input" />
     <button @onclick="BeginSetupAsync" disabled="@(busy || string.IsNullOrEmpty(password))" class="two-factor-primary" style="width: 100%; margin-top: 10px;">
         Set up two-factor sign-in
     </button>
@@ -63,7 +63,7 @@ else
     <label for="two-factor-code" class="two-factor-label">Code from your app, or a recovery code</label>
     <input id="two-factor-code" autocomplete="one-time-code" @bind="enteredCode" @bind:event="oninput" class="two-factor-input" />
     <label for="two-factor-password" class="two-factor-label" style="margin-top: 8px;">Your password (to turn it off)</label>
-    <input id="two-factor-password" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput" class="two-factor-input" />
+    <PasswordInput id="two-factor-password" autocomplete="current-password" @bind-Value="password" class="two-factor-input" />
     <div style="display: flex; gap: 8px; margin-top: 10px;">
         <button @onclick="NewCodesAsync" disabled="@(busy || string.IsNullOrWhiteSpace(enteredCode))" class="two-factor-primary" style="flex: 1;">New recovery codes</button>
         <button @onclick="TurnOffAsync" disabled="@(busy || string.IsNullOrWhiteSpace(enteredCode) || string.IsNullOrEmpty(password))" class="two-factor-secondary">Turn off</button>

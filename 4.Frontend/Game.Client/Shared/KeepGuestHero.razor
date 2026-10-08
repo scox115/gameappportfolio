@@ -17,7 +17,7 @@
             <input id="keep-name" @bind="name" @bind:event="oninput" autocomplete="username"
                    style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9; box-sizing: border-box;" />
             <label for="keep-password" style="display: block; color: #cbd5e1; font-size: 0.8rem; margin: 8px 0 4px;">Password (at least 8 characters)</label>
-            <input id="keep-password" type="password" @bind="password" @bind:event="oninput" autocomplete="new-password"
+            <PasswordInput id="keep-password" @bind-Value="password" autocomplete="new-password"
                    style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9; box-sizing: border-box;" />
             <button type="submit" disabled="@(saving || string.IsNullOrWhiteSpace(name) || string.IsNullOrEmpty(password))"
                     style="width: 100%; background: #047857; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer;">

@@ -67,9 +67,9 @@
                         </div>
 
                     <div style="margin-bottom: 20px;">
-                        <label
+                        <label for="sign-in-password"
                             style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Password:</label>
-                            <input type="password" @bind="inputPassword" @bind:event="oninput" placeholder="At least 8 characters..." autocomplete="@(creatingHero ? "new-password" : "current-password")"
+                            <PasswordInput id="sign-in-password" @bind-Value="inputPassword" placeholder="At least 8 characters..." autocomplete="@(creatingHero ? "new-password" : "current-password")"
                                    style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
                         </div>
 
