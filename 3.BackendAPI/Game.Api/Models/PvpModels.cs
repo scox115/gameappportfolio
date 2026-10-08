@@ -69,3 +69,38 @@ public record PvpTurnView(
 
 /// <summary>Pushed to a player whenever their battle changes. Reward is set once, when it ends.</summary>
 public record PvpUpdate(PvpBattleView Battle, PvpTurnView? LastTurn, BattleRewardResponse? Reward);
+
+/// <summary>
+/// A duel as a spectator sees it: both heroes side by side and whose turn it is, without either
+/// player's cards (see docs/adr/0036-spectating.md).
+/// </summary>
+/// <param name="ActivePlayerId">Whose turn it is; null once the duel is over.</param>
+/// <param name="WinnerId">Who won, once the duel is over.</param>
+public record DuelWatchView(
+    Guid Id,
+    PvpPlayerView PlayerOne,
+    PvpPlayerView PlayerTwo,
+    Guid? ActivePlayerId,
+    int Turn,
+    int TurnSecondsLeft,
+    PvpBattleStatus Status,
+    Guid? WinnerId,
+    PvpEndReason? EndReason,
+    int Wager,
+    bool Practice,
+    bool AgainstBot,
+    DateTime StartedAt)
+{
+    public static DuelWatchView For(PvpBattle battle, Player playerOne, Player playerTwo, DateTime now)
+    {
+        // Player one's view already has both heroes' health, shields and classes; only the cards are theirs alone.
+        var asPlayerOne = PvpBattleView.For(playerOne.Id, battle, playerOne, playerTwo, now);
+        return new(battle.Id, asPlayerOne.You, asPlayerOne.Opponent,
+            battle.IsFinished ? null : battle.ActivePlayerId,
+            battle.Turn, asPlayerOne.TurnSecondsLeft, battle.Status, battle.WinnerId, battle.EndReason,
+            battle.Wager, battle.Practice, asPlayerOne.AgainstBot, battle.StartedAt);
+    }
+}
+
+/// <summary>Pushed to a duel's spectators whenever it changes. LastTurn is the card just played, if one was.</summary>
+public record DuelWatchUpdate(DuelWatchView Duel, PvpTurnView? LastTurn);

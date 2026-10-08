@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Game.Api.Auth;
+using Game.Api.Caching;
 using Game.Api.Hubs;
 
 namespace Game.Api.Endpoints;
@@ -15,5 +16,11 @@ public static class PvpEndpoints
                     : Results.NoContent())
             .WithTags("Battles")
             .RequireAuthorization();
+
+        // GET: /api/v1/duels/live. Anyone can watch, signed in or not; the moves come over the lobby hub.
+        app.MapGet("/duels/live", async (PvpBattleService battles) => Results.Ok(await battles.GetLiveDuelsAsync()))
+            .WithTags("Battles")
+            .AllowAnonymous()
+            .CacheOutput(OutputCaching.Policies.LiveDuels);
     }
 }

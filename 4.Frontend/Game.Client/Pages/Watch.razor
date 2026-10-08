@@ -1,0 +1,344 @@
+@page "/watch"
+@page "/watch/{DuelId:guid}"
+@using Game.Client.Services
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.Http.Connections
+@inject HttpClient Http
+@inject ApiEndpoint Api
+@implements IAsyncDisposable
+
+@* Spectating: anyone, signed in or not, can pick a duel under way and watch it turn by turn. The moves
+   come over the lobby hub, the same feed as the live numbers (see docs/adr/0036-spectating.md). *@
+<PageTitle>Watch duels · Kings of the Card Arena</PageTitle>
+
+<div class="watch-shell">
+<div class="watch-page">
+    <header class="watch-header">
+        <a href="" class="watch-home">⚔️ Kings of the Card Arena</a>
+        <h1>@(DuelId is null ? "Watch a duel" : duel is null ? "Watching a duel" : $"{duel.PlayerOne.Username} vs {duel.PlayerTwo.Username}")</h1>
+    </header>
+
+    @if (DuelId is null)
+    {
+        <p class="watch-intro">Duels being fought right now. Pick one to watch every card as it's played.</p>
+        @if (duels is null)
+        {
+            <p class="watch-note" role="status">@(listError ?? "Looking for duels under way…")</p>
+        }
+        else if (duels.Count == 0)
+        {
+            <p class="watch-note" role="status">No duels are under way right now. This list updates by itself, so check back in a moment, or start one yourself.</p>
+        }
+        else
+        {
+            <ul class="watch-list" aria-label="Duels under way">
+                @foreach (var d in duels)
+                {
+                    <li class="watch-item">
+                        <div class="watch-item-heroes">
+                            @HeroLine(d.PlayerOne, d.ActivePlayerId)
+                            <span class="watch-vs" aria-hidden="true">vs</span>
+                            @HeroLine(d.PlayerTwo, d.ActivePlayerId)
+                        </div>
+                        <div class="watch-item-meta">
+                            <span>Turn @d.Turn</span>
+                            @if (d.Wager > 0)
+                            {
+                                <span class="watch-wager">🎲 @d.Wager gold each</span>
+                            }
+                            @if (d.AgainstBot)
+                            {
+                                <span>🤖 Practice</span>
+                            }
+                            <a class="watch-button" href="watch/@d.Id" aria-label="Watch @d.PlayerOne.Username vs @d.PlayerTwo.Username">👁️ Watch</a>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    }
+    else if (duel is null)
+    {
+        <p class="watch-note" role="status">@(watchError ?? "Joining the crowd…")</p>
+        @if (watchError is not null)
+        {
+            <p><a href="watch">See the duels under way</a></p>
+        }
+    }
+    else
+    {
+        <div class="watch-arena">
+            @Panel(duel.PlayerOne, "#3b82f6")
+            @Panel(duel.PlayerTwo, "#ef4444")
+        </div>
+
+        @if (duel.AgainstBot)
+        {
+            <p class="watch-banner">🤖 A practice duel against the Arena Bot: nothing is at stake.</p>
+        }
+        else if (duel.Wager > 0)
+        {
+            <p class="watch-banner watch-wager">🎲 @duel.Wager gold each on the line. The winner takes @(duel.Wager * 2 - duel.Wager * 2 / 10).</p>
+        }
+
+        @if (duel.Status == "InProgress")
+        {
+            <div class="watch-turn" role="status">
+                ⏳ @NameOf(duel.ActivePlayerId)'s turn
+                <span class="@(secondsLeft <= 10 ? "watch-hurry" : "")">@secondsLeft s</span>
+            </div>
+        }
+        else
+        {
+            <div class="watch-result" role="status">
+                <div class="watch-result-icon" aria-hidden="true">🏆</div>
+                <h2>@NameOf(duel.WinnerId) wins!</h2>
+                <p>@EndText()</p>
+                <a class="watch-button" href="watch">👁️ Watch another duel</a>
+            </div>
+        }
+
+        <!-- The newest line at the bottom: column-reverse keeps the scroll pinned there. -->
+        <div role="log" aria-label="Duel log" tabindex="0" class="watch-log">
+            @foreach (var line in Enumerable.Reverse(logs))
+            {
+                <div>@line</div>
+            }
+        </div>
+        <p class="watch-back"><a href="watch">← All duels under way</a></p>
+    }
+
+    <p class="watch-back"><a href="">Back to the game</a></p>
+</div>
+</div>
+
+@code {
+    private static readonly TimeSpan ListRefresh = TimeSpan.FromSeconds(5);
+
+    // The Arena Bot's hero (Game.Core.Battles.ArenaBot.Id): it has no rating to win or lose.
+    private static readonly Guid ArenaBotId = new("a7e4ab07-0000-4000-8000-000000000001");
+
+    [Parameter] public Guid? DuelId { get; set; }
+
+    private List<DuelDto>? duels;
+    private string? listError;
+    private DuelDto? duel;
+    private string? watchError;
+    private Guid? watching;
+    private readonly List<string> logs = new();
+    private int secondsLeft;
+    private HubConnection? hub;
+    private Timer? ticker;
+    private int ticks;
+
+    protected override void OnInitialized()
+    {
+        // One timer for both views: the turn countdown each second, and the list every few seconds.
+        ticker = new Timer(_ => InvokeAsync(TickAsync), null, 1000, 1000);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DuelId == watching && (DuelId is not null || duels is not null)) return;
+
+        await StopWatchingAsync();
+        if (DuelId is { } id)
+        {
+            await WatchAsync(id);
+        }
+        else
+        {
+            await LoadListAsync();
+        }
+    }
+
+    private async Task LoadListAsync()
+    {
+        try
+        {
+            duels = await Http.GetFromJsonAsync<List<DuelDto>>("/api/v1/duels/live");
+            listError = null;
+        }
+        catch (Exception)
+        {
+            // The server may be waking up; the next refresh tries again.
+            listError ??= "The arena couldn't be reached. Trying again…";
+        }
+    }
+
+    private async Task WatchAsync(Guid id)
+    {
+        watching = id;
+        duel = null;
+        watchError = null;
+        logs.Clear();
+        try
+        {
+            hub ??= await ConnectAsync();
+            var current = await hub.InvokeAsync<DuelDto?>("WatchDuel", id);
+            if (watching != id) return; // the viewer moved on meanwhile
+            if (current is null)
+            {
+                watchError = "That duel isn't in the arena any more.";
+                return;
+            }
+
+            logs.Add($"👁️ You're watching {current.PlayerOne.Username} and {current.PlayerTwo.Username}, turn {current.Turn}.");
+            if (current.Status != "InProgress") logs.Add(EndLine(current));
+            Show(current);
+        }
+        catch (Exception)
+        {
+            watchError = "The arena couldn't be reached. Please try again.";
+        }
+    }
+
+    private async Task<HubConnection> ConnectAsync()
+    {
+        var connection = new HubConnectionBuilder()
+            .WithUrl(new Uri(Api.BaseAddress, "hubs/lobby"), options =>
+            {
+                // Straight to WebSockets, as for the other hubs: with several API replicas, a separate
+                // negotiate request could reach a different replica from the connection itself.
+                options.SkipNegotiation = true;
+                options.Transports = HttpTransportType.WebSockets;
+            })
+            .WithAutomaticReconnect()
+            .Build();
+        connection.On<DuelUpdateDto>("DuelUpdated", update => InvokeAsync(() => OnDuelUpdated(update)));
+        // A new connection isn't in the duel's group any more; join again and catch up.
+        connection.Reconnected += _ => InvokeAsync(async () =>
+        {
+            if (watching is { } id && duel?.Status == "InProgress")
+            {
+                if (await connection.InvokeAsync<DuelDto?>("WatchDuel", id) is { } current) Show(current);
+            }
+        });
+        await connection.StartAsync();
+        return connection;
+    }
+
+    private void OnDuelUpdated(DuelUpdateDto update)
+    {
+        // Another duel's move, or an old one arriving late from another server.
+        if (duel is null || update.Duel.Id != duel.Id || duel.Status != "InProgress" || update.Duel.Turn < duel.Turn) return;
+
+        if (update.LastTurn is { } turn)
+        {
+            logs.Add(turn switch
+            {
+                { CardFailed: true } => $"🌀 Turn {turn.Turn}: {turn.PlayerName} played {turn.CardName}, but it was {turn.CardFailedReason}!",
+                { AttackBlocked: true } => $"🛡️ Turn {turn.Turn}: {turn.PlayerName} played {turn.CardName}, but it was blocked by a shield!",
+                { DamageDealt: > 0 } => $"» Turn {turn.Turn}: {turn.PlayerName} cast {turn.CardName} for {turn.DamageDealt} DMG.",
+                _ => $"» Turn {turn.Turn}: {turn.PlayerName} raised {turn.CardName}, healing {turn.HealthRestored} HP."
+            });
+        }
+        if (update.Duel.Status != "InProgress") logs.Add(EndLine(update.Duel));
+        Show(update.Duel);
+    }
+
+    private void Show(DuelDto current)
+    {
+        duel = current;
+        secondsLeft = current.TurnSecondsLeft;
+        StateHasChanged();
+    }
+
+    private async Task TickAsync()
+    {
+        ticks++;
+        if (duel?.Status == "InProgress" && secondsLeft > 0)
+        {
+            secondsLeft--;
+            StateHasChanged();
+        }
+        if (DuelId is null && ticks % (int)ListRefresh.TotalSeconds == 0)
+        {
+            await LoadListAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task StopWatchingAsync()
+    {
+        if (watching is { } id && hub?.State == HubConnectionState.Connected)
+        {
+            try { await hub.InvokeAsync("StopWatching", id); } catch { /* the server forgets it when the page closes anyway */ }
+        }
+        watching = null;
+        duel = null;
+    }
+
+    private string NameOf(Guid? heroId) =>
+        heroId == duel?.PlayerOne.Id ? duel!.PlayerOne.Username : heroId == duel?.PlayerTwo.Id ? duel!.PlayerTwo.Username : "Someone";
+
+    private string LoserName() => duel!.WinnerId == duel.PlayerOne.Id ? duel.PlayerTwo.Username : duel.PlayerOne.Username;
+
+    private string EndText() => duel?.EndReason switch
+    {
+        "Timeout" => $"{LoserName()} ran out of time.",
+        "Forfeit" => $"{LoserName()} forfeited.",
+        _ => $"{NameOf(duel?.WinnerId)} knocked out {LoserName()}."
+    };
+
+    private static string EndLine(DuelDto ended)
+    {
+        var (winner, loser) = ended.WinnerId == ended.PlayerOne.Id
+            ? (ended.PlayerOne.Username, ended.PlayerTwo.Username)
+            : (ended.PlayerTwo.Username, ended.PlayerOne.Username);
+        return ended.EndReason switch
+        {
+            "Timeout" => $"⌛ {loser} ran out of time. {winner} wins.",
+            "Forfeit" => $"🏳️ {loser} forfeited. {winner} wins.",
+            _ => $"🏆 Knockout! {winner} wins."
+        };
+    }
+
+    private RenderFragment HeroLine(PlayerDto hero, Guid? active) => __builder =>
+    {
+        <span class="watch-hero @(hero.Id == active ? "watch-hero-active" : "")">
+            <img src="@Avatars.For(hero.AvatarUrl, hero.Username)" alt="" style="@CosmeticStyles.Frame(hero.Frame)" />
+            <span>
+                <b>@hero.Username</b>
+                <small>@HeroClassIcons.For(hero.Class) @hero.Class · @hero.Hp/@hero.MaxHp HP</small>
+            </span>
+        </span>
+    };
+
+    private RenderFragment Panel(PlayerDto hero, string color) => __builder =>
+    {
+        var active = duel?.Status == "InProgress" && hero.Id == duel.ActivePlayerId;
+        <div class="watch-panel @(active ? "watch-panel-active" : "")" style="--hero-color: @color;">
+            <div class="watch-panel-head">
+                <img src="@Avatars.For(hero.AvatarUrl, hero.Username)" alt="" style="@CosmeticStyles.Frame(hero.Frame)" />
+                <div>
+                    <div class="watch-panel-class">@HeroClassIcons.For(hero.Class) @hero.Class @(active ? "· ⚡ playing" : "")</div>
+                    <div class="watch-panel-name">@hero.Username @(hero.Shielded ? "🛡️" : "")</div>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(hero.Title))
+            {
+                <div class="watch-panel-title">👑 @hero.Title</div>
+            }
+            <div class="watch-panel-rating">@(hero.Id == ArenaBotId ? "Practice partner" : $"🏅 Rating {hero.Rating}")</div>
+            <div class="watch-hp" role="meter" aria-label="@hero.Username's health" aria-valuemin="0" aria-valuemax="@hero.MaxHp" aria-valuenow="@hero.Hp">
+                <div style="width: @(hero.Hp * 100 / Math.Max(1, hero.MaxHp))%;"></div>
+            </div>
+            <div class="watch-hp-text">@hero.Hp / @hero.MaxHp HP</div>
+        </div>
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        ticker?.Dispose();
+        if (hub is not null) await hub.DisposeAsync();
+    }
+
+    // Shapes of what the server sends (see Game.Api.Models.DuelWatchView).
+    private record PlayerDto(Guid Id, string Username, string? Title, int Rating, string? AvatarUrl, string? Frame, int Hp, int MaxHp, bool Shielded, string Class = "Sorcerer");
+    private record DuelDto(Guid Id, PlayerDto PlayerOne, PlayerDto PlayerTwo, Guid? ActivePlayerId, int Turn, int TurnSecondsLeft,
+        string Status, Guid? WinnerId, string? EndReason, int Wager, bool Practice, bool AgainstBot, DateTime StartedAt);
+    private record TurnDto(int Turn, bool YourCard, string PlayerName, string CardName, bool CardFailed,
+        string? CardFailedReason, int DamageDealt, int HealthRestored, bool AttackBlocked);
+    private record DuelUpdateDto(DuelDto Duel, TurnDto? LastTurn);
+}

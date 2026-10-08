@@ -15,7 +15,7 @@ namespace Game.Api.Hubs;
 
 /// <summary>
 /// Runs PvP battles: starts them when two players are paired, applies moves, settles rewards
-/// when a battle ends and pushes every change to both players.
+/// when a battle ends and pushes every change to both players and anyone watching.
 /// </summary>
 public class PvpBattleService(
     AppDbContext dbContext,
@@ -24,6 +24,7 @@ public class PvpBattleService(
     TimeProvider timeProvider,
     MatchOutbox outbox,
     IHubContext<ArenaHub, IArenaClient> hub,
+    IHubContext<LobbyHub, ILobbyClient> lobbyHub,
     IOptions<AntiCheatOptions> antiCheat,
     ArenaPulse pulse,
     ILogger<PvpBattleService> logger)
@@ -59,6 +60,39 @@ public class PvpBattleService(
 
         var (you, opponent) = await LoadPlayersAsync(battle, playerId);
         return PvpBattleView.For(playerId, battle, you, opponent, Now);
+    }
+
+    /// <summary>How many duels <see cref="GetLiveDuelsAsync"/> lists at most.</summary>
+    public const int LiveDuelsShown = 20;
+
+    /// <summary>Duels under way that anyone can watch, the newest first.</summary>
+    public async Task<IReadOnlyList<DuelWatchView>> GetLiveDuelsAsync()
+    {
+        var battles = await dbContext.PvpBattles.AsNoTracking()
+            .Where(b => b.Status == PvpBattleStatus.InProgress)
+            .OrderByDescending(b => b.StartedAt)
+            .Take(LiveDuelsShown)
+            .ToListAsync();
+        if (battles.Count == 0) return [];
+
+        var ids = battles.SelectMany(b => new[] { b.PlayerOneId, b.PlayerTwoId }).Distinct().ToList();
+        var players = await dbContext.Players.AsNoTracking().Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id);
+        return battles
+            .Where(b => players.ContainsKey(b.PlayerOneId) && players.ContainsKey(b.PlayerTwoId))
+            .Select(b => DuelWatchView.For(b, players[b.PlayerOneId], players[b.PlayerTwoId], Now))
+            .ToList();
+    }
+
+    /// <summary>One duel as a spectator sees it, finished or not, or null if there is no such duel.</summary>
+    public async Task<DuelWatchView?> GetWatchViewAsync(Guid battleId)
+    {
+        var battle = await dbContext.PvpBattles.AsNoTracking().FirstOrDefaultAsync(b => b.Id == battleId);
+        if (battle is null) return null;
+
+        var playerOne = await dbContext.Players.FindAsync(battle.PlayerOneId);
+        var playerTwo = await dbContext.Players.FindAsync(battle.PlayerTwoId);
+        // A hero who deleted their account takes their name with them.
+        return playerOne is null || playerTwo is null ? null : DuelWatchView.For(battle, playerOne, playerTwo, Now);
     }
 
     /// <summary>Returns true when the player is waiting in the lobby, false when a battle started or resumed.</summary>
@@ -426,6 +460,22 @@ public class PvpBattleService(
                 lastTurn is null ? null : PvpTurnView.For(viewer.Id, lastTurn, playedBy!.Username),
                 rewards?.GetValueOrDefault(viewer.Id));
             await send(hub.Clients.User(viewer.Id.ToString()), update);
+        }
+
+        // A duel that has only just started has nobody watching yet.
+        if (lastTurn is null && !battle.IsFinished) return;
+
+        // Spectators see the duel from neither side. The move is saved and both players are told, so a
+        // spectator who misses this one catches up with the next.
+        try
+        {
+            await lobbyHub.Clients.Group(LobbyHub.DuelGroup(battle.Id)).DuelUpdated(new DuelWatchUpdate(
+                DuelWatchView.For(battle, playerOne, playerTwo, Now),
+                lastTurn is null ? null : PvpTurnView.For(Guid.Empty, lastTurn, playedBy!.Username)));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not tell the spectators of duel {BattleId}.", battle.Id);
         }
     }
 

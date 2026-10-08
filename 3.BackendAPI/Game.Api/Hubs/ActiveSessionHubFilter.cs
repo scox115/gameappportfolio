@@ -1,4 +1,5 @@
 using Game.Api.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Game.Api.Hubs;
@@ -7,6 +8,7 @@ namespace Game.Api.Hubs;
 /// A hub connection is authenticated once, when it opens. This re-checks the session on every
 /// call, so a browser that was signed out by a newer sign-in can't keep playing over an old connection.
 /// Every call is refused with a message the browser can show, instead of the connection dropping silently.
+/// Hubs open to visitors (<see cref="AllowAnonymousAttribute"/>, such as the lobby) have no session to check.
 /// </summary>
 public class ActiveSessionHubFilter(ActiveSessionValidator sessions) : IHubFilter
 {
@@ -14,6 +16,11 @@ public class ActiveSessionHubFilter(ActiveSessionValidator sessions) : IHubFilte
         HubInvocationContext invocationContext,
         Func<HubInvocationContext, ValueTask<object?>> next)
     {
+        if (invocationContext.Hub.GetType().IsDefined(typeof(AllowAnonymousAttribute), inherit: true))
+        {
+            return await next(invocationContext);
+        }
+
         var connection = invocationContext.Context;
         if (connection.User is not { } user || !await sessions.IsCurrentAsync(user, connection.ConnectionAborted))
         {

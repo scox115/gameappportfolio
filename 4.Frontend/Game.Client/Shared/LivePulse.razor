@@ -7,7 +7,9 @@
     <p class="live-pulse">
         <span title="Heroes with the game open, guests included"><span aria-hidden="true">🟢</span> <b>@pulse.PlayersOnline</b> @(pulse.PlayersOnline == 1 ? "hero" : "heroes") online</span>
         <span title="Heroes in the duel lobby waiting for an opponent"><span aria-hidden="true">⏳</span> <b>@pulse.WaitingForDuel</b> waiting for a duel</span>
-        <span title="Duels being played right now, Arena Bot duels included"><span aria-hidden="true">⚔️</span> <b>@pulse.DuelsUnderWay</b> @(pulse.DuelsUnderWay == 1 ? "duel" : "duels") under way</span>
+        <span title="Duels being played right now, Arena Bot duels included. Open the list to watch one.">
+            <a href="watch"><span aria-hidden="true">⚔️</span> <b>@pulse.DuelsUnderWay</b> @(pulse.DuelsUnderWay == 1 ? "duel" : "duels") under way <span aria-hidden="true">· 👁️</span> watch</a>
+        </span>
     </p>
 }
 

@@ -31,7 +31,8 @@ public sealed class SqlBackplane(
     TimeProvider timeProvider,
     ILogger<SqlBackplane> logger) : BackgroundService
 {
-    public delegate Task Delivery(string method, IReadOnlyList<string>? userIds, object?[] args, CancellationToken cancellationToken);
+    /// <summary>Delivers a message to this replica's connections: to a group when one is named, else to the users, else to everyone.</summary>
+    public delegate Task Delivery(string method, IReadOnlyList<string>? userIds, string? group, object?[] args, CancellationToken cancellationToken);
 
     /// <summary>How far back each read looks, to cover inserts that commit late and small clock differences between replicas.</summary>
     public static readonly TimeSpan Overlap = TimeSpan.FromSeconds(5);
@@ -55,14 +56,15 @@ public sealed class SqlBackplane(
     public void ConnectionClosed() => Interlocked.Decrement(ref _connections);
 
     /// <summary>Saves a message for the other replicas. The sender has already delivered it to its own connections.</summary>
-    public async Task PublishAsync(string hub, string method, IReadOnlyList<string>? userIds, object?[] args, CancellationToken cancellationToken)
+    public async Task PublishAsync(string hub, string method, IReadOnlyList<string>? userIds, object?[] args, CancellationToken cancellationToken,
+        string? group = null)
     {
         try
         {
             var arguments = JsonSerializer.Serialize(args, json.Value.PayloadSerializerOptions);
             await using var scope = scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.HubMessages.Add(new HubMessage(hub, method, userIds, arguments, ReplicaId, Now));
+            db.HubMessages.Add(new HubMessage(hub, method, userIds, arguments, ReplicaId, Now, group));
             await db.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -135,7 +137,7 @@ public sealed class SqlBackplane(
             try
             {
                 var args = JsonSerializer.Deserialize<JsonElement[]>(message.Arguments)!.Cast<object?>().ToArray();
-                await deliver(message.Method, message.Recipients, args, cancellationToken);
+                await deliver(message.Method, message.Recipients, message.Group, args, cancellationToken);
                 delivered++;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
