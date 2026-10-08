@@ -34,40 +34,41 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
 
         Assert.Equal(Player.StartingGold, shop!.Gold);
         Assert.Equal(Enum.GetValues<ShopItem>().Length, shop.Offers.Count);
-        Assert.Equal(150, shop.Offers.Single(o => o.Item == ShopItem.FireballUpgrade).Price);
+        Assert.Equal(600, shop.Offers.Single(o => o.Item == ShopItem.FireballUpgrade).Price);
         Assert.Equal(GoldShop.ElixirPrice, shop.Offers.Single(o => o.Item == ShopItem.BattleElixir).Price);
     }
 
     [Fact]
     public async Task Buying_SpendsGoldAndTheProfileShowsIt()
     {
-        var client = await SignedInClientAsync();
+        var (client, playerId) = await SignedInPlayerAsync();
+        await _factory.GiveGoldAsync(playerId, 1000 - Player.StartingGold);
 
         var response = await BuyAsync(client, ShopItem.DragonClawUpgrade);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var shop = (await response.Content.ReadFromJsonAsync<ShopResponse>(Json))!;
-        Assert.Equal(Player.StartingGold - 150, shop.Gold);
+        Assert.Equal(400, shop.Gold);
         Assert.Equal(2, shop.Offers.Single(o => o.Item == ShopItem.DragonClawUpgrade).Owned);
 
         var me = await client.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
-        Assert.Equal(Player.StartingGold - 150, me!.Gold);
+        Assert.Equal(400, me!.Gold);
     }
 
     [Fact]
     public async Task Buying_FailsWithAReasonWhenThePlayerRunsOutOfGold()
     {
         var (client, playerId) = await SignedInPlayerAsync();
-        await _factory.GiveGoldAsync(playerId, 500 - Player.StartingGold);
-        await BuyAsync(client, ShopItem.FireballUpgrade);   // 500 -> 350
-        await BuyAsync(client, ShopItem.FireballUpgrade);   // 350 -> 50
+        await _factory.GiveGoldAsync(playerId, 1900 - Player.StartingGold);
+        await BuyAsync(client, ShopItem.FireballUpgrade);   // 1900 -> 1300
+        await BuyAsync(client, ShopItem.FireballUpgrade);   // 1300 -> 100
 
         var response = await BuyAsync(client, ShopItem.HolyShieldUpgrade);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("150 gold", await response.Content.ReadAsStringAsync());
+        Assert.Contains("600 gold", await response.Content.ReadAsStringAsync());
         var shop = await client.GetFromJsonAsync<ShopResponse>("/api/v1/shop", Json);
-        Assert.Equal(50, shop!.Gold);
+        Assert.Equal(100, shop!.Gold);
     }
 
     [Fact]
@@ -83,7 +84,8 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
     [Fact]
     public async Task TheNextBossFightUsesUpgradesAndAnElixir()
     {
-        var client = await SignedInClientAsync();
+        var (client, playerId) = await SignedInPlayerAsync();
+        await _factory.GiveGoldAsync(playerId, 1000 - Player.StartingGold);
         await BuyAsync(client, ShopItem.FireballUpgrade);
         await BuyAsync(client, ShopItem.BattleElixir);
 
@@ -118,16 +120,17 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
     {
         var (client, playerId) = await SignedInPlayerAsync();
 
+        await _factory.GiveGoldAsync(playerId, 1000 - Player.StartingGold);
         var locked = await BuyAsync(client, ShopItem.TitleDuelist);
         Assert.Equal(HttpStatusCode.BadRequest, locked.StatusCode);
-        Assert.Contains("1 more duel", await locked.Content.ReadAsStringAsync());
+        Assert.Contains("5 more duels", await locked.Content.ReadAsStringAsync());
 
-        await GiveDuelWinsAsync(playerId, 1);
+        await GiveDuelWinsAsync(playerId, 5);
         var bought = await BuyAsync(client, ShopItem.TitleDuelist);
         Assert.Equal(HttpStatusCode.OK, bought.StatusCode);
         var shop = (await bought.Content.ReadFromJsonAsync<ShopResponse>(Json))!;
         Assert.Equal(PlayerTitle.Duelist, shop.EquippedTitle);
-        Assert.Equal(1, shop.PvpWins);
+        Assert.Equal(5, shop.PvpWins);
 
         var hidden = await client.PutAsJsonAsync("/api/v1/shop/title", new EquipTitleRequest(null), Json);
         Assert.Null((await hidden.Content.ReadFromJsonAsync<ShopResponse>(Json))!.EquippedTitle);
@@ -140,7 +143,8 @@ public class ShopEndpointsTests : IClassFixture<GameApiFactory>
     public async Task TheLeaderboardShowsTitles()
     {
         var (client, playerId) = await SignedInPlayerAsync();
-        await GiveDuelWinsAsync(playerId, 1);
+        await GiveDuelWinsAsync(playerId, 5);
+        await _factory.GiveGoldAsync(playerId, 1000 - Player.StartingGold);
         await BuyAsync(client, ShopItem.TitleDuelist);
 
         // The leaderboard ranks by PvP rating, so give this player a top rating to make the top 10.

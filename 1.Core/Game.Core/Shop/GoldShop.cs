@@ -38,7 +38,7 @@ public static class GoldShop
     public const int DuelElixirPrice = 60;
 
     /// <summary>Upgrade prices by the level being bought: level 2, then level 3.</summary>
-    private static readonly int[] UpgradePrices = [150, 300];
+    private static readonly int[] UpgradePrices = [600, 1200];
 
     public static IReadOnlyList<ShopOffer> OffersFor(Player player)
     {

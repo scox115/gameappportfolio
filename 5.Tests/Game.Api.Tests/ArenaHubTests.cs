@@ -197,9 +197,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         var tooRich = await Assert.ThrowsAnyAsync<Exception>(() => alice.FindWageredOpponentAsync(DuelWagers.Stakes.Max() * 2));
         Assert.Contains("Wagers can be", tooRich.Message);
 
-        await using var bob = await ConnectAsync();
-        var shop = await bob.Http.PostAsJsonAsync("/api/v1/shop/purchases", new { Item = "FireballUpgrade" }, Json);
-        shop.EnsureSuccessStatusCode();
+        await using var bob = await ConnectAsync(); // a new hero's starting gold is less than 500
         var broke = await Assert.ThrowsAnyAsync<Exception>(() => bob.FindWageredOpponentAsync(500));
         Assert.Contains("You need 500 gold", broke.Message);
     }
@@ -376,7 +374,7 @@ public class ArenaHubTests : IClassFixture<GameApiFactory>
         await using (bob)
         {
             var bobProfile = await bob.Http.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json);
-            await _factory.GiveGoldAsync(bobProfile!.Id, 100);
+            await _factory.GiveGoldAsync(bobProfile!.Id, 500);
             (await bob.Http.PostAsJsonAsync("/api/v1/shop/purchases", new { Item = "FireballUpgrade" })).EnsureSuccessStatusCode();
             (await bob.Http.PostAsJsonAsync("/api/v1/shop/purchases", new { Item = "DuelElixir" })).EnsureSuccessStatusCode();
 
