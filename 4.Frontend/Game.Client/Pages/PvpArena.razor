@@ -10,6 +10,11 @@
 
 @* The live PvP arena: the player picks a wager, waits in the lobby for a real opponent with the
    same wager, then plays turns over SignalR. The server decides every result and pushes it to both players. *@
+@if (battle is null)
+{
+    @* The arena's live numbers stay in view while the player waits for an opponent. *@
+    <LivePulse />
+}
 <div style="max-width: 900px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
     @if (battle is null)
     {
