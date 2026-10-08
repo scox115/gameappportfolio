@@ -118,8 +118,11 @@ public class AccountService(
         dbContext.AccountTokens.RemoveRange(await dbContext.AccountTokens.Where(t => t.UserId == playerId).ToListAsync(cancellationToken));
         dbContext.UserTokens.RemoveRange(await dbContext.UserTokens.Where(t => t.UserId == playerId).ToListAsync(cancellationToken)); // authenticator key, recovery codes
         dbContext.PveBattles.RemoveRange(await dbContext.PveBattles.Where(b => b.PlayerId == playerId).ToListAsync(cancellationToken));
-        dbContext.PvpBattles.RemoveRange(await dbContext.PvpBattles
-            .Where(b => b.PlayerOneId == playerId || b.PlayerTwoId == playerId).ToListAsync(cancellationToken));
+        var duels = await dbContext.PvpBattles
+            .Where(b => b.PlayerOneId == playerId || b.PlayerTwoId == playerId).ToListAsync(cancellationToken);
+        var duelIds = duels.Select(b => b.Id).ToList();
+        dbContext.DuelMoves.RemoveRange(await dbContext.DuelMoves.Where(m => duelIds.Contains(m.BattleId)).ToListAsync(cancellationToken));
+        dbContext.PvpBattles.RemoveRange(duels);
         dbContext.Matches.RemoveRange(await dbContext.Matches
             .Where(m => m.PlayerOneId == playerId || m.PlayerTwoId == playerId).ToListAsync(cancellationToken));
         dbContext.MatchHistory.RemoveRange(await dbContext.MatchHistory.Where(e => e.PlayerId == playerId).ToListAsync(cancellationToken));

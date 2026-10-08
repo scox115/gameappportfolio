@@ -18,11 +18,13 @@ public record MatchHistoryItemResponse(
     int ExperienceEarned,
     int? RatingChange,
     int WagerResult,
-    DateTime PlayedAt)
+    DateTime PlayedAt,
+    Guid? ReplayId = null)
 {
-    public static MatchHistoryItemResponse From(MatchHistoryEntry e) =>
+    /// <param name="replayId">The duel to replay at /api/v1/duels/{id}/replay, when its moves were recorded.</param>
+    public static MatchHistoryItemResponse From(MatchHistoryEntry e, Guid? replayId = null) =>
         new(e.MatchId, e.Kind, e.Won, e.Class, e.OpponentName, e.OpponentClass, e.Difficulty, e.EndReason,
-            e.Turns, e.GoldEarned, e.ExperienceEarned, e.RatingChange, e.WagerResult, e.PlayedAt);
+            e.Turns, e.GoldEarned, e.ExperienceEarned, e.RatingChange, e.WagerResult, e.PlayedAt, replayId);
 }
 
 public record DailyArenaStatsResponse(

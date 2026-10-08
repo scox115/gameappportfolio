@@ -1,0 +1,250 @@
+@page "/replay/{DuelId:guid}"
+@using System.Net
+@using Game.Client.Services
+@inject HttpClient Http
+@implements IDisposable
+
+@* A finished duel played back card by card, at the player's pace. Every move's result was recorded when it
+   was played, so nothing is rolled again (see docs/adr/0038-match-replays.md). *@
+<PageTitle>Duel replay · Kings of the Card Arena</PageTitle>
+
+<div class="watch-shell">
+<div class="watch-page">
+    <header class="watch-header">
+        <a href="" class="watch-home">⚔️ Kings of the Card Arena</a>
+        <h1>@(replay is null ? "Duel replay" : $"Replay: {replay.PlayerOne.Username} vs {replay.PlayerTwo.Username}")</h1>
+        @if (replay is not null)
+        {
+            <p class="replay-when">Fought @Local(replay.StartedAt)@(replay.Wager > 0 ? $" for {replay.Wager} gold each" : "")@(replay.AgainstBot ? " · practice against the Arena Bot" : replay.Practice ? " · practice" : "")</p>
+        }
+    </header>
+
+    @if (replay is null)
+    {
+        <p class="watch-note" role="status">@(error ?? "Loading the replay…")</p>
+        @if (live)
+        {
+            <p><a class="watch-button" href="watch/@DuelId">👁️ Watch it live</a></p>
+        }
+    }
+    else
+    {
+        <div class="watch-arena">
+            @Panel(replay.PlayerOne, PlayerOneHp, PlayerOneShielded, "#3b82f6")
+            @Panel(replay.PlayerTwo, PlayerTwoHp, PlayerTwoShielded, "#ef4444")
+        </div>
+
+        <div class="replay-controls" role="group" aria-label="Replay controls">
+            <button @onclick="Restart" disabled="@(shown == 0)" aria-label="Back to the start">⏮</button>
+            <button @onclick="StepBack" disabled="@(shown == 0)" aria-label="Previous card">◀</button>
+            <button class="replay-play" @onclick="TogglePlay" disabled="@(replay.Moves.Count == 0)"
+                    aria-label="@(playing ? "Pause" : AtEnd ? "Play again" : "Play")">@(playing ? "⏸ Pause" : AtEnd ? "↻ Again" : "▶ Play")</button>
+            <button @onclick="StepForward" disabled="@AtEnd" aria-label="Next card">▶</button>
+            <button @onclick="ToEnd" disabled="@AtEnd" aria-label="Skip to the result">⏭</button>
+            <button @onclick="ToggleSpeed" aria-label="Playback speed @(fast ? "double" : "normal")">@(fast ? "2×" : "1×")</button>
+        </div>
+        <p class="replay-position" role="status">
+            @(replay.Moves.Count == 0 ? "No cards were played." : $"Card {shown} of {replay.Moves.Count}")
+        </p>
+
+        @if (AtEnd)
+        {
+            <div class="watch-result">
+                <div class="watch-result-icon" aria-hidden="true">🏆</div>
+                <h2>@NameOf(replay.WinnerId) wins!</h2>
+                <p>@EndText()</p>
+            </div>
+        }
+
+        <!-- The newest line at the bottom: column-reverse keeps the scroll pinned there. -->
+        <div role="log" aria-label="Duel log" tabindex="0" class="watch-log">
+            @foreach (var line in Enumerable.Reverse(Lines()))
+            {
+                <div>@line</div>
+            }
+        </div>
+    }
+
+    <p class="watch-back"><a href="watch">👁️ Duels under way</a></p>
+    <p class="watch-back"><a href="">Back to the game</a></p>
+</div>
+</div>
+
+@code {
+    private static readonly TimeSpan Step = TimeSpan.FromMilliseconds(1200);
+
+    [Parameter] public Guid DuelId { get; set; }
+
+    private ReplayDto? replay;
+    private string? error;
+    private bool live;
+    private int shown; // how many cards have been played back
+    private bool playing;
+    private bool fast;
+    private Timer? player;
+
+    private bool AtEnd => replay is not null && shown >= replay.Moves.Count;
+    private MoveDto? Current => shown == 0 ? null : replay!.Moves[shown - 1];
+    private int PlayerOneHp => Current?.PlayerOneHp ?? replay!.PlayerOne.MaxHp;
+    private int PlayerTwoHp => Current?.PlayerTwoHp ?? replay!.PlayerTwo.MaxHp;
+    private bool PlayerOneShielded => Current?.PlayerOneShielded ?? false;
+    private bool PlayerTwoShielded => Current?.PlayerTwoShielded ?? false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Stop();
+        replay = null;
+        error = null;
+        live = false;
+        shown = 0;
+        try
+        {
+            var response = await Http.GetAsync($"/api/v1/duels/{DuelId}/replay");
+            if (response.StatusCode == HttpStatusCode.Conflict)
+            {
+                (live, error) = (true, "This duel is still being fought, so there's no replay yet.");
+                return;
+            }
+            if (!response.IsSuccessStatusCode)
+            {
+                error = "There's no replay of that duel. Replays are kept for 30 days.";
+                return;
+            }
+
+            replay = await response.Content.ReadFromJsonAsync<ReplayDto>();
+            if (replay is { Moves.Count: > 0 }) Play(); // starts straight away; pause or step through at any time
+        }
+        catch (Exception)
+        {
+            error = "The arena couldn't be reached. Please try again.";
+        }
+    }
+
+    private void TogglePlay()
+    {
+        if (playing)
+        {
+            Stop();
+            return;
+        }
+        if (AtEnd) shown = 0;
+        Play();
+    }
+
+    private void Play()
+    {
+        playing = true;
+        var every = fast ? Step / 2 : Step;
+        player?.Dispose();
+        player = new Timer(_ => InvokeAsync(Advance), null, every, every);
+    }
+
+    private void Stop()
+    {
+        playing = false;
+        player?.Dispose();
+        player = null;
+    }
+
+    private void Advance()
+    {
+        if (!playing) return;
+        if (!AtEnd) shown++;
+        if (AtEnd) Stop();
+        StateHasChanged();
+    }
+
+    private void StepForward()
+    {
+        Stop();
+        if (!AtEnd) shown++;
+    }
+
+    private void StepBack()
+    {
+        Stop();
+        if (shown > 0) shown--;
+    }
+
+    private void Restart()
+    {
+        Stop();
+        shown = 0;
+    }
+
+    private void ToEnd()
+    {
+        Stop();
+        shown = replay?.Moves.Count ?? 0;
+    }
+
+    private void ToggleSpeed()
+    {
+        fast = !fast;
+        if (playing) Play();
+    }
+
+    private IEnumerable<string> Lines()
+    {
+        yield return $"⚔️ {replay!.PlayerOne.Username} and {replay.PlayerTwo.Username} enter the arena.";
+        foreach (var move in replay.Moves.Take(shown))
+        {
+            yield return move switch
+            {
+                { CardFailed: true } => $"🌀 Turn {move.Turn}: {move.PlayerName} played {move.CardName}, but it was {move.CardFailedReason}!",
+                { AttackBlocked: true } => $"🛡️ Turn {move.Turn}: {move.PlayerName} played {move.CardName}, but it was blocked by a shield!",
+                { DamageDealt: > 0 } => $"» Turn {move.Turn}: {move.PlayerName} cast {move.CardName} for {move.DamageDealt} DMG.",
+                _ => $"» Turn {move.Turn}: {move.PlayerName} raised {move.CardName}, healing {move.HealthRestored} HP."
+            };
+        }
+        if (AtEnd) yield return EndText();
+    }
+
+    private string NameOf(Guid? heroId) =>
+        heroId == replay?.PlayerOne.Id ? replay!.PlayerOne.Username : heroId == replay?.PlayerTwo.Id ? replay!.PlayerTwo.Username : "Someone";
+
+    private string EndText()
+    {
+        var winner = NameOf(replay!.WinnerId);
+        var loser = replay.WinnerId == replay.PlayerOne.Id ? replay.PlayerTwo.Username : replay.PlayerOne.Username;
+        return replay.EndReason switch
+        {
+            "Timeout" => $"⌛ {loser} ran out of time. {winner} wins.",
+            "Forfeit" => $"🏳️ {loser} forfeited. {winner} wins.",
+            _ => $"🏆 Knockout! {winner} wins."
+        };
+    }
+
+    private static string Local(DateTime utc) => DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime().ToString("MMM d, h:mm tt");
+
+    private RenderFragment Panel(PlayerDto hero, int hp, bool shielded, string color) => __builder =>
+    {
+        var acting = Current?.PlayerId == hero.Id;
+        <div class="watch-panel @(acting ? "watch-panel-active" : "")" style="--hero-color: @color;">
+            <div class="watch-panel-head">
+                <img src="@Avatars.For(hero.AvatarUrl, hero.Username)" alt="" style="@CosmeticStyles.Frame(hero.Frame)" />
+                <div>
+                    <div class="watch-panel-class">@HeroClassIcons.For(hero.Class) @hero.Class @(acting ? "· ⚡ played" : "")</div>
+                    <div class="watch-panel-name">@hero.Username @(shielded ? "🛡️" : "")</div>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(hero.Title))
+            {
+                <div class="watch-panel-title">👑 @hero.Title</div>
+            }
+            <div class="watch-hp" role="meter" aria-label="@hero.Username's health" aria-valuemin="0" aria-valuemax="@hero.MaxHp" aria-valuenow="@hp">
+                <div style="width: @(hp * 100 / Math.Max(1, hero.MaxHp))%;"></div>
+            </div>
+            <div class="watch-hp-text">@hp / @hero.MaxHp HP</div>
+        </div>
+    };
+
+    public void Dispose() => player?.Dispose();
+
+    // Shapes of the API's DuelReplayView.
+    private record PlayerDto(Guid Id, string Username, string? Title, int Rating, string? AvatarUrl, string? Frame, int Hp, int MaxHp, bool Shielded, string Class = "Sorcerer");
+    private record MoveDto(int Turn, Guid PlayerId, string PlayerName, string CardName, bool CardFailed, string? CardFailedReason,
+        int DamageDealt, int HealthRestored, bool AttackBlocked, int PlayerOneHp, int PlayerTwoHp, bool PlayerOneShielded, bool PlayerTwoShielded);
+    private record ReplayDto(Guid Id, PlayerDto PlayerOne, PlayerDto PlayerTwo, List<MoveDto> Moves, Guid? WinnerId, string? EndReason,
+        int Wager, bool Practice, bool AgainstBot, DateTime StartedAt, DateTime? CompletedAt);
+}

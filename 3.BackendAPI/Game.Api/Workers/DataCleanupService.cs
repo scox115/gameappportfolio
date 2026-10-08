@@ -50,6 +50,10 @@ public class DataCleanupService(AppDbContext dbContext, TimeProvider timeProvide
             dbContext.PvpBattles.Where(b => b.Status != PvpBattleStatus.InProgress && b.CompletedAt < battleCutoff).OrderBy(b => b.CompletedAt),
             "duel", cancellationToken);
 
+        // A duel's replay goes with it.
+        await DeleteInBatchesAsync(
+            dbContext.DuelMoves.Where(m => !dbContext.PvpBattles.Any(b => b.Id == m.BattleId)).OrderBy(m => m.Id), "duel_move", cancellationToken);
+
         var auditEntries = await DeleteInBatchesAsync(
             dbContext.AuditLog.Where(e => e.At < auditCutoff).OrderBy(e => e.At), "audit_log_entry", cancellationToken);
 

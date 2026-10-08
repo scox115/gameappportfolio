@@ -94,7 +94,10 @@
                 <div class="watch-result-icon" aria-hidden="true">🏆</div>
                 <h2>@NameOf(duel.WinnerId) wins!</h2>
                 <p>@EndText()</p>
-                <a class="watch-button" href="watch">👁️ Watch another duel</a>
+                <div class="watch-result-actions">
+                    <a class="watch-button" href="replay/@duel.Id">▶ Watch the replay</a>
+                    <a class="watch-button" href="watch">👁️ Watch another duel</a>
+                </div>
             </div>
         }
 

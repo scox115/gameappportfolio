@@ -104,3 +104,57 @@ public record DuelWatchView(
 
 /// <summary>Pushed to a duel's spectators whenever it changes. LastTurn is the card just played, if one was.</summary>
 public record DuelWatchUpdate(DuelWatchView Duel, PvpTurnView? LastTurn);
+
+/// <summary>
+/// A finished duel to play back: the two heroes as they started (full health, no shields), every card
+/// in order with the state after it, and the result (see docs/adr/0038-match-replays.md).
+/// </summary>
+public record DuelReplayView(
+    Guid Id,
+    PvpPlayerView PlayerOne,
+    PvpPlayerView PlayerTwo,
+    IReadOnlyList<DuelReplayMove> Moves,
+    Guid? WinnerId,
+    PvpEndReason? EndReason,
+    int Wager,
+    bool Practice,
+    bool AgainstBot,
+    DateTime StartedAt,
+    DateTime? CompletedAt)
+{
+    public static DuelReplayView For(PvpBattle battle, Player playerOne, Player playerTwo, IReadOnlyList<DuelMove> moves)
+    {
+        var finished = PvpBattleView.For(playerOne.Id, battle, playerOne, playerTwo, battle.CompletedAt ?? battle.StartedAt);
+        var names = new Dictionary<Guid, string> { [playerOne.Id] = playerOne.Username, [playerTwo.Id] = playerTwo.Username };
+        return new(battle.Id,
+            finished.You with { Hp = finished.You.MaxHp, Shielded = false },
+            finished.Opponent with { Hp = finished.Opponent.MaxHp, Shielded = false },
+            moves.Select(m => DuelReplayMove.From(m, names[m.PlayerId])).ToList(),
+            battle.WinnerId, battle.EndReason, battle.Wager, battle.Practice, finished.AgainstBot, battle.StartedAt, battle.CompletedAt);
+    }
+}
+
+/// <summary>One card in a replay, and both heroes' health and shields straight after it.</summary>
+public record DuelReplayMove(
+    int Turn,
+    Guid PlayerId,
+    string PlayerName,
+    string CardName,
+    bool CardFailed,
+    string? CardFailedReason,
+    int DamageDealt,
+    int HealthRestored,
+    bool AttackBlocked,
+    int PlayerOneHp,
+    int PlayerTwoHp,
+    bool PlayerOneShielded,
+    bool PlayerTwoShielded)
+{
+    public static DuelReplayMove From(DuelMove move, string playerName)
+    {
+        var card = BattleCards.Get(move.Card);
+        return new(move.Turn, move.PlayerId, playerName, card.Name, move.CardFailed, move.CardFailed ? card.FailedVerb : null,
+            move.DamageDealt, move.HealthRestored, move.AttackBlocked,
+            move.PlayerOneHp, move.PlayerTwoHp, move.PlayerOneShielded, move.PlayerTwoShielded);
+    }
+}

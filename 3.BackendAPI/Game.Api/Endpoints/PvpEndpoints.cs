@@ -22,5 +22,17 @@ public static class PvpEndpoints
             .WithTags("Battles")
             .AllowAnonymous()
             .CacheOutput(OutputCaching.Policies.LiveDuels);
+
+        // GET: /api/v1/duels/{id}/replay. A finished duel, card by card; anyone can watch it, like a live one.
+        // 409 while the duel is still under way (watch it live instead), 404 when there's no such duel.
+        app.MapGet("/duels/{id:guid}/replay", async (Guid id, PvpBattleService battles) =>
+            {
+                if (await battles.GetReplayAsync(id) is { } replay) return Results.Ok(replay);
+                return await battles.GetWatchViewAsync(id) is not null
+                    ? Results.Problem("This duel is still under way. Watch it live instead.", statusCode: StatusCodes.Status409Conflict)
+                    : Results.NotFound();
+            })
+            .WithTags("Battles")
+            .AllowAnonymous();
     }
 }

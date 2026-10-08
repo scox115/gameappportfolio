@@ -69,6 +69,19 @@ public sealed class DataCleanupTests : IDisposable
     }
 
     [Fact]
+    public async Task ADuelsReplay_IsDeletedWithTheDuel()
+    {
+        var (oldDuel, oldMove) = FinishedDuelWithAMove(daysAgo: 31);
+        var (recentDuel, recentMove) = FinishedDuelWithAMove(daysAgo: 1);
+        await SaveAsync(oldDuel, oldMove, recentDuel, recentMove);
+
+        await RunCleanupAsync();
+
+        await using var db = NewContext();
+        Assert.Equal([recentDuel.Id], await db.DuelMoves.Select(m => m.BattleId).ToListAsync());
+    }
+
+    [Fact]
     public async Task EmailLinks_AreDeletedOnceTheyAreLongExpired()
     {
         var old = new AccountToken(_userId, AccountTokenPurpose.ResetPassword, "old-hash", Now.AddDays(-10), TimeSpan.FromHours(1));
@@ -176,6 +189,15 @@ public sealed class DataCleanupTests : IDisposable
 
     private AuditLogEntry AuditEntry(int daysAgo) =>
         new(Now.AddDays(-daysAgo), AdminAction.AdjustGold, Guid.NewGuid(), "admin", _userId, "cleaner", "Refund for a bug.", "+10 gold");
+
+    private (PvpBattle Duel, DuelMove Move) FinishedDuelWithAMove(int daysAgo)
+    {
+        var at = Now.AddDays(-daysAgo);
+        var battle = PvpBattle.Start(_userId, Guid.NewGuid(), at);
+        var move = DuelMove.Record(battle, battle.PlayCard(_userId, BattleCard.Fireball, new FixedBattleRandom(), at), at);
+        battle.Forfeit(_userId, at);
+        return (battle, move);
+    }
 
     private PvpBattle FinishedDuel(int daysAgo)
     {
