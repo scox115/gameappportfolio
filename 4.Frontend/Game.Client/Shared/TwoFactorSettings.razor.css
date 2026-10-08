@@ -1,0 +1,26 @@
+/* "Two-factor sign-in" in the account dialog. */
+.two-factor-title { margin: 22px 0 6px; font-size: 0.95rem; color: #c7d2fe; }
+.two-factor-loading { color: var(--color-text-muted); font-size: 0.85rem; margin: 0; }
+.two-factor-note { color: var(--color-text-muted); font-size: 0.85rem; margin: 0 0 10px; }
+.two-factor-note-tight { margin: 0 0 8px; }
+.two-factor-key-note { color: var(--color-text-muted); font-size: 0.8rem; margin: 6px 0 10px; }
+.two-factor-on { color: #86efac; }
+
+/* Form parts. The boxes use the shared .dialog-input in app.css: PasswordInput renders one of them, out of this file's reach. */
+.two-factor-label { display: block; color: var(--color-text-dim); font-size: 0.85rem; margin-bottom: 4px; }
+.two-factor-label-spaced { margin-top: 8px; }
+.two-factor-primary { background: var(--color-accent); color: white; padding: 9px 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+.two-factor-secondary { background: var(--color-border); color: var(--color-text-soft); padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; }
+.two-factor-primary:disabled, .two-factor-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.two-factor-actions { display: flex; gap: 8px; margin-top: 10px; }
+.two-factor-grow { flex: 1; }
+.two-factor-wide { width: 100%; margin-top: 10px; }
+
+/* The QR code, the key under it, and the one-time list of recovery codes. */
+.two-factor-qr { display: block; width: 180px; height: 180px; margin: 0 auto; border-radius: 6px; }
+.two-factor-key { color: var(--color-text-soft); background: var(--color-page); padding: 2px 6px; border-radius: 4px; word-break: break-all; }
+.two-factor-codes { columns: 2; margin: 0 0 10px; padding-left: 1.6em; color: var(--color-text-soft); font-family: ui-monospace, Consolas, monospace; font-size: 0.9rem; line-height: 1.7; }
+
+/* The outcome: green when it worked, red when it didn't. */
+.two-factor-message { color: #86efac; font-size: 0.85rem; margin: 8px 0 0; }
+.two-factor-message.is-failed { color: var(--color-danger); }

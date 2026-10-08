@@ -9,39 +9,36 @@
 @inject LiveLobby Lobby
 @implements IDisposable
 
-<div class="game-client-shell"
-     style="background: #0f172a; min-height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #f8fafc;">
-    
+<div class="game-client-shell">
+
     <!-- HEADER BAR: PERMANENTLY DISPLAYS GAME IDENTITY & STATUS ONCE LOGGED IN -->
-    <div class="game-header"
-        style="display: flex; flex-wrap: wrap; gap: 12px 20px; justify-content: space-between; align-items: center; border-bottom: 2px solid #334155; padding-bottom: 15px; margin-bottom: 25px;">
-        <h2 class="game-title" style="margin: 0; color: #818cf8; font-weight: 800; tracking: wide;">⚔️ KINGS OF THE CARD ARENA <a href="status" style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;" title="Build @AppVersion.Commit. Open the system status page.">@AppVersion.Number</a></h2>
-        
+    <div class="game-header">
+        <h2 class="game-title">⚔️ KINGS OF THE CARD ARENA <a href="status" class="game-version" title="Build @AppVersion.Commit. Open the system status page.">@AppVersion.Number</a></h2>
+
         @if (State.CurrentScreen != GameScreen.LoginMenu)
         {
-            <div class="game-status"
-                style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; background: #1e293b; padding: 8px 20px; border-radius: 30px; border: 1px solid #475569;">
-                <img src="@Avatars.For(State.AvatarUrl, State.Username)" alt=""
-                     style="width: 35px; height: 35px; border-radius: 50%; @CosmeticStyles.Frame(State.Frame, 2, "2px solid #818cf8") object-fit: cover;" />
-                <span style="font-weight: bold; color: #f1f5f9;">@State.Username</span>
-                <span style="color: #c7d2fe; font-size: 0.9rem; white-space: nowrap;" title="Your class">@HeroClassIcons.For(State.HeroClass) @State.HeroClass</span>
-                <span style="color: #fbbf24; font-weight: bold;">🪙 @State.Gold</span>
+            <div class="game-status">
+                <img src="@Avatars.For(State.AvatarUrl, State.Username)" alt="" class="header-avatar"
+                     style="@CosmeticStyles.Frame(State.Frame, 2, "2px solid #818cf8")" />
+                <span class="header-name">@State.Username</span>
+                <span class="header-class" title="Your class">@HeroClassIcons.For(State.HeroClass) @State.HeroClass</span>
+                <span class="header-gold">🪙 @State.Gold</span>
 
 
                 <span
-                    style="background: #4f46e5; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;">LVL
+                    class="header-level">LVL
                     @State.Level</span>
 
                     <!-- Inside the top header row, append action links next to Logout -->
-                    <button @onclick='() => State.ChangeScreen(GameScreen.CharacterDashboard)' style="background: transparent; color: #818cf8; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold; margin-right: 10px;">🏰 Town Dashboard</button>
-                    <button @onclick="LaunchLeaderboardView" style="background: transparent; color: #fbbf24; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold; margin-right: 10px;">🏆 Leaderboards</button>
+                    <button @onclick='() => State.ChangeScreen(GameScreen.CharacterDashboard)' class="header-button header-town">🏰 Town Dashboard</button>
+                    <button @onclick="LaunchLeaderboardView" class="header-button header-leaderboards">🏆 Leaderboards</button>
 
                     <button @onclick="Sounds.ToggleAsync" title="@(Sounds.Enabled ? "Turn sound effects off" : "Turn sound effects on")"
                             aria-label="@(Sounds.Enabled ? "Turn sound effects off" : "Turn sound effects on")"
-                            style="background: transparent; border: none; cursor: pointer; font-size: 1.1rem; margin-right: 10px;">@(Sounds.Enabled ? "🔊" : "🔇")</button>
+                            class="header-button header-sound">@(Sounds.Enabled ? "🔊" : "🔇")</button>
 
                     <button @onclick="Logout"
-                            style="background: transparent; color: #94a3b8; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold;">Logout</button>
+                            class="header-button header-logout">Logout</button>
                 </div>
             }
         </div>
@@ -51,37 +48,36 @@
         {
             case GameScreen.LoginMenu:
                 <!-- RENDERS LOGIN / ACCOUNT CREATION SIMULTANEOUSLY -->
-                <div style="margin-top: 40px;"><LivePulse /></div>
+                <div class="login-pulse"><LivePulse /></div>
                 <div
-                    class="arena-panel" style="max-width: 450px; margin: 0 auto 60px; background: #1e293b; padding: 35px; border-radius: 16px; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
-                    <h3 style="text-align: center; margin-top: 0; color: #f1f5f9;">@(creatingHero ? "Create a New Hero" : "Enter the Realm")</h3>
-                
+                    class="arena-panel login-panel">
+                    <h3 class="login-heading">@(creatingHero ? "Create a New Hero" : "Enter the Realm")</h3>
+
                     <!-- A FORM SO PRESSING ENTER IN EITHER FIELD SIGNS IN (OR CREATES THE HERO) -->
                     <form @onsubmit="SubmitCredentials">
-                    <div style="margin-bottom: 20px; margin-top: 25px;">
+                    <div class="login-field login-field-first">
                         <label
-                            style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Character
+                            class="field-label">Character
                             Name:</label>
                             <input type="text" @bind="inputUsername" @bind:event="oninput" placeholder="Enter Character name..." autocomplete="username"
-                                   style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
+                                   class="login-input" />
                         </div>
 
-                    <div style="margin-bottom: 20px;">
+                    <div class="login-field login-password">
                         <label for="sign-in-password"
-                            style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Password:</label>
-                            <PasswordInput id="sign-in-password" @bind-Value="inputPassword" placeholder="At least 8 characters..." autocomplete="@(creatingHero ? "new-password" : "current-password")"
-                                   style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box;" />
+                            class="field-label">Password:</label>
+                            <PasswordInput id="sign-in-password" @bind-Value="inputPassword" placeholder="At least 8 characters..." autocomplete="@(creatingHero ? "new-password" : "current-password")" />
                         </div>
 
                     @if (askForTwoFactorCode && !creatingHero)
                     {
                         <!-- HEROES WITH TWO-FACTOR SIGN-IN ON: THE PASSWORD WAS RIGHT, NOW THE CODE FROM THEIR APP -->
-                        <div style="margin-bottom: 20px;">
+                        <div class="login-field">
                             <label for="sign-in-code"
-                                   style="display: block; margin-bottom: 8px; font-weight: bold; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">Code from your authenticator app:</label>
+                                   class="field-label">Code from your authenticator app:</label>
                             <input id="sign-in-code" @ref="twoFactorInput" @bind="inputTwoFactorCode" @bind:event="oninput" autocomplete="one-time-code" aria-describedby="sign-in-code-hint"
-                                   style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: white; font-size: 1rem; box-sizing: border-box; letter-spacing: 0.1em;" />
-                            <p id="sign-in-code-hint" style="color: #94a3b8; font-size: 0.8rem; margin: 6px 0 0;">Lost your phone? Enter one of your recovery codes instead.</p>
+                                   class="login-input login-code-input" />
+                            <p id="sign-in-code-hint" class="code-hint">Lost your phone? Enter one of your recovery codes instead.</p>
                         </div>
                     }
 
@@ -89,46 +85,46 @@
                     {
                         <!-- ONLY NEW HEROES PICK A CLASS; RETURNING HEROES KEEP THEIRS -->
                         <ClassPicker @bind-Selected="chosenClass" Heading="Choose your class:" />
-                        <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 12px;">
-                            By creating a hero you agree to the <a href="terms" style="color: #a5b4fc;">Terms of Service</a>
-                            and <a href="privacy" style="color: #a5b4fc;">Privacy Policy</a>.
+                        <p class="terms-note">
+                            By creating a hero you agree to the <a href="terms" class="soft-link">Terms of Service</a>
+                            and <a href="privacy" class="soft-link">Privacy Policy</a>.
                         </p>
                         <button type="submit" disabled="@(!CredentialsEntered)"
-                                style="width: 100%; background: #047857; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: @(CredentialsEntered ? "pointer" : "not-allowed"); opacity: @(CredentialsEntered ? "1" : "0.5");">Create Hero</button>
+                                class="login-submit create-submit @(CredentialsEntered ? "" : "is-waiting")">Create Hero</button>
                     }
                     else
                     {
                         <button type="submit" disabled="@(!CredentialsEntered)"
-                                style="width: 100%; background: #4f46e5; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: @(CredentialsEntered ? "pointer" : "not-allowed"); opacity: @(CredentialsEntered ? "1" : "0.5");">Play Game</button>
+                                class="login-submit play-submit @(CredentialsEntered ? "" : "is-waiting")">Play Game</button>
                         <FeatureGate Feature="@FeatureFlags.AccountRecovery">
-                            <p style="text-align: center; margin: 12px 0 0;"><a href="forgot-password" style="color: #a5b4fc; font-size: 0.9rem;">Forgot your password?</a></p>
+                            <p class="forgot-line"><a href="forgot-password" class="soft-link forgot-link">Forgot your password?</a></p>
                         </FeatureGate>
                     }
                     </form>
-                    <p style="text-align: center; color: #94a3b8; font-size: 0.9rem; margin: 18px 0 0;">
+                    <p class="switch-line">
                         @(creatingHero ? "Already have a hero?" : "New to the arena?")
-                        <button @onclick="ToggleCreatingHero" style="background: transparent; border: none; color: #818cf8; cursor: pointer; font-weight: bold; text-decoration: underline; font-size: 0.9rem;">
+                        <button @onclick="ToggleCreatingHero" class="switch-button">
                             @(creatingHero ? "Sign in" : "Create a new hero")
                         </button>
                     </p>
 
                     <!-- ONE CLICK TO TRY THE GAME: A GUEST HERO, KEPT LATER WITH A NAME AND PASSWORD IF THE PLAYER LIKES IT -->
-                    <div aria-hidden="true" style="display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: #94a3b8; font-size: 0.8rem;">
-                        <span style="flex: 1; height: 1px; background: #334155;"></span>or<span style="flex: 1; height: 1px; background: #334155;"></span>
+                    <div aria-hidden="true" class="or-divider">
+                        <span class="or-rule"></span>or<span class="or-rule"></span>
                     </div>
                     <button @onclick="PlayAsGuest" disabled="@startingGuest"
-                            style="width: 100%; background: transparent; color: #e2e8f0; border: 1px solid #475569; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer;">
+                            class="guest-button">
                         @(startingGuest ? "Starting..." : "⚡ Play as a guest")
                     </button>
-                    <p style="text-align: center; color: #94a3b8; font-size: 0.8rem; margin: 8px 0 0;">
+                    <p class="guest-note">
                         No sign-up. Keep your hero later if you like it. By playing you agree to the
-                        <a href="terms" style="color: #a5b4fc;">Terms</a> and <a href="privacy" style="color: #a5b4fc;">Privacy Policy</a>.
+                        <a href="terms" class="soft-link">Terms</a> and <a href="privacy" class="soft-link">Privacy Policy</a>.
                     </p>
 
                             @if (!string.IsNullOrEmpty(statusMsg) || !string.IsNullOrEmpty(State.SignOutReason))
                             {
                                 <div
-                                    style="margin-top: 20px; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 0.9rem; background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2);">
+                                    class="login-error">
                                     @(string.IsNullOrEmpty(statusMsg) ? State.SignOutReason : statusMsg)
                                 </div>
                             }
@@ -137,53 +133,52 @@
 
         case GameScreen.CharacterDashboard:
                             <!-- RENDERS TOWN INVENTORY AND AVATAR FILE UPLOADER -->
-                            <div style="max-width: 480px; margin: 0 auto;">
+                            <div class="town-column">
                                 <LivePulse />
 
                                 <!-- CHARACTER CARD BOX -->
-                                <div class="arena-panel"
-                                    style="background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155; text-align: center;">
-                                    <img src="@Avatars.For(State.AvatarUrl, State.Username)" alt="@($"{State.Username}'s portrait")"
-                                         style="width: 160px; height: 160px; border-radius: 50%; @CosmeticStyles.Frame(State.Frame, 5, "4px solid #6366f1") object-fit: cover; background: #0f172a; margin-bottom: 15px;" />
-                                    <h2 style="margin: 0; color: #f1f5f9;">@State.Username</h2>
+                                <div class="arena-panel hero-card">
+                                    <img src="@Avatars.For(State.AvatarUrl, State.Username)" alt="@($"{State.Username}'s portrait")" class="hero-portrait"
+                                         style="@CosmeticStyles.Frame(State.Frame, 5, "4px solid #6366f1")" />
+                                    <h2 class="hero-name">@State.Username</h2>
                                     @if (State.IsGuest)
                                     {
                                         <KeepGuestHero />
                                     }
                                     <button @onclick="OpenPortraitPopup"
-                                            style="background: none; border: 1px solid #475569; color: #94a3b8; border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; cursor: pointer; margin-top: 8px;">
+                                            class="portrait-button">
                                         🖼️ Change portrait
                                     </button>
                                     <ClassSwitcher />
-                    
+
                                     <button @onclick="() => EnterArena()"
-                                            style="width: 100%; background: #dc2626; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(220,38,38,0.3);">
+                                            class="town-action town-battle">
                                         ⚔️ LAUNCH BATTLE ARENA
                                     </button>
                                     <FeatureGate Feature="@FeatureFlags.Duels">
                                         <ChildContent>
                                             <button @onclick="() => State.ChangeScreen(GameScreen.PvpArena)"
-                                                    style="width: 100%; background: #0e7490; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(14,116,144,0.3);">
+                                                    class="town-action town-duel">
                                                 🆚 FIND AN OPPONENT
                                             </button>
                                         </ChildContent>
-                                        <Off><p style="color: #94a3b8; font-size: 0.85rem; margin: 15px 0 0;">🆚 Duels are closed for now. Check back soon!</p></Off>
+                                        <Off><p class="closed-note">🆚 Duels are closed for now. Check back soon!</p></Off>
                                     </FeatureGate>
                                     <FeatureGate Feature="@FeatureFlags.GoldShop">
                                         <ChildContent>
                                             <button @onclick="() => State.ChangeScreen(GameScreen.Shop)"
-                                                    style="width: 100%; background: #b45309; color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(180,83,9,0.3);">
+                                                    class="town-action town-shop">
                                                 🪙 GOLD SHOP
                                             </button>
                                         </ChildContent>
-                                        <Off><p style="color: #94a3b8; font-size: 0.85rem; margin: 15px 0 0;">🪙 The Gold Shop is closed for now. Check back soon!</p></Off>
+                                        <Off><p class="closed-note">🪙 The Gold Shop is closed for now. Check back soon!</p></Off>
                                     </FeatureGate>
                                     <FeatureGate Feature="@FeatureFlags.HeroicBoss">
                                         <HeroicChallenge OnFight="() => EnterArena(heroic: true)" />
                                     </FeatureGate>
                                     @if (!string.IsNullOrEmpty(statusMsg))
                                     {
-                                        <p style="color: #f87171; margin: 15px 0 0;">@statusMsg</p>
+                                        <p class="town-error">@statusMsg</p>
                                     }
                                     @if (!State.IsGuest)
                                     {
@@ -192,7 +187,7 @@
                                     }
                                     @if (State.IsAdmin)
                                     {
-                                        <a href="admin" style="display: block; color: #fbbf24; font-size: 0.8rem; margin-top: 10px;">🛡️ Admin tools</a>
+                                        <a href="admin" class="admin-link">🛡️ Admin tools</a>
                                     }
                                 </div>
 
@@ -202,22 +197,22 @@
                             {
                                 <!-- PORTRAIT UPLOAD POPUP -->
                                 <div role="dialog" aria-modal="true" aria-labelledby="portrait-title" @onclick="ClosePortraitPopup" @onkeydown="PortraitPopupKeyDown"
-                                     style="position: fixed; inset: 0; background: rgba(2,6,23,0.75); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;">
+                                     class="portrait-backdrop">
                                     <div @onclick:stopPropagation="true"
-                                         style="background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; width: 100%; max-width: 380px; color: #f1f5f9;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                                            <h4 id="portrait-title" style="margin: 0; font-size: 1.1rem;">🛡️ Change portrait</h4>
+                                         class="portrait-dialog">
+                                        <div class="portrait-dialog-head">
+                                            <h4 id="portrait-title" class="portrait-title">🛡️ Change portrait</h4>
                                             <button aria-label="Close" @onclick="ClosePortraitPopup" @ref="portraitCloseButton"
-                                                    style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;">✕</button>
+                                                    class="portrait-close">✕</button>
                                         </div>
-                                        <p style="color: #94a3b8; font-size: 0.85rem; margin: 8px 0 14px;">PNG or JPG, up to 4 MB.</p>
-                                        <InputFile OnChange="HandleFileSelected" accept=".png,.jpg,.jpeg" aria-label="Portrait image (PNG or JPG)" style="color: #94a3b8; width: 100%;" />
+                                        <p class="portrait-hint">PNG or JPG, up to 4 MB.</p>
+                                        <InputFile OnChange="HandleFileSelected" accept=".png,.jpg,.jpeg" aria-label="Portrait image (PNG or JPG)" />
                                         @if (!string.IsNullOrEmpty(uploadError))
                                         {
-                                            <p style="color: #f87171; font-size: 0.85rem; margin: 10px 0 0;">@uploadError</p>
+                                            <p class="upload-error">@uploadError</p>
                                         }
                                         <button @onclick="ExecuteAvatarUpload" disabled="@(selectedFile == null || uploading)"
-                                                style="width: 100%; background: #4f46e5; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; margin-top: 16px; cursor: @(selectedFile == null || uploading ? "not-allowed" : "pointer"); opacity: @(selectedFile == null || uploading ? "0.5" : "1");">
+                                                class="upload-button @(selectedFile == null || uploading ? "is-waiting" : "")">
                                             @(uploading ? "Uploading..." : "Save portrait")
                                         </button>
                                     </div>
@@ -240,15 +235,15 @@
 
         case GameScreen.Leaderboard:
                                 <!-- RENDERS DYNAMIC CARD ARENA ROSTER RANKINGS -->
-                                <div class="arena-panel" style="max-width: 800px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
-                                    <div style="text-align: center; margin-bottom: 25px;">
-                                        <h3 style="margin: 0; color: #fbbf24; font-size: 1.8rem; font-weight: 800;">🏆 GLOBAL HERO RANKINGS</h3>
-                                        <p style="color: #94a3b8; font-size: 0.95rem; margin-top: 5px;">@(leaderboardClass is null
+                                <div class="arena-panel leaderboard-panel">
+                                    <div class="leaderboard-intro">
+                                        <h3 class="leaderboard-heading">🏆 GLOBAL HERO RANKINGS</h3>
+                                        <p class="leaderboard-subtitle">@(leaderboardClass is null
                                             ? "Ranked by PvP rating: beat stronger heroes to climb faster"
                                             : $"Duels fought as a {leaderboardClass}, ranked by wins")</p>
                                         @if (registeredPlayers is { } total)
                                         {
-                                            <p style="color: #22d3ee; font-weight: bold; margin: 10px 0 0;">👥 @total.ToString("N0") registered hero@(total == 1 ? "" : "es")</p>
+                                            <p class="registered-count">👥 @total.ToString("N0") registered hero@(total == 1 ? "" : "es")</p>
                                         }
                                     </div>
 
@@ -258,12 +253,12 @@
                                     <p class="visually-hidden" aria-live="polite">@(leaderboardUpdatedLive ? "The rankings were just updated." : "")</p>
 
                                     <!-- ALL HEROES, OR ONE CLASS'S DUEL RECORDS -->
-                                    <div role="tablist" style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;">
+                                    <div role="tablist" class="leaderboard-tabs">
                                         @foreach (var tab in LeaderboardTabs)
                                         {
                                             var active = tab == leaderboardClass;
                                             <button role="tab" aria-selected="@(active ? "true" : "false")" @onclick="() => ShowLeaderboard(tab)"
-                                                    style="background: @(active ? "#312e81" : "#0f172a"); color: @(active ? "white" : "#94a3b8"); border: 1px solid @(active ? "#818cf8" : "#334155"); border-radius: 20px; padding: 6px 14px; cursor: pointer; font-weight: bold;">
+                                                    class="leaderboard-tab @(active ? "is-active" : "")">
                                                 @(tab is null ? "🌐 All" : $"{HeroClassIcons.For(tab)} {tab}")
                                             </button>
                                         }
@@ -271,24 +266,24 @@
 
                                     @if (leaderboardLoading)
                                     {
-                                        <p style="text-align: center; color: #94a3b8;">Querying relational data graphs...</p>
+                                        <p class="leaderboard-loading">Querying relational data graphs...</p>
                                     }
                                     else if (leaderboardPlayers == null || !leaderboardPlayers.Any())
                                     {
-                                        <p style="text-align: center; color: #f87171;">@(leaderboardClass is null ? "No heroes have claimed records inside the arena yet." : $"No {leaderboardClass} has fought a duel yet.")</p>
+                                        <p class="leaderboard-empty">@(leaderboardClass is null ? "No heroes have claimed records inside the arena yet." : $"No {leaderboardClass} has fought a duel yet.")</p>
                                     }
                                     else
                                     {
-                                        <div style="overflow-x: auto;">
-                                            <table class="leaderboard-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 1rem;">
+                                        <div class="leaderboard-scroll">
+                                            <table class="leaderboard-table">
                                                 <thead>
-                                                    <tr style="border-bottom: 2px solid #334155; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase;">
-                                                        <th style="padding: 12px;">Rank</th>
-                                                        <th style="padding: 12px;">Hero</th>
-                                                        <th style="padding: 12px; text-align: center;">Rating</th>
-                                                        <th style="padding: 12px; text-align: center;">Level</th>
-                                                        <th style="padding: 12px; text-align: center;">@(leaderboardClass is null ? "Duels W-L" : $"{leaderboardClass} W-L")</th>
-                                                        <th style="padding: 12px; text-align: right;">Gold Reserves</th>
+                                                    <tr class="leaderboard-head-row">
+                                                        <th>Rank</th>
+                                                        <th>Hero</th>
+                                                        <th class="col-center">Rating</th>
+                                                        <th class="col-center">Level</th>
+                                                        <th class="col-center">@(leaderboardClass is null ? "Duels W-L" : $"{leaderboardClass} W-L")</th>
+                                                        <th class="col-right">Gold Reserves</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -296,31 +291,31 @@
                                                     {
                                                         var item = leaderboardPlayers[i];
                                                         var isCurrentUser = item.id == State.PlayerId;
-                                                        
-                                                        <tr style="border-bottom: 1px solid #334155; background: @(isCurrentUser ? "rgba(99,102,241,0.15)" : "transparent"); font-weight: @(isCurrentUser ? "bold" : "normal");">
-                                                            <td style="padding: 14px; font-weight: bold; color: @(i == 0 ? "#fbbf24" : i == 1 ? "#cbd5e1" : i == 2 ? "#b45309" : "#94a3b8");">
+
+                                                        <tr class="leaderboard-row @(isCurrentUser ? "is-current" : "")">
+                                                            <td class="rank-cell @(i == 0 ? "rank-first" : i == 1 ? "rank-second" : i == 2 ? "rank-third" : "")">
                                                                 @(i + 1) @(i == 0 ? "👑" : "")
                                                             </td>
-                                                            <td style="padding: 14px; display: flex; align-items: center; gap: 12px;">
-                                                                <img src="@Avatars.For(item.avatarUrl, item.username)" alt="" style="width: 30px; height: 30px; border-radius: 50%; @CosmeticStyles.Frame(item.frame, 2, "1px solid #475569") object-fit: cover;" />
-                                                                <span style="color: @(isCurrentUser ? "#a5b4fc" : "#f1f5f9");">@item.username @(isCurrentUser ? " (You)" : "")</span>
+                                                            <td class="hero-cell">
+                                                                <img src="@Avatars.For(item.avatarUrl, item.username)" alt="" class="leaderboard-avatar" style="@CosmeticStyles.Frame(item.frame, 2, "1px solid #475569")" />
+                                                                <span class="leaderboard-name @(isCurrentUser ? "is-you" : "")">@item.username @(isCurrentUser ? " (You)" : "")</span>
                                                                 @if (item.heroClass is { } heroClass)
                                                                 {
                                                                     <span title="Plays @heroClass now">@HeroClassIcons.For(heroClass)</span>
                                                                 }
                                                                 @if (!string.IsNullOrEmpty(item.title))
                                                                 {
-                                                                    <span style="color: #fbbf24; font-size: 0.85rem; font-style: italic;">@item.title</span>
+                                                                    <span class="leaderboard-title">@item.title</span>
                                                                 }
                                                                 @if (!isCurrentUser)
                                                                 {
-                                                                    <span style="margin-left: auto;"><ReportHero HeroId="item.id" HeroName="@item.username" HasPortrait="@(!string.IsNullOrEmpty(item.avatarUrl))" /></span>
+                                                                    <span class="report-slot"><ReportHero HeroId="item.id" HeroName="@item.username" HasPortrait="@(!string.IsNullOrEmpty(item.avatarUrl))" /></span>
                                                                 }
                                                             </td>
-                                                            <td style="padding: 14px; text-align: center; color: #22d3ee; font-weight: bold;">🏅 @item.rating</td>
-                                                            <td style="padding: 14px; text-align: center; color: #38bdf8; font-weight: bold;">@item.level</td>
-                                                            <td style="padding: 14px; text-align: center; color: #cbd5e1; font-weight: bold;">⚔️ @item.pvpWins-@item.pvpLosses</td>
-                                                            <td style="padding: 14px; text-align: right; color: #fbbf24; font-weight: bold;">🪙 @item.gold</td>
+                                                            <td class="rating-cell">🏅 @item.rating</td>
+                                                            <td class="level-cell">@item.level</td>
+                                                            <td class="duels-cell">⚔️ @item.pvpWins-@item.pvpLosses</td>
+                                                            <td class="gold-cell">🪙 @item.gold</td>
                                                         </tr>
                                                     }
                                                 </tbody>
@@ -336,24 +331,23 @@
 
         case GameScreen.BattleArena:
                                     <!-- RENDERS THE INTERACTIVE TURN-BASED COMBAT GAME CANVAS -->
-                                    <div class="arena-panel"
-                                        style="max-width: 900px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
-                                        <div class="arena-head" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                                            <h3 style="margin: 0; color: @(heroic ? "#f59e0b" : "#ef4444");">@(heroic ? "👑" : "😈") Boss: @bossName</h3>
-                                            <div class="arena-hp" style="font-size: 1.2rem; font-weight: bold; white-space: nowrap;">
+                                    <div class="arena-panel battle-panel">
+                                        <div class="arena-head">
+                                            <h3 class="boss-name @(heroic ? "is-heroic" : "")">@(heroic ? "👑" : "😈") Boss: @bossName</h3>
+                                            <div class="arena-hp">
                                                 @if (bossEnraged)
                                                 {
-                                                    <span title="Below @enrageBelowPercent% health the boss's attacks hit 50% harder." style="background: #7f1d1d; color: #fecaca; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem; margin-right: 12px;">😡 ENRAGED</span>
+                                                    <span title="Below @enrageBelowPercent% health the boss's attacks hit 50% harder." class="enraged-badge">😡 ENRAGED</span>
                                                 }
-                                                <span style="color: #ef4444; margin-right: 20px;">Boss HP: @enemyHp / @enemyMaxHp</span>
-                                                <span style="color: #3b82f6;">@HeroClassIcons.For(State.HeroClass) Your HP: @playerHp / @playerMaxHp</span>
+                                                <span class="boss-hp">Boss HP: @enemyHp / @enemyMaxHp</span>
+                                                <span class="player-hp">@HeroClassIcons.For(State.HeroClass) Your HP: @playerHp / @playerMaxHp</span>
                                             </div>
                                         </div>
 
                                         @if (battleResult is null)
                                         {
                                             <!-- THE BOSS ANNOUNCES ITS NEXT MOVE SO THE PLAYER CAN PLAN AROUND IT -->
-                                            <div style="background: rgba(239,68,68,0.1); border: 1px solid #7f1d1d; border-radius: 8px; padding: 10px 15px; margin-bottom: 15px; color: #fca5a5;">
+                                            <div class="boss-intent">
                                                 @BossMoveIcon(bossNextMove) Next boss move: <strong>@bossNextMoveName</strong> for <strong>@enemyIntentAttack DMG</strong>
                                                 @if (bossNextMove == "LifeDrain")
                                                 {
@@ -364,7 +358,7 @@
 
                                         <!-- COMBAT EVENTS LOGGER FEED (column-reverse keeps the scroll pinned to the newest line, so the lines are rendered in reverse) -->
                                         <div role="log" aria-label="Battle log" tabindex="0"
-                                            style="height: 180px; background: #0f172a; border-radius: 8px; padding: 15px; overflow-y: auto; display: flex; flex-direction: column-reverse; border: 1px solid #334155; font-family: monospace; color: #94a3b8; margin-bottom: 25px; line-height: 1.6;">
+                                            class="battle-log">
                                             @foreach (var log in Enumerable.Reverse(logs))
                                             {
                                                 <div>@log</div>
@@ -374,21 +368,21 @@
                                         @if (battleResult is null)
                                         {
                                         <!-- DECK ACTION HAND CARD PANELS -->
-                                        <div class="card-hand" style="display: flex; justify-content: center; gap: 15px;">
+                                        <div class="card-hand">
                                             @foreach (var card in ArenaCards.Hand)
                                             {
                                                 var recharging = rechargingCard == card.Id;
                                                 var held = heldCards.FirstOrDefault(c => c.card == card.Id);
                                                 var signature = HeroClassIcons.SignatureCard(State.HeroClass) == card.Id;
-                                                <button class="hand-card" @onclick="() => PlayTurn(card.Id)" disabled="@recharging"
+                                                <button class="hand-card @(signature ? "is-signature" : "") @(recharging ? "is-recharging" : "")" @onclick="() => PlayTurn(card.Id)" disabled="@recharging"
                                                         title="@(signature ? $"{State.HeroClass} signature card. {card.Hint}" : card.Hint)"
-                                                        style="background: @(recharging ? "#475569" : CosmeticStyles.CardBackground(State.CardSkin, card.Color)); width: 150px; min-height: 110px; padding: 8px 6px; border-radius: 12px; position: relative; border: @(signature ? "2px solid #c7d2fe" : "none"); color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.7); font-weight: bold; cursor: @(recharging ? "not-allowed" : "pointer"); opacity: @(recharging ? "0.6" : "1");">
+                                                        style="--card-bg: @CosmeticStyles.CardBackground(State.CardSkin, card.Color)">
                                                     @if (signature)
                                                     {
-                                                        <span style="position: absolute; top: -10px; right: -10px; width: 26px; height: 26px; line-height: 26px; border-radius: 50%; background: #1e1b4b; border: 2px solid #c7d2fe; font-size: 0.8rem;">@HeroClassIcons.For(State.HeroClass)</span>
+                                                        <span class="signature-badge">@HeroClassIcons.For(State.HeroClass)</span>
                                                     }
                                                     @card.Icon @card.Label@(held is { level: > 1 } ? $" ★{held.level}" : "")<br /><small>@(held is null ? card.Effect : ArenaCards.EffectOf(held.damage, held.heal))</small><br />
-                                                    <small style="font-weight: normal;">@(recharging ? "⏳ Recharging" : held is null ? card.Risk : ArenaCards.RiskOf(card.Id, held.failChance))</small>
+                                                    <small class="card-risk">@(recharging ? "⏳ Recharging" : held is null ? card.Risk : ArenaCards.RiskOf(card.Id, held.failChance))</small>
                                                 </button>
                                             }
                                                     </div>
@@ -396,45 +390,45 @@
                                         else
                                         {
                                             <!-- BATTLE RESULT PANEL: SHOWS THE SERVER'S VERDICT AND THE REWARDS EARNED -->
-                                            <div style="text-align: center; padding: 25px; border-radius: 12px; background: @(battleResult.won ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)"); border: 2px solid @(battleResult.won ? "#22c55e" : "#ef4444");">
-                                                <div style="font-size: 3rem; line-height: 1;">@(battleResult.won ? "🏆" : "💀")</div>
-                                                <h2 style="margin: 10px 0 5px; color: @(battleResult.won ? "#4ade80" : "#f87171"); letter-spacing: 2px;">@(battleResult.won ? "VICTORY" : "DEFEAT")</h2>
-                                                <p style="color: #cbd5e1; margin: 0 0 20px;">
+                                            <div class="battle-result @(battleResult.won ? "is-won" : "is-lost")">
+                                                <div class="result-icon">@(battleResult.won ? "🏆" : "💀")</div>
+                                                <h2 class="result-title @(battleResult.won ? "is-won" : "is-lost")">@(battleResult.won ? "VICTORY" : "DEFEAT")</h2>
+                                                <p class="result-summary">
                                                     @(battleResult.won ? $"{bossName} has fallen!" : $"{bossName} prevails... this time.")
                                                 </p>
 
-                                                <div class="reward-line" style="display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; font-weight: bold;">
-                                                    <span style="color: #fbbf24;">🪙 +@battleResult.goldEarned Gold</span>
-                                                    <span style="color: #a78bfa;">✨ +@battleResult.experienceEarned XP</span>
+                                                <div class="reward-line">
+                                                    <span class="reward-gold">🪙 +@battleResult.goldEarned Gold</span>
+                                                    <span class="reward-xp">✨ +@battleResult.experienceEarned XP</span>
                                                 </div>
 
                                                 <RewardBonuses StreakBonus="battleResult.streakBonus" Bounties="battleResult.bounties" />
 
                                                 @if (heroic && battleResult.won)
                                                 {
-                                                    <div style="color: #94a3b8; margin-bottom: 15px;">@(battleResult.reducedBossReward
+                                                    <div class="result-note">@(battleResult.reducedBossReward
                                                         ? "You've already claimed today's Heroic reward, so this win paid 25 gold. It comes back tomorrow."
                                                         : "👑 Heroic victory! That was today's Heroic reward; it comes back tomorrow.")</div>
                                                 }
                                                 else if (battleResult.reducedBossReward)
                                                 {
-                                                    <div style="color: #94a3b8; margin-bottom: 15px;">You've used today's 5 full-reward boss wins, so this one paid 25 gold. Full rewards come back tomorrow.</div>
+                                                    <div class="result-note">You've used today's 5 full-reward boss wins, so this one paid 25 gold. Full rewards come back tomorrow.</div>
                                                 }
                                                 else if (battleResult.won && battleResult.fullRewardWinsLeft is { } left)
                                                 {
-                                                    <div style="color: #94a3b8; margin-bottom: 15px;">@(left == 0 ? "That was your last full-reward boss win today." : $"{left} full-reward boss win{(left == 1 ? "" : "s")} left today.")</div>
+                                                    <div class="result-note">@(left == 0 ? "That was your last full-reward boss win today." : $"{left} full-reward boss win{(left == 1 ? "" : "s")} left today.")</div>
                                                 }
 
                                                 @if (battleResult.leveledUp)
                                                 {
-                                                    <div style="color: #fbbf24; font-weight: bold; margin-bottom: 20px;">⬆️ LEVEL UP! You are now level @battleResult.newLevel.</div>
+                                                    <div class="level-up">⬆️ LEVEL UP! You are now level @battleResult.newLevel.</div>
                                                 }
 
-                                                <div class="result-actions" style="display: flex; justify-content: center; gap: 15px;">
+                                                <div class="result-actions">
                                                     <button @onclick="ReturnToTown"
-                                                            style="background: #334155; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🏰 Return to Town</button>
+                                                            class="result-button result-town">🏰 Return to Town</button>
                                                     <button @onclick="() => EnterArena(heroic)"
-                                                            style="background: #dc2626; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">⚔️ Fight Again</button>
+                                                            class="result-button result-again">⚔️ Fight Again</button>
                                                 </div>
                                             </div>
                                         }

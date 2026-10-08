@@ -8,14 +8,12 @@
 @* Signs an inactive player out, with a warning shortly before it happens. *@
 @if (secondsLeft is int left)
 {
-    <div role="alertdialog" aria-live="assertive"
-         style="position: fixed; inset: 0; background: rgba(2,6,23,0.75); display: flex; align-items: center; justify-content: center; z-index: 1000;">
-        <div style="background: #1e293b; border: 1px solid #f59e0b; border-radius: 16px; padding: 30px; max-width: 420px; text-align: center; color: #f8fafc;">
-            <div style="font-size: 2.5rem;">⏳</div>
-            <h3 style="margin: 10px 0; color: #fbbf24;">Are you still there?</h3>
-            <p style="color: #cbd5e1;">You'll be signed out in <strong>@left</strong> seconds because you haven't been active.</p>
-            <button @onclick="StaySignedIn"
-                    style="background: #4f46e5; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Stay signed in</button>
+    <div role="alertdialog" aria-live="assertive" class="idle-backdrop">
+        <div class="idle-dialog">
+            <div class="idle-icon">⏳</div>
+            <h3 class="idle-title">Are you still there?</h3>
+            <p class="idle-text">You'll be signed out in <strong>@left</strong> seconds because you haven't been active.</p>
+            <button @onclick="StaySignedIn" class="idle-stay">Stay signed in</button>
         </div>
     </div>
 }

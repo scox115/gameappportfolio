@@ -1,0 +1,12 @@
+/* The "you're playing as a guest" box on the hero card. */
+.keep-hero { background: rgba(79,70,229,0.12); border: 1px solid var(--color-accent); border-radius: 12px; padding: 14px; margin: 14px 0 4px; text-align: left; }
+.keep-hero-title { margin: 0 0 4px; font-size: 0.95rem; color: #c7d2fe; }
+.keep-hero-note { color: var(--color-text-muted); font-size: 0.8rem; margin: 0 0 10px; }
+
+/* The form. The password box is PasswordInput's own input, so both inputs are reached through ::deep. */
+.keep-hero-label { display: block; color: var(--color-text-dim); font-size: 0.8rem; margin-bottom: 4px; }
+.keep-hero-password-label { margin: 8px 0 4px; }
+.keep-hero-form ::deep .keep-hero-input { width: 100%; padding: 9px; border-radius: 8px; border: 1px solid var(--color-border-strong); background: var(--color-page); color: var(--color-text); box-sizing: border-box; }
+.keep-hero-save { width: 100%; background: #047857; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+.keep-hero-open { width: 100%; background: var(--color-accent); color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+.keep-hero-error { color: var(--color-danger); font-size: 0.8rem; margin: 8px 0 0; }

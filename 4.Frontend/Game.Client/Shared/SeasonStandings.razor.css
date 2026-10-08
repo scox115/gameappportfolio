@@ -1,0 +1,25 @@
+/* The ranked season leaderboard, under the all-time one. */
+.season-standings { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--color-border); }
+.season-standings-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px; }
+.season-standings h4 { margin: 0; color: var(--color-text); font-size: 1.2rem; }
+.season-standings select { background: var(--color-page); color: var(--color-text); border: 1px solid var(--color-border-strong); border-radius: 8px; padding: 6px 10px; font: inherit; }
+.season-standings-note { color: var(--color-text-muted); font-size: 0.85rem; margin: 10px 0 14px; }
+.season-standings-empty { text-align: center; color: var(--color-text-muted); }
+
+/* The table scrolls sideways on narrow screens rather than squeezing. */
+.season-standings-scroll { overflow-x: auto; }
+.season-standings table { width: 100%; border-collapse: collapse; text-align: left; }
+.season-standings th { padding: 10px 12px; border-bottom: 2px solid var(--color-border); color: var(--color-text-muted); font-size: 0.8rem; text-transform: uppercase; }
+.season-standings td { padding: 12px; border-bottom: 1px solid var(--color-border); color: var(--color-text); }
+.season-standings .num { text-align: center; }
+.season-standings .rank { font-weight: bold; color: var(--color-text-muted); }
+.season-standings .rating { color: #22d3ee; font-weight: bold; }
+.season-standings .gold { color: var(--color-gold); font-weight: bold; }
+
+/* The signed-in hero's own row. */
+.season-standings tr.me { background: rgba(99, 102, 241, 0.15); font-weight: bold; }
+
+/* Portrait, name, class and title in one cell; the portrait's frame comes from CosmeticStyles inline. */
+.season-standings .hero { display: flex; align-items: center; gap: 10px; }
+.season-standings .hero img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.season-standings .title { color: var(--color-gold); font-size: 0.85rem; font-style: italic; }

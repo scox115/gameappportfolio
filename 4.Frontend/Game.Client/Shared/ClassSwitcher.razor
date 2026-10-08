@@ -5,24 +5,24 @@
 @implements IDisposable
 
 @* Shows the hero's class on the dashboard and lets them switch to another for gold. *@
-<p style="color: #94a3b8; font-size: 0.95rem; margin: 5px 0 0;">
-    Class: <b style="color: #c7d2fe;">@HeroClassIcons.For(State.HeroClass) @State.HeroClass</b>
-    <button @onclick="Toggle" style="background: transparent; border: none; color: #818cf8; cursor: pointer; font-size: 0.85rem; text-decoration: underline;">
+<p class="class-line">
+    Class: <b class="class-name">@HeroClassIcons.For(State.HeroClass) @State.HeroClass</b>
+    <button @onclick="Toggle" class="class-change-toggle">
         @(open ? "Cancel" : "Change")
     </button>
 </p>
 
 @if (open)
 {
-    <div style="text-align: left; margin-top: 12px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 15px;">
+    <div class="class-switch-panel">
         <ClassPicker @bind-Selected="newClass" Exclude="@State.HeroClass" Heading="@($"Switch class for {Price} gold:")" />
         <button @onclick="Confirm" disabled="@(newClass is null || saving)"
-                style="width: 100%; background: #4f46e5; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; opacity: @(newClass is null ? "0.5" : "1");">
+                class="class-confirm @(newClass is null ? "is-waiting" : "")">
             @(newClass is null ? "Pick a class" : $"Become a {newClass} for {Price} gold")
         </button>
         @if (!string.IsNullOrEmpty(message))
         {
-            <p style="color: #f87171; margin: 10px 0 0; font-size: 0.9rem;">@message</p>
+            <p class="class-error">@message</p>
         }
     </div>
 }

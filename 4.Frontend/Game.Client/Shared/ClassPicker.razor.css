@@ -1,0 +1,24 @@
+/* The class picker: a heading and one button per class. */
+.class-picker { margin-bottom: 20px; }
+.class-picker-heading { display: block; margin-bottom: 8px; font-weight: bold; color: var(--color-text-muted); font-size: 0.85rem; text-transform: uppercase; }
+.class-options { display: flex; flex-direction: column; gap: 8px; }
+
+.class-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    background: var(--color-page);
+    color: white;
+    padding: 10px 12px;
+    border: 2px solid var(--color-border);
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+/* The class currently picked. */
+.class-option.is-selected { background: #312e81; border-color: var(--color-accent-text); }
+
+.class-option-icon { font-size: 1.6rem; }
+.class-option-name { display: block; font-weight: bold; }
+.class-option-effect { display: block; color: var(--color-text-dim); font-size: 0.85rem; }

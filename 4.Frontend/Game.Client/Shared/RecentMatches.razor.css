@@ -1,0 +1,46 @@
+/* The recent matches panel. */
+.matches-panel {
+    max-width: 1100px;
+    margin: 25px auto 0;
+    background: var(--color-surface);
+    padding: 20px 30px;
+    border-radius: 16px;
+    border: 1px solid var(--color-border);
+}
+
+.matches-title { margin: 0 0 12px; color: var(--color-text); font-size: 1.2rem; }
+.matches-empty { color: var(--color-text-muted); margin: 0; }
+.matches-list { display: flex; flex-direction: column; gap: 6px; }
+
+/* One row per match, edged green for a win and red for a loss. */
+.match-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: var(--color-page);
+    border-left: 4px solid #ef4444;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.9rem;
+}
+
+.match-row.is-win { border-left-color: #22c55e; }
+
+.match-result { font-weight: bold; color: var(--color-danger); min-width: 40px; }
+.match-result.is-win { color: var(--color-success); }
+.match-summary { color: var(--color-text); flex: 1; min-width: 180px; }
+.match-detail { color: var(--color-text-muted); }
+.match-rating { color: var(--color-danger); font-weight: bold; }
+.match-rating.is-up { color: #22d3ee; }
+.match-gold { color: var(--color-gold); font-weight: bold; }
+.match-when { color: var(--color-text-muted); min-width: 70px; text-align: right; }
+
+/* The link to a duel's replay. */
+.match-replay { color: #c7d2fe; font-weight: bold; text-decoration: none; border: 1px solid var(--color-accent); border-radius: 8px; padding: 3px 10px; }
+.match-replay:hover { background: rgba(79,70,229,0.2); }
+
+/* Phones: the panel loses its wide padding. */
+@media (max-width: 600px) {
+    .matches-panel { padding: 16px; }
+}

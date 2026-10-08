@@ -1,0 +1,38 @@
+/* A friend's duel challenge, floating at the bottom of whatever screen is open. */
+.challenge-invite {
+    position: fixed;
+    z-index: 1100;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    width: min(460px, calc(100vw - 32px));
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background: #1e1b4b;
+    border: 2px solid var(--color-accent-text);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.7);
+    color: var(--color-text-soft);
+    animation: challenge-in 0.25s ease-out;
+}
+/* The challenger's portrait; its frame comes from their cosmetic, inline. */
+.challenge-invite img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: var(--color-page); flex-shrink: 0; }
+.challenge-invite h2 { margin: 0 0 4px; font-size: 1.05rem; color: var(--color-text-bright); overflow-wrap: anywhere; }
+.challenge-invite p { margin: 0 0 10px; font-size: 0.85rem; color: #c7d2fe; }
+.challenge-invite-clock { color: var(--color-gold); font-weight: bold; }
+
+.challenge-invite-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.challenge-invite-actions button { border: none; border-radius: 8px; padding: 9px 16px; font-weight: bold; cursor: pointer; }
+.challenge-accept { background: #dc2626; color: white; }
+.challenge-decline { background: var(--color-border); color: var(--color-text-soft); }
+
+/* Slides up into view, unless the player asked for less motion. */
+@keyframes challenge-in {
+    from { opacity: 0; transform: translate(-50%, 16px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .challenge-invite { animation: none; }
+}

@@ -1,0 +1,18 @@
+/* "Recovery email" in the account dialog. */
+.recovery-email-title { margin: 22px 0 6px; font-size: 0.95rem; color: #c7d2fe; }
+.recovery-email-loading { color: var(--color-text-muted); font-size: 0.85rem; margin: 0; }
+.recovery-email-note { color: var(--color-text-muted); font-size: 0.85rem; margin: 0 0 10px; }
+.recovery-email-address { color: var(--color-text-soft); }
+
+/* The form. (The password box is PasswordInput's own input, styled inline: this file has no element around it.) */
+.recovery-email-label { display: block; color: var(--color-text-dim); font-size: 0.85rem; margin-bottom: 4px; }
+.recovery-email-password-label { margin: 8px 0 4px; }
+.recovery-email-input { width: 100%; padding: 9px; border-radius: 8px; border: 1px solid var(--color-border-strong); background: var(--color-page); color: var(--color-text); }
+.recovery-email-actions { display: flex; gap: 8px; margin-top: 10px; }
+.recovery-email-save { flex: 1; background: var(--color-accent); color: white; padding: 9px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; opacity: 1; }
+.recovery-email-remove { background: var(--color-border); color: var(--color-text-soft); padding: 9px 12px; border: none; border-radius: 8px; cursor: pointer; opacity: 1; }
+.recovery-email-save.is-disabled, .recovery-email-remove.is-disabled { opacity: 0.5; }
+
+/* The outcome: green when it worked, red when it didn't. */
+.recovery-email-message { color: #86efac; font-size: 0.85rem; margin: 8px 0 0; }
+.recovery-email-message.is-failed { color: var(--color-danger); }

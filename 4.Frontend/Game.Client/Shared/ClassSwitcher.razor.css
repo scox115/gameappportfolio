@@ -1,0 +1,24 @@
+/* The hero's class and the link-style button that opens the switcher. */
+.class-line { color: var(--color-text-muted); font-size: 0.95rem; margin: 5px 0 0; }
+.class-name { color: #c7d2fe; }
+.class-change-toggle { background: transparent; border: none; color: var(--color-accent-text); cursor: pointer; font-size: 0.85rem; text-decoration: underline; }
+
+/* The switcher: a class picker and the button that pays for the switch. */
+.class-switch-panel { text-align: left; margin-top: 12px; background: var(--color-page); border: 1px solid var(--color-border); border-radius: 12px; padding: 15px; }
+
+.class-confirm {
+    width: 100%;
+    background: var(--color-accent);
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    opacity: 1;
+}
+
+/* Faded until a class is picked. */
+.class-confirm.is-waiting { opacity: 0.5; }
+
+.class-error { color: var(--color-danger); margin: 10px 0 0; font-size: 0.9rem; }

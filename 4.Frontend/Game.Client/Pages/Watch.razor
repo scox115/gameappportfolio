@@ -325,7 +325,7 @@
             }
             <div class="watch-panel-rating">@(hero.Id == ArenaBotId ? "Practice partner" : $"🏅 Rating {hero.Rating}")</div>
             <div class="watch-hp" role="meter" aria-label="@hero.Username's health" aria-valuemin="0" aria-valuemax="@hero.MaxHp" aria-valuenow="@hero.Hp">
-                <div style="width: @(hero.Hp * 100 / Math.Max(1, hero.MaxHp))%;"></div>
+                <div class="watch-hp-fill" style="--hp: @(hero.Hp * 100 / Math.Max(1, hero.MaxHp))%;"></div>
             </div>
             <div class="watch-hp-text">@hero.Hp / @hero.MaxHp HP</div>
         </div>

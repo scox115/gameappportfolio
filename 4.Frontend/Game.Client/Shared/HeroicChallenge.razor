@@ -11,10 +11,10 @@
 {
     <button @onclick="OnFight"
             title="A much tougher Shadow Overlord: more health, harder hits, and it enrages at half health."
-            style="width: 100%; background: linear-gradient(135deg, #b45309, #7c2d12); color: #fef3c7; padding: 15px; border: 2px solid #f59e0b; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 15px; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(245,158,11,0.3);">
+            class="heroic-button">
         👑 FACE THE HEROIC BOSS
     </button>
-    <p style="color: #fbbf24; font-size: 0.85rem; margin: 8px 0 0;">
+    <p class="heroic-reward">
         @(status.heroicRewardAvailable
             ? "Today's first Heroic win pays 300 gold and 150 XP."
             : "Today's Heroic reward is claimed. Wins pay 25 gold until tomorrow.")
@@ -22,7 +22,7 @@
 }
 else
 {
-    <p style="color: #94a3b8; font-size: 0.85rem; margin: 15px 0 0;">
+    <p class="heroic-locked">
         🔒 Upgrade all three cards to level 3 in the Gold Shop to unlock the Heroic boss.
     </p>
 }

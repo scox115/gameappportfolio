@@ -10,25 +10,25 @@
 {
     <div role="dialog" aria-modal="true" aria-labelledby="@titleId" @onclick="Close" @onkeydown="KeyDown" class="report-hero-backdrop">
         <div @onclick:stopPropagation="true" class="report-hero-dialog">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-                <h4 id="@titleId" style="margin: 0; font-size: 1.1rem;">⚑ Report @HeroName</h4>
+            <div class="report-hero-head">
+                <h4 id="@titleId" class="report-hero-title">⚑ Report @HeroName</h4>
                 <button aria-label="Close" @onclick="Close" @ref="closeButton" class="report-hero-close">✕</button>
             </div>
 
             @if (sent)
             {
-                <p role="status" style="color: #86efac; margin: 16px 0 0;">
+                <p role="status" class="report-hero-sent">
                     Thanks. An admin will look at @HeroName's @(reason == "Portrait" ? "portrait" : "name"). They won't be told who reported it.
                 </p>
-                <button @onclick="Close" class="report-hero-submit" style="margin-top: 16px;">Done</button>
+                <button @onclick="Close" class="report-hero-submit report-hero-done">Done</button>
             }
             else
             {
-                <p style="color: #94a3b8; font-size: 0.85rem; margin: 12px 0;">
+                <p class="report-hero-intro">
                     Report names or portraits that are offensive or pretend to be staff. Losing a duel isn't a reason to report.
                 </p>
-                <fieldset style="border: none; padding: 0; margin: 0;">
-                    <legend style="color: #cbd5e1; font-size: 0.85rem; margin-bottom: 6px;">What's wrong?</legend>
+                <fieldset class="report-hero-reasons">
+                    <legend class="report-hero-legend">What's wrong?</legend>
                     <label class="report-hero-choice">
                         <input type="radio" name="@($"{titleId}-reason")" checked="@(reason == "Name")" @onchange="@(() => reason = "Name")" />
                         Their name
@@ -41,14 +41,14 @@
                         </label>
                     }
                 </fieldset>
-                <label for="@($"{titleId}-note")" style="display: block; color: #cbd5e1; font-size: 0.85rem; margin: 12px 0 4px;">Anything an admin should know? (optional)</label>
+                <label for="@($"{titleId}-note")" class="report-hero-note-label">Anything an admin should know? (optional)</label>
                 <textarea id="@($"{titleId}-note")" @bind="note" @bind:event="oninput" maxlength="200" rows="3" class="report-hero-note"></textarea>
                 <button @onclick="SendAsync" disabled="@busy" class="report-hero-submit">
                     @(busy ? "Sending..." : "Send report")
                 </button>
                 @if (!string.IsNullOrEmpty(message))
                 {
-                    <p role="alert" style="color: #f87171; font-size: 0.85rem; margin: 10px 0 0;">@message</p>
+                    <p role="alert" class="report-hero-error">@message</p>
                 }
             }
         </div>
