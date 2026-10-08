@@ -37,5 +37,6 @@ Each record explains one decision that shapes this codebase: what problem it sol
 | [0031](0031-faster-first-visit.md) | A smaller client, and wake the server while it loads | Accepted |
 | [0032](0032-arena-bot.md) | A bot to duel when nobody else is in the lobby | Accepted |
 | [0033](0033-ops-dashboard.md) | An ops dashboard and alerts kept in code | Accepted |
+| [0034](0034-live-lobby.md) | A live lobby: who is online, waiting and duelling | Accepted |
 
 To add one, copy [template.md](template.md), give it the next number, and add it to the table.

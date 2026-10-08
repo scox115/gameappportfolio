@@ -26,5 +26,8 @@ public class GameMatchConfiguration : IEntityTypeConfiguration<GameMatch>
 
         builder.Property(m => m.CreatedAt)
             .IsRequired();
+
+        // The live lobby tells browsers when the latest match changed the leaderboards.
+        builder.HasIndex(m => m.CreatedAt);
     }
 }

@@ -12,7 +12,7 @@ namespace Game.Api.Hubs;
 /// Results come back to both players through <see cref="IArenaClient"/>.
 /// </summary>
 [Authorize]
-public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatureManager features) : Hub<IArenaClient>
+public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatureManager features, ArenaPulse pulse) : Hub<IArenaClient>
 {
     public const string Path = "/hubs/arena";
 
@@ -20,14 +20,18 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatu
     public async Task<bool> FindOpponent()
     {
         await EnsureDuelsAreOnAsync();
-        return await battles.FindOpponentAsync(PlayerId, network: Network);
+        var waiting = await battles.FindOpponentAsync(PlayerId, network: Network);
+        pulse.Changed(); // joined the lobby, or paired and started a duel
+        return waiting;
     }
 
     /// <summary>Joins the lobby staking gold on the duel; only players with the same wager are paired.</summary>
     public async Task<bool> FindWageredOpponent(int wager)
     {
         await EnsureDuelsAreOnAsync();
-        return await battles.FindOpponentAsync(PlayerId, wager, Network);
+        var waiting = await battles.FindOpponentAsync(PlayerId, wager, Network);
+        pulse.Changed();
+        return waiting;
     }
 
     /// <summary>Starts a practice duel against the Arena Bot instead of waiting for another player.</summary>
@@ -35,6 +39,7 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatu
     {
         await EnsureDuelsAreOnAsync();
         await battles.StartBotDuelAsync(PlayerId);
+        pulse.Changed();
     }
 
     // Switching duels off stops new ones; duels already under way play out.
@@ -46,7 +51,11 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatu
         }
     }
 
-    public Task CancelSearch() => matchmaker.LeaveAsync(PlayerId);
+    public async Task CancelSearch()
+    {
+        await matchmaker.LeaveAsync(PlayerId);
+        pulse.Changed();
+    }
 
     public Task PlayCard(Guid battleId, BattleCard card) => battles.PlayCardAsync(PlayerId, battleId, card);
 
@@ -57,6 +66,7 @@ public class ArenaHub(PvpBattleService battles, PvpMatchmaker matchmaker, IFeatu
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         await matchmaker.LeaveAsync(PlayerId);
+        pulse.Changed();
         await base.OnDisconnectedAsync(exception);
     }
 

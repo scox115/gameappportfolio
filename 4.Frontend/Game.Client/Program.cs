@@ -24,6 +24,7 @@ builder.Services.AddScoped<TokenRefresher>();
 builder.Services.AddScoped<SoundEffects>();
 builder.Services.AddScoped<FeatureFlags>();
 builder.Services.AddScoped<BrowserTelemetry>();
+builder.Services.AddScoped<LiveLobby>();
 // Errors the client logs go to Application Insights too (see wwwroot/js/telemetry.js).
 builder.Services.AddSingleton<ILoggerProvider, TelemetryLoggerProvider>();
 builder.Services.AddScoped(sp => new HttpClient(new AuthTokenHandler(sp.GetRequiredService<GameState>(), sp.GetRequiredService<TokenRefresher>()))

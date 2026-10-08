@@ -2,11 +2,11 @@
 
 A real-time card battler built as if it were a production service: a .NET 10 API and a Blazor WebAssembly client, live in Azure, deployed on every merge, and run for close to nothing. This page is the five-minute tour: what it is, how it's built, the decisions that shaped it and the numbers behind them. Each decision links to its full Architecture Decision Record (ADR).
 
-**▶ [Play it](https://play.scottcoxdev.com)** (one click as a guest) · [Source and setup](../ReadMe.md) · [All 33 ADRs](adr/README.md)
+**▶ [Play it](https://play.scottcoxdev.com)** (one click as a guest) · [Source and setup](../ReadMe.md) · [All 34 ADRs](adr/README.md)
 
 ![Two browsers playing a live duel against each other](images/duel.gif)
 
-*Two browsers, two heroes, one live duel. Each card goes to the server over SignalR, the server plays the turn and both screens update. Visiting alone? Practice against the server-played Arena Bot.*
+*Two browsers, two heroes, one live duel. Each card goes to the server over SignalR, the server plays the turn and both screens update. Visiting alone? Practice against the server-played Arena Bot. The sign-in page shows live how many heroes are online, waiting and duelling.*
 
 ## At a glance
 
@@ -41,7 +41,7 @@ flowchart LR
 
     subgraph sql[Azure SQL, serverless]
         game[(Heroes, battles,<br/>gold, ratings)]
-        shared[(Shared between replicas:<br/>duel lobby, hub messages,<br/>event outbox)]
+        shared[(Shared between replicas:<br/>duel lobby, who is online,<br/>hub messages, event outbox)]
     end
 
     browser -- loads --> client

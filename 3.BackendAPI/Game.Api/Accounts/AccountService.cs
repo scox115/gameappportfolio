@@ -100,6 +100,7 @@ public class AccountService(
 
         // Out of the lobby too, in the same save. (A replica still holding their connection notices at its next heartbeat.)
         dbContext.PvpLobby.RemoveRange(await dbContext.PvpLobby.Where(e => e.PlayerId == playerId).ToListAsync(cancellationToken));
+        dbContext.OnlinePresence.RemoveRange(await dbContext.OnlinePresence.Where(p => p.PlayerId == playerId).ToListAsync(cancellationToken));
         // Loaded and removed one by one rather than with ExecuteDelete, so everything goes in the one
         // SaveChanges that UserManager.DeleteAsync makes: the account is deleted completely or not at all.
         dbContext.RefreshTokens.RemoveRange(await dbContext.RefreshTokens.Where(t => t.UserId == playerId).ToListAsync(cancellationToken));

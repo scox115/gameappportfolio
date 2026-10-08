@@ -25,6 +25,8 @@ public sealed class ArenaFixture : IAsyncLifetime
 
     public Task SetRatingAsync(string username, int rating) => _api!.SetRatingAsync(username, rating);
 
+    public Task RecordMatchAsync(string username, int rating) => _api!.RecordMatchAsync(username, rating);
+
     /// <summary>What the browsers sent to "Application Insights".</summary>
     public TelemetrySink Telemetry => _telemetry!;
 

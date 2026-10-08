@@ -2,6 +2,7 @@ using Game.Api.Observability;
 using System.Security.Claims;
 using Game.Api.Auth;
 using Game.Api.Features;
+using Game.Api.Hubs;
 using Game.Api.Messaging;
 using Game.Api.Models;
 using Game.Core.Battles;
@@ -88,7 +89,8 @@ public static class BattleEndpoints
             AppDbContext dbContext,
             IBattleRandom random,
             TimeProvider timeProvider,
-            MatchOutbox outbox) =>
+            MatchOutbox outbox,
+            ArenaPulse pulse) =>
         {
             var playerId = user.GetPlayerId();
 
@@ -166,6 +168,7 @@ public static class BattleEndpoints
             if (completed is not null)
             {
                 outbox.Notify();
+                pulse.Changed(); // the leaderboards may have moved
                 GameTelemetry.BattleCompleted("pve", completed.WinnerId == playerId ? "victory" : "defeat", battle.Difficulty.ToString());
             }
 
