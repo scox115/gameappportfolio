@@ -40,13 +40,13 @@
             By creating a hero you agree to the <a href="terms" class="soft-link">Terms of Service</a>
             and <a href="privacy" class="soft-link">Privacy Policy</a>.
         </p>
-        <button type="submit" disabled="@(!CredentialsEntered)"
-                class="login-submit create-submit @(CredentialsEntered ? "" : "is-waiting")">Create Hero</button>
+        <button type="submit" disabled="@(!CredentialsEntered || submitting)"
+                class="login-submit create-submit @(CredentialsEntered && !submitting ? "" : "is-waiting")">@(submitting ? "Creating..." : "Create Hero")</button>
     }
     else
     {
-        <button type="submit" disabled="@(!CredentialsEntered)"
-                class="login-submit play-submit @(CredentialsEntered ? "" : "is-waiting")">Play Game</button>
+        <button type="submit" disabled="@(!CredentialsEntered || submitting)"
+                class="login-submit play-submit @(CredentialsEntered && !submitting ? "" : "is-waiting")">@(submitting ? "Signing in..." : "Play Game")</button>
         <FeatureGate Feature="@FeatureFlags.AccountRecovery">
             <p class="forgot-line"><a href="forgot-password" class="soft-link forgot-link">Forgot your password?</a></p>
         </FeatureGate>

@@ -50,7 +50,17 @@ public partial class SignInPanel : IDisposable
     // Play Game / Create Hero stay disabled until both fields have something in them.
     private bool CredentialsEntered => !string.IsNullOrWhiteSpace(inputUsername) && !string.IsNullOrEmpty(inputPassword);
 
-    private Task SubmitCredentials() => creatingHero ? HandleRegister() : HandleLogin();
+    // Set while a sign-in or new hero is on its way to the server, so a second tap or Enter can't send
+    // another: each sign-in ends the session before it, so the second one would sign the first out.
+    private bool submitting;
+
+    private async Task SubmitCredentials()
+    {
+        if (submitting) return;
+        submitting = true;
+        try { await (creatingHero ? HandleRegister() : HandleLogin()); }
+        finally { submitting = false; }
+    }
 
     private async Task HandleLogin()
     {
@@ -108,6 +118,7 @@ public partial class SignInPanel : IDisposable
 
     private async Task PlayAsGuest()
     {
+        if (startingGuest) return;
         startingGuest = true;
         try
         {
