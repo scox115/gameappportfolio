@@ -4,7 +4,7 @@
 
 @* The hero's latest matches. The server builds this list in the background from RabbitMQ match
    events, so a battle that just ended can take a moment to appear. *@
-<div style="max-width: 1100px; margin: 25px auto 0; background: #1e293b; padding: 20px 30px; border-radius: 16px; border: 1px solid #334155;">
+<div class="arena-panel" style="max-width: 1100px; margin: 25px auto 0; background: #1e293b; padding: 20px 30px; border-radius: 16px; border: 1px solid #334155;">
     <h4 style="margin: 0 0 12px; color: #f1f5f9; font-size: 1.2rem;">📖 Recent Matches</h4>
 
     @if (matches is null)

@@ -15,7 +15,7 @@
     @* The arena's live numbers stay in view while the player waits for an opponent. *@
     <LivePulse />
 }
-<div style="max-width: 900px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
+<div class="arena-panel" style="max-width: 900px; margin: 0 auto; background: #1e293b; padding: 30px; border-radius: 16px; border: 1px solid #334155;">
     @if (battle is null)
     {
         <!-- LOBBY: CHOOSE A WAGER, THEN WAIT FOR A SECOND PLAYER -->
@@ -73,7 +73,7 @@
     else
     {
         <!-- BOTH PLAYERS' HEALTH -->
-        <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px;">
+        <div class="duel-heroes" style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px;">
             @PlayerPanel(battle.You, "#3b82f6", "You")
             @PlayerPanel(battle.Opponent, "#ef4444", "Opponent")
         </div>
@@ -119,15 +119,15 @@
 
         @if (battle.Status == "InProgress")
         {
-            <div style="display: flex; justify-content: center; gap: 15px;">
+            <div class="card-hand" style="display: flex; justify-content: center; gap: 15px;">
                 @foreach (var card in ArenaCards.Hand)
                 {
                     var recharging = battle.RechargingCard == card.Id;
                     var disabled = recharging || !battle.YourTurn || sending;
                     var held = battle.YourCards?.FirstOrDefault(c => c.Card == card.Id);
                     var signature = HeroClassIcons.SignatureCard(State.HeroClass) == card.Id;
-                    <button @onclick="() => PlayCard(card.Id)" disabled="@disabled" title="@(signature ? $"{State.HeroClass} signature card. {card.Hint}" : card.Hint)"
-                            style="background: @(disabled ? "#475569" : CosmeticStyles.CardBackground(State.CardSkin, card.Color)); width: 150px; height: 110px; border-radius: 12px; position: relative; border: @(signature ? "2px solid #c7d2fe" : "none"); color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.7); font-weight: bold; cursor: @(disabled ? "not-allowed" : "pointer"); opacity: @(disabled ? "0.6" : "1");">
+                    <button class="hand-card" @onclick="() => PlayCard(card.Id)" disabled="@disabled" title="@(signature ? $"{State.HeroClass} signature card. {card.Hint}" : card.Hint)"
+                            style="background: @(disabled ? "#475569" : CosmeticStyles.CardBackground(State.CardSkin, card.Color)); width: 150px; min-height: 110px; padding: 8px 6px; border-radius: 12px; position: relative; border: @(signature ? "2px solid #c7d2fe" : "none"); color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.7); font-weight: bold; cursor: @(disabled ? "not-allowed" : "pointer"); opacity: @(disabled ? "0.6" : "1");">
                         @if (signature)
                         {
                             <span style="position: absolute; top: -10px; right: -10px; width: 26px; height: 26px; line-height: 26px; border-radius: 50%; background: #1e1b4b; border: 2px solid #c7d2fe; font-size: 0.8rem;">@HeroClassIcons.For(State.HeroClass)</span>
@@ -155,7 +155,7 @@
                 }
                 else if (reward is not null)
                 {
-                    <div style="display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; font-weight: bold;">
+                    <div class="reward-line" style="display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; font-weight: bold;">
                         <span style="color: #fbbf24;">🪙 +@reward.GoldEarned Gold</span>
                         <span style="color: #a78bfa;">✨ +@reward.ExperienceEarned XP</span>
                         @if (reward.RatingChange is { } change)
@@ -166,7 +166,7 @@
                     <RewardBonuses WagerResult="reward.WagerResult" StreakBonus="reward.StreakBonus"
                                    Bounties="@(reward.BountiesCompleted?.Select(b => new RewardBonuses.BountyLine(b.Name, b.Reward)).ToList() ?? [])" />
                 }
-                <div style="display: flex; justify-content: center; gap: 15px;">
+                <div class="result-actions" style="display: flex; justify-content: center; gap: 15px;">
                     <button @onclick="LeaveLobby" style="background: #334155; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🏰 Return to Town</button>
                     <button @onclick="FindAnother" style="background: #0e7490; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🆚 Find Another Opponent</button>
                     @if (battle.AgainstBot)
@@ -563,7 +563,7 @@
 
     private RenderFragment PlayerPanel(PvpPlayerDto player, string color, string label) => __builder =>
     {
-        <div style="flex: 1; background: #0f172a; border-radius: 12px; padding: 15px; border: 1px solid #334155;">
+        <div style="flex: 1; min-width: 0; background: #0f172a; border-radius: 12px; padding: 15px; border: 1px solid #334155;">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <img src="@Avatars.For(player.AvatarUrl, player.Username)" alt=""
                      style="width: 44px; height: 44px; border-radius: 50%; background: #1e293b; object-fit: cover; @CosmeticStyles.Frame(player.Frame)" />
