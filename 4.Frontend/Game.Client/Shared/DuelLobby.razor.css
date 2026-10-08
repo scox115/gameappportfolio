@@ -1,0 +1,57 @@
+/* Lobby: choose a wager, then wait for a second player. */
+.lobby { text-align: center; padding: 30px 10px; }
+.lobby-icon { font-size: 3rem; }
+.lobby-title { color: #22d3ee; margin: 10px 0; }
+.lobby-error { color: var(--color-danger); }
+.lobby-text { color: var(--color-text-dim); }
+.lobby-hint { color: var(--color-text-muted); font-size: 0.9rem; }
+.challenge-clock { color: var(--color-gold); font-weight: bold; }
+.wager-prompt { color: var(--color-text-dim); margin-bottom: 5px; }
+.wager-fee { color: var(--color-text-muted); font-size: 0.9rem; margin-top: 0; }
+.guest-hint { color: var(--color-text-muted); font-size: 0.9rem; margin-top: 12px; }
+
+.ghost-button {
+    background: transparent;
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border-strong);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 5px;
+}
+
+.bot-button {
+    background: #7c3aed;
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 5px 8px 0 0;
+}
+
+.town-button {
+    background: var(--color-border);
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 15px;
+}
+
+/* The wager choices: a friendly duel, gold wagers, and greyed-out wagers the hero can't afford. */
+.wager-options { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+.wager-button {
+    background: #0e7490;
+    color: white;
+    padding: 12px 18px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.wager-button.is-gold { background: #b45309; }
+.wager-button.is-locked { background: var(--color-border-strong); cursor: not-allowed; }

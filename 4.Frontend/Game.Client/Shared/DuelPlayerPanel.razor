@@ -1,0 +1,34 @@
+@* One hero's side of the duel: portrait, class, rating, title and health. *@
+<div class="duel-hero" style="--hero-color: @Color">
+    <div class="duel-hero-head">
+        <img src="@Avatars.For(Player.AvatarUrl, Player.Username)" alt=""
+             class="duel-avatar" style="@CosmeticStyles.Frame(Player.Frame)" />
+        <div>
+            <div class="duel-hero-class">@Label · @HeroClassIcons.For(Player.Class) @Player.Class</div>
+            <div class="duel-hero-name">@Player.Username @(Player.Shielded ? "🛡️" : "")</div>
+        </div>
+    </div>
+    <div class="duel-hero-rating">
+        @if (AgainstBot && Player.Id != YourPlayerId)
+        {
+            @* The bot has no rating to win or lose, and nothing to report. *@
+            <span>Practice partner</span>
+        }
+        else
+        {
+            <span>🏅 Rating @Player.Rating</span>
+        }
+        @if (Player.Id != YourPlayerId && !AgainstBot)
+        {
+            <ReportHero HeroId="Player.Id" HeroName="@Player.Username" HasPortrait="@(!string.IsNullOrEmpty(Player.AvatarUrl))" />
+        }
+    </div>
+    @if (!string.IsNullOrEmpty(Player.Title))
+    {
+        <div class="duel-hero-title">👑 @Player.Title</div>
+    }
+    <div class="hp-track">
+        <div class="hp-fill" style="--hp: @(Player.Hp * 100 / Math.Max(1, Player.MaxHp))%"></div>
+    </div>
+    <div class="hp-text">@Player.Hp / @Player.MaxHp HP</div>
+</div>

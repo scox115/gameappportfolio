@@ -1,0 +1,95 @@
+@* The arena's rankings: every hero, or one class's duel records *@
+<div class="arena-panel leaderboard-panel">
+    <div class="leaderboard-intro">
+        <h3 class="leaderboard-heading">🏆 GLOBAL HERO RANKINGS</h3>
+        <p class="leaderboard-subtitle">@(leaderboardClass is null
+            ? "Ranked by PvP rating: beat stronger heroes to climb faster"
+            : $"Duels fought as a {leaderboardClass}, ranked by wins")</p>
+        @if (registeredPlayers is { } total)
+        {
+            <p class="registered-count">👥 @total.ToString("N0") registered hero@(total == 1 ? "" : "es")</p>
+        }
+    </div>
+
+    <LivePulse />
+    <ArenaStats />
+    @* Said once, politely, when a match elsewhere reorders the table. *@
+    <p class="visually-hidden" aria-live="polite">@(leaderboardUpdatedLive ? "The rankings were just updated." : "")</p>
+
+    @* All heroes, or one class's duel records *@
+    <div role="tablist" class="leaderboard-tabs">
+        @foreach (var tab in LeaderboardTabs)
+        {
+            var active = tab == leaderboardClass;
+            <button role="tab" aria-selected="@(active ? "true" : "false")" @onclick="() => ShowLeaderboard(tab)"
+                    class="leaderboard-tab @(active ? "is-active" : "")">
+                @(tab is null ? "🌐 All" : $"{HeroClassIcons.For(tab)} {tab}")
+            </button>
+        }
+    </div>
+
+    @if (leaderboardLoading)
+    {
+        <p class="leaderboard-loading">Querying relational data graphs...</p>
+    }
+    else if (leaderboardPlayers == null || !leaderboardPlayers.Any())
+    {
+        <p class="leaderboard-empty">@(leaderboardClass is null ? "No heroes have claimed records inside the arena yet." : $"No {leaderboardClass} has fought a duel yet.")</p>
+    }
+    else
+    {
+        <div class="leaderboard-scroll">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr class="leaderboard-head-row">
+                        <th>Rank</th>
+                        <th>Hero</th>
+                        <th class="col-center">Rating</th>
+                        <th class="col-center">Level</th>
+                        <th class="col-center">@(leaderboardClass is null ? "Duels W-L" : $"{leaderboardClass} W-L")</th>
+                        <th class="col-right">Gold Reserves</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < leaderboardPlayers.Count; i++)
+                    {
+                        var item = leaderboardPlayers[i];
+                        var isCurrentUser = item.id == State.PlayerId;
+
+                        <tr class="leaderboard-row @(isCurrentUser ? "is-current" : "")">
+                            <td class="rank-cell @(i == 0 ? "rank-first" : i == 1 ? "rank-second" : i == 2 ? "rank-third" : "")">
+                                @(i + 1) @(i == 0 ? "👑" : "")
+                            </td>
+                            <td class="hero-cell">
+                                <img src="@Avatars.For(item.avatarUrl, item.username)" alt="" class="leaderboard-avatar" style="@CosmeticStyles.Frame(item.frame, 2, "1px solid #475569")" />
+                                <span class="leaderboard-name @(isCurrentUser ? "is-you" : "")">@item.username @(isCurrentUser ? " (You)" : "")</span>
+                                @if (item.heroClass is { } heroClass)
+                                {
+                                    <span title="Plays @heroClass now">@HeroClassIcons.For(heroClass)</span>
+                                }
+                                @if (!string.IsNullOrEmpty(item.title))
+                                {
+                                    <span class="leaderboard-title">@item.title</span>
+                                }
+                                @if (!isCurrentUser)
+                                {
+                                    <span class="report-slot"><ReportHero HeroId="item.id" HeroName="@item.username" HasPortrait="@(!string.IsNullOrEmpty(item.avatarUrl))" /></span>
+                                }
+                            </td>
+                            <td class="rating-cell">🏅 @item.rating</td>
+                            <td class="level-cell">@item.level</td>
+                            <td class="duels-cell">⚔️ @item.pvpWins-@item.pvpLosses</td>
+                            <td class="gold-cell">🪙 @item.gold</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(loadError))
+    {
+        <p class="leaderboard-loading">@loadError</p>
+    }
+
+    <SeasonStandings RefreshedAt="leaderboardMatchesUpTo" />
+</div>

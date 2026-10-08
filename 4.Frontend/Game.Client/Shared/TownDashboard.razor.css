@@ -1,0 +1,49 @@
+/* Town: the hero's card and the ways out of town */
+.town-column { max-width: 480px; margin: 0 auto; }
+
+.hero-card {
+    background: var(--color-surface);
+    padding: 30px;
+    border-radius: 16px;
+    border: 1px solid var(--color-border);
+    text-align: center;
+}
+
+/* The frame (border and glow) comes inline from CosmeticStyles.Frame. */
+.hero-portrait { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; background: var(--color-page); margin-bottom: 15px; }
+.hero-name { margin: 0; color: var(--color-text); }
+
+.portrait-button {
+    background: none;
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-text-muted);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-top: 8px;
+}
+
+.town-action {
+    width: 100%;
+    color: white;
+    padding: 15px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.town-battle { background: #dc2626; margin-top: 25px; box-shadow: 0 10px 15px -3px rgba(220,38,38,0.3); }
+.town-duel { background: #0e7490; margin-top: 15px; box-shadow: 0 10px 15px -3px rgba(14,116,144,0.3); }
+.town-shop { background: #b45309; margin-top: 15px; box-shadow: 0 10px 15px -3px rgba(180,83,9,0.3); }
+
+.closed-note { color: var(--color-text-muted); font-size: 0.85rem; margin: 15px 0 0; }
+.town-error { color: var(--color-danger); margin: 15px 0 0; }
+.admin-link { display: block; color: var(--color-gold); font-size: 0.8rem; margin-top: 10px; }
+
+/* Phones: the card loses its wide padding. */
+@media (max-width: 600px) {
+    .arena-panel { padding: 16px; }
+}

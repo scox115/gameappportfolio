@@ -1,0 +1,82 @@
+@* Signing in and creating a hero, side by side on one panel *@
+<div class="login-pulse"><LivePulse /></div>
+<div
+    class="arena-panel login-panel">
+    <h3 class="login-heading">@(creatingHero ? "Create a New Hero" : "Enter the Realm")</h3>
+
+    @* A form, so pressing Enter in either field signs in (or creates the hero) *@
+    <form @onsubmit="SubmitCredentials">
+    <div class="login-field login-field-first">
+        <label
+            class="field-label">Character
+            Name:</label>
+            <input type="text" @bind="inputUsername" @bind:event="oninput" placeholder="Enter Character name..." autocomplete="username"
+                   class="login-input" />
+        </div>
+
+    <div class="login-field login-password">
+        <label for="sign-in-password"
+            class="field-label">Password:</label>
+            <PasswordInput id="sign-in-password" @bind-Value="inputPassword" placeholder="At least 8 characters..." autocomplete="@(creatingHero ? "new-password" : "current-password")" />
+        </div>
+
+    @if (askForTwoFactorCode && !creatingHero)
+    {
+        @* Heroes with two-factor sign-in on: the password was right, now the code from their app *@
+        <div class="login-field">
+            <label for="sign-in-code"
+                   class="field-label">Code from your authenticator app:</label>
+            <input id="sign-in-code" @ref="twoFactorInput" @bind="inputTwoFactorCode" @bind:event="oninput" autocomplete="one-time-code" aria-describedby="sign-in-code-hint"
+                   class="login-input login-code-input" />
+            <p id="sign-in-code-hint" class="code-hint">Lost your phone? Enter one of your recovery codes instead.</p>
+        </div>
+    }
+
+    @if (creatingHero)
+    {
+        @* Only new heroes pick a class; returning heroes keep theirs *@
+        <ClassPicker @bind-Selected="chosenClass" Heading="Choose your class:" />
+        <p class="terms-note">
+            By creating a hero you agree to the <a href="terms" class="soft-link">Terms of Service</a>
+            and <a href="privacy" class="soft-link">Privacy Policy</a>.
+        </p>
+        <button type="submit" disabled="@(!CredentialsEntered)"
+                class="login-submit create-submit @(CredentialsEntered ? "" : "is-waiting")">Create Hero</button>
+    }
+    else
+    {
+        <button type="submit" disabled="@(!CredentialsEntered)"
+                class="login-submit play-submit @(CredentialsEntered ? "" : "is-waiting")">Play Game</button>
+        <FeatureGate Feature="@FeatureFlags.AccountRecovery">
+            <p class="forgot-line"><a href="forgot-password" class="soft-link forgot-link">Forgot your password?</a></p>
+        </FeatureGate>
+    }
+    </form>
+    <p class="switch-line">
+        @(creatingHero ? "Already have a hero?" : "New to the arena?")
+        <button @onclick="ToggleCreatingHero" class="switch-button">
+            @(creatingHero ? "Sign in" : "Create a new hero")
+        </button>
+    </p>
+
+    @* One click to try the game: a guest hero, kept later with a name and password if the player likes it *@
+    <div aria-hidden="true" class="or-divider">
+        <span class="or-rule"></span>or<span class="or-rule"></span>
+    </div>
+    <button @onclick="PlayAsGuest" disabled="@startingGuest"
+            class="guest-button">
+        @(startingGuest ? "Starting..." : "⚡ Play as a guest")
+    </button>
+    <p class="guest-note">
+        No sign-up. Keep your hero later if you like it. By playing you agree to the
+        <a href="terms" class="soft-link">Terms</a> and <a href="privacy" class="soft-link">Privacy Policy</a>.
+    </p>
+
+    @if (!string.IsNullOrEmpty(statusMsg) || !string.IsNullOrEmpty(State.SignOutReason))
+    {
+        <div
+            class="login-error">
+            @(string.IsNullOrEmpty(statusMsg) ? State.SignOutReason : statusMsg)
+        </div>
+    }
+</div>

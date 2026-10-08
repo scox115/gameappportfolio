@@ -1,0 +1,69 @@
+@* The town: the hero's card with the ways out of town, and the panels below it *@
+<div class="town-column">
+    <LivePulse />
+
+    @* The character card *@
+    <div class="arena-panel hero-card">
+        <img src="@Avatars.For(State.AvatarUrl, State.Username)" alt="@($"{State.Username}'s portrait")" class="hero-portrait"
+             style="@CosmeticStyles.Frame(State.Frame, 5, "4px solid #6366f1")" />
+        <h2 class="hero-name">@State.Username</h2>
+        @if (State.IsGuest)
+        {
+            <KeepGuestHero />
+        }
+        <button @onclick="OpenPortraitPopup"
+                class="portrait-button">
+            🖼️ Change portrait
+        </button>
+        <ClassSwitcher />
+
+        <button @onclick="() => EnterArena()"
+                class="town-action town-battle">
+            ⚔️ LAUNCH BATTLE ARENA
+        </button>
+        <FeatureGate Feature="@FeatureFlags.Duels">
+            <ChildContent>
+                <button @onclick="() => State.ChangeScreen(GameScreen.PvpArena)"
+                        class="town-action town-duel">
+                    🆚 FIND AN OPPONENT
+                </button>
+            </ChildContent>
+            <Off><p class="closed-note">🆚 Duels are closed for now. Check back soon!</p></Off>
+        </FeatureGate>
+        <FeatureGate Feature="@FeatureFlags.GoldShop">
+            <ChildContent>
+                <button @onclick="() => State.ChangeScreen(GameScreen.Shop)"
+                        class="town-action town-shop">
+                    🪙 GOLD SHOP
+                </button>
+            </ChildContent>
+            <Off><p class="closed-note">🪙 The Gold Shop is closed for now. Check back soon!</p></Off>
+        </FeatureGate>
+        <FeatureGate Feature="@FeatureFlags.HeroicBoss">
+            <HeroicChallenge OnFight="() => EnterArena(heroic: true)" />
+        </FeatureGate>
+        @if (!string.IsNullOrEmpty(statusMsg))
+        {
+            <p class="town-error">@statusMsg</p>
+        }
+        @if (!State.IsGuest)
+        {
+            @* A guest has no password to confirm changes with; keeping the hero comes first *@
+            <AccountSettings />
+        }
+        @if (State.IsAdmin)
+        {
+            <a href="admin" class="admin-link">🛡️ Admin tools</a>
+        }
+    </div>
+
+</div>
+
+@if (showPortraitPopup)
+{
+    <PortraitDialog OnClose="ClosePortraitPopup" />
+}
+<SeasonCard />
+<FriendsPanel />
+<BountyBoard />
+<RecentMatches />
