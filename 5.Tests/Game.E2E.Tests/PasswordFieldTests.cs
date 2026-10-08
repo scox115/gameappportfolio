@@ -34,5 +34,11 @@ public class PasswordFieldTests(ArenaFixture arena) : BrowserTest(arena)
         await Assertions.Expect(warning).ToHaveCountAsync(0);
         await page.Keyboard.PressAsync("Shift+C");
         await Assertions.Expect(warning).ToHaveCountAsync(0);
+
+        // Chrome's autofill sends a keydown with no key, which mustn't break the page.
+        await password.EvaluateAsync("box => box.dispatchEvent(new Event('keydown', { bubbles: true }))");
+        await page.Keyboard.PressAsync("D");
+        await Assertions.Expect(warning).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("#blazor-error-ui")).ToBeHiddenAsync();
     });
 }
