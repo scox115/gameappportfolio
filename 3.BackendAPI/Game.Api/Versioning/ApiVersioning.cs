@@ -99,6 +99,7 @@ public static class ApiVersioning
         group.MapClassEndpoints();
         group.MapBountyEndpoints();
         group.MapHistoryEndpoints();
+        group.MapSeasonEndpoints();
         group.MapFeatureEndpoints();
         group.MapStatusEndpoints();
         return group;

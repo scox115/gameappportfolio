@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Game.Core.Entities;
 using Game.Core.History;
+using Game.Core.Seasons;
 using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -27,7 +28,7 @@ public static class OutputCaching
 
     public static class Tags
     {
-        /// <summary>Responses built from Players (and their class records).</summary>
+        /// <summary>Responses built from Players (and their class and season records).</summary>
         public const string Players = "players";
 
         /// <summary>Responses built from DailyArenaStats.</summary>
@@ -168,7 +169,7 @@ public sealed class CacheEvictionInterceptor(IOutputCacheStore store, ILogger<Ca
             .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             .Select(entry => entry.Entity switch
             {
-                Player or ClassRecord => OutputCaching.Tags.Players,
+                Player or ClassRecord or SeasonRecord or ClosedSeason => OutputCaching.Tags.Players,
                 DailyArenaStats => OutputCaching.Tags.ArenaStats,
                 _ => null
             })

@@ -382,6 +382,10 @@ builder.Services.AddScoped<DataCleanupService>();
 builder.Services.AddScoped<GuestCleanupService>();
 builder.Services.AddHostedService<DataCleanupWorker>();
 
+// Ends each monthly ranked season: final standings, rewards, and a soft rating reset (docs/adr/0035-ranked-seasons.md).
+builder.Services.AddScoped<Game.Api.Seasons.SeasonService>();
+builder.Services.AddHostedService<SeasonWorker>();
+
 // The public status page: what is running, and a release log written when each revision goes live.
 builder.Services.AddSingleton<BuildInfo>();
 builder.Services.AddSingleton<ReleaseRecorder>();

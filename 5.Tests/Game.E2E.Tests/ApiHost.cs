@@ -5,6 +5,7 @@ using Game.Api.Workers;
 using Game.Core.Battles;
 using Game.Core.Entities;
 using Game.Core.Interfaces;
+using Game.Core.Seasons;
 using Game.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -109,6 +110,24 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
         db.Matches.Add(new GameMatch(player.Id, GameMatch.AiBossId));
         await db.SaveChangesAsync();
         Services.GetRequiredService<ArenaPulse>().Changed();
+    }
+
+    /// <summary>
+    /// As if the hero had just fought these duels in the season under way and finished on this rating,
+    /// telling open leaderboards to reload the way a real duel does.
+    /// </summary>
+    public async Task RecordSeasonDuelsAsync(string username, int wins, int losses, int rating)
+    {
+        using (var scope = Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Username == username);
+            player.EnterSeason(Season.At(DateTime.UtcNow));
+            for (var i = 0; i < wins; i++) player.RecordPvpWin(0);
+            for (var i = 0; i < losses; i++) player.RecordPvpLoss(0);
+            await db.SaveChangesAsync();
+        }
+        await RecordMatchAsync(username, rating);
     }
 
     private static void RemoveAll<T>(IServiceCollection services)

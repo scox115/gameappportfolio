@@ -1,5 +1,6 @@
 using Game.Core.Battles;
 using Game.Core.Bounties;
+using Game.Core.Seasons;
 using Game.Core.Services;
 
 namespace Game.Core.Entities;
@@ -15,6 +16,7 @@ public class Player
     private readonly List<OwnedCosmetic> _cosmetics = new();
     private readonly List<BountyProgress> _bounties = new();
     private readonly List<ClassRecord> _classRecords = new();
+    private readonly List<SeasonRecord> _seasonRecords = new();
 
     /// <summary>Extra gold per win in a row after the first, up to <see cref="MaxStreakBonus"/>.</summary>
     public const int StreakBonusPerWin = 10;
@@ -56,6 +58,21 @@ public class Player
 
     /// <summary>Elo-style PvP rating; everyone starts at <see cref="EloRating.StartingRating"/>.</summary>
     public int Rating { get; private set; } = EloRating.StartingRating;
+
+    /// <summary>
+    /// The ranked season <see cref="Rating"/>, <see cref="SeasonWins"/> and <see cref="SeasonLosses"/> belong to.
+    /// Null for a hero who hasn't dueled since seasons began.
+    /// </summary>
+    public DateOnly? SeasonStart { get; private set; }
+
+    /// <summary>Duels won in the current ranked season.</summary>
+    public int SeasonWins { get; private set; }
+
+    /// <summary>Duels lost in the current ranked season.</summary>
+    public int SeasonLosses { get; private set; }
+
+    /// <summary>How the hero finished each past season they dueled in.</summary>
+    public IReadOnlyCollection<SeasonRecord> SeasonRecords => _seasonRecords;
 
     /// <summary>Titles bought in the Gold Shop.</summary>
     public IReadOnlyCollection<OwnedTitle> Titles => _titles;
@@ -208,6 +225,7 @@ public class Player
     {
         if (ratingGained < 0) throw new ArgumentException("Rating gained cannot be negative.");
         PvpWins++;
+        SeasonWins++;
         ClassRecordFor(playedAs ?? Class).AddWin();
         Rating += ratingGained;
         Version = Guid.NewGuid();
@@ -218,8 +236,57 @@ public class Player
     {
         if (ratingLost < 0) throw new ArgumentException("Rating lost cannot be negative.");
         PvpLosses++;
+        SeasonLosses++;
         ClassRecordFor(playedAs ?? Class).AddLoss();
         Rating = Math.Max(EloRating.MinimumRating, Rating - ratingLost);
+        Version = Guid.NewGuid();
+    }
+
+    /// <summary>
+    /// Moves the hero into <paramref name="season"/> if their rating still belongs to an earlier one:
+    /// the old season's record is kept (if they dueled in it), their rating is softly reset, and the
+    /// season's wins and losses start from zero. Does nothing if they are already in that season.
+    /// </summary>
+    /// <returns>The record of the season just left, or null if there was none to keep.</returns>
+    public SeasonRecord? EnterSeason(Season season)
+    {
+        if (SeasonStart is not { } current)
+        {
+            // Heroes from before seasons began bring their rating into their first season as it is,
+            // but only duels fought in a season count towards it.
+            SeasonStart = season.Start;
+            SeasonWins = 0;
+            SeasonLosses = 0;
+            Version = Guid.NewGuid();
+            return null;
+        }
+        if (current >= season.Start) return null;
+
+        SeasonRecord? record = null;
+        if (SeasonWins + SeasonLosses > 0)
+        {
+            record = new SeasonRecord(current, Rating, SeasonWins, SeasonLosses);
+            _seasonRecords.Add(record);
+        }
+        Rating = SeasonRules.SoftReset(Rating);
+        SeasonWins = 0;
+        SeasonLosses = 0;
+        SeasonStart = season.Start;
+        Version = Guid.NewGuid();
+        return record;
+    }
+
+    /// <summary>
+    /// Settles the hero's record for a closed season: their final rank (null if they fought too few
+    /// duels to be ranked) and the reward it pays, which is added to their gold.
+    /// </summary>
+    public void SettleSeason(Season season, int? rank)
+    {
+        var record = _seasonRecords.FirstOrDefault(r => r.SeasonStart == season.Start)
+            ?? throw new InvalidOperationException($"{Username} has no record for the {season.Name} season.");
+        var reward = rank is { } finished ? SeasonRules.RewardFor(finished) : 0;
+        record.Settle(rank, reward);
+        if (reward > 0) AddGold(reward);
         Version = Guid.NewGuid();
     }
 
