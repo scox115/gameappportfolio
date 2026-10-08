@@ -23,9 +23,27 @@ public partial class LiveLobbyTests(ArenaFixture arena) : BrowserTest(arena)
         await player.Locator("button[aria-label=\"Friendly duel\"]").ClickAsync();
         await Assertions.Expect(pulse).ToContainTextAsync(new Regex($@"\b{before.Waiting + 1} waiting for a duel"));
 
+        // The player keeps the live numbers in view while waiting in the PvP lobby, not just the visitor.
+        var playersPulse = player.Locator(".live-pulse");
+        await Assertions.Expect(playersPulse).ToBeVisibleAsync();
+        await Assertions.Expect(playersPulse).ToContainTextAsync(new Regex(@"\b[1-9]\d* waiting for a duel"));
+
         await player.GetByRole(AriaRole.Button, new() { Name = "Practice against the Arena Bot" }).ClickAsync();
         await Assertions.Expect(pulse).ToContainTextAsync(new Regex($@"\b{before.Waiting} waiting for a duel"));
         await Assertions.Expect(pulse).ToContainTextAsync(new Regex($@"\b{before.Duels + 1} duels? under way"));
+        await Assertions.Expect(playersPulse).ToHaveCountAsync(0); // out of the way once the duel starts
+    });
+
+    [Fact]
+    public Task OnANarrowWindow_TheHeaderWrapsInsteadOfRunningOffTheScreen() => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var player = await CreateHeroAsync(NewHeroName("Narrow"));
+        await player.SetViewportSizeAsync(800, 900);
+        await Assertions.Expect(player.Locator(".live-pulse")).ToBeVisibleAsync();
+
+        var overflow = await player.EvaluateAsync<int>("document.documentElement.scrollWidth - document.documentElement.clientWidth");
+        Assert.True(overflow <= 0, $"The page is {overflow}px wider than the window.");
+        await Assertions.Expect(player.GetByRole(AriaRole.Button, new() { Name = "Logout" })).ToBeInViewportAsync();
     });
 
     [Fact]
