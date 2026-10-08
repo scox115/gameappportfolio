@@ -27,7 +27,7 @@ else
     <input id="recovery-email" type="email" autocomplete="email" @bind="address" @bind:event="oninput"
            style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9;" />
     <label for="recovery-password" style="display: block; color: #cbd5e1; font-size: 0.85rem; margin: 8px 0 4px;">Your password</label>
-    <input id="recovery-password" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput"
+    <PasswordInput id="recovery-password" autocomplete="current-password" @bind-Value="password"
            style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9;" />
     <div style="display: flex; gap: 8px; margin-top: 10px;">
         <button @onclick="SaveAsync" disabled="@(busy || string.IsNullOrWhiteSpace(address) || string.IsNullOrEmpty(password))"

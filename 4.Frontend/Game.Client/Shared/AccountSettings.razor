@@ -42,7 +42,7 @@
                 It can't be undone. Opponents keep their record of your duels, without your name.
             </p>
             <label for="delete-password" style="display: block; color: #cbd5e1; font-size: 0.85rem; margin-bottom: 4px;">Your password, to confirm</label>
-            <input id="delete-password" type="password" autocomplete="current-password" @bind="password" @bind:event="oninput"
+            <PasswordInput id="delete-password" autocomplete="current-password" @bind-Value="password"
                    style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f1f5f9;" />
             <button @onclick="DeleteAsync" disabled="@(busy || string.IsNullOrEmpty(password))"
                     style="width: 100%; background: #b91c1c; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; opacity: @(busy || string.IsNullOrEmpty(password) ? "0.5" : "1");">
