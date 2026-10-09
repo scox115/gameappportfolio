@@ -1,0 +1,73 @@
+name: Move to the shared base
+
+# One-off: moves one copy of the game onto the shared portfolio base (infra/shared.bicep), after
+# infra/setup-shared.ps1 has created it. Copies the database to a free database on the shared SQL
+# server, then deploys the API into the shared Container Apps environment. The game is down for the
+# few minutes between the two. Run it for staging first, check the staging site, then for production.
+# Running it again after a move does nothing but redeploy. See docs/adr/0040-shared-portfolio-base.md.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which copy of the game
+        type: choice
+        options: [staging, production]
+        default: staging
+      confirm:
+        description: Type "move" to confirm (the game is down for a few minutes)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  id-token: write   # sign in to Azure with OIDC
+  packages: write   # the deploy that follows pushes the API image
+
+env:
+  DOTNET_NOLOGO: true
+
+jobs:
+  move:
+    if: inputs.confirm == 'move' && vars.AZURE_SHARED_RESOURCE_GROUP != ''
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    # The deploy's group, so a deploy from main never runs in the middle of the move.
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install sqlpackage
+        run: dotnet tool install --global microsoft.sqlpackage
+
+      - name: Sign in to Azure
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Copy the database to the shared server
+        run: |
+          python3 infra/move_to_shared_base.py --resource-group "$RESOURCE_GROUP" \
+            --shared-resource-group "$SHARED_GROUP" --environment "${{ inputs.environment }}"
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          SHARED_GROUP: ${{ vars.AZURE_SHARED_RESOURCE_GROUP }}
+
+  # Runs even when the move failed: the move takes the old API down first, and with no database on the
+  # shared server this deploy puts the game back where it was.
+  deploy:
+    needs: move
+    if: always() && needs.move.result != 'skipped'
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: ${{ inputs.environment }}
+      full: true
+    secrets: inherit

@@ -70,14 +70,19 @@ def now():
     return dt.datetime.now(dt.timezone.utc)
 
 
-def find_server(group):
-    """The SQL server of the latest successful deployment (the same place the deploy workflow reads it)."""
-    fqdn = az("deployment", "group", "list", "--resource-group", group, "--query",
-              "sort_by([?starts_with(name, 'card-arena-') && properties.provisioningState == 'Succeeded'], "
-              "&properties.timestamp)[-1].properties.outputs.sqlServer.value")
-    if not fqdn:
+def find_database(group):
+    """The SQL server, its resource group and the database of the latest successful deployment (the same
+    place the deploy workflow reads them). On the shared portfolio base the server is in the shared
+    resource group (docs/adr/0040-shared-portfolio-base.md); deployments from before it say neither."""
+    outputs = az("deployment", "group", "list", "--resource-group", group, "--query",
+                 "sort_by([?starts_with(name, 'card-arena-') && properties.provisioningState == 'Succeeded'], "
+                 "&properties.timestamp)[-1].properties.outputs")
+    if not outputs or "sqlServer" not in outputs:
         raise RuntimeError(f"No successful card-arena deployment in {group}; deploy the game first.")
-    return fqdn
+
+    def value(name, default):
+        return (outputs.get(name) or {}).get("value") or default
+    return outputs["sqlServer"]["value"], value("sqlResourceGroup", group), value("databaseName", "GameDb")
 
 
 def compare(live, restored):
@@ -119,7 +124,11 @@ def summary(server, database, drill, restore_point, seconds, live, restored, pro
 
 
 def run(group, database, minutes_ago, keep, server=None):
-    fqdn = server or find_server(group)
+    if server:
+        fqdn, database = server, database or "GameDb"
+    else:
+        fqdn, group, found = find_database(group)
+        database = database or found
     server_name = fqdn.split(".")[0]
     started_at = now()
     restore_point = (started_at - dt.timedelta(minutes=minutes_ago)).replace(second=0, microsecond=0)
@@ -187,7 +196,7 @@ def run(group, database, minutes_ago, keep, server=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--resource-group", required=True)
-    parser.add_argument("--database", default="GameDb")
+    parser.add_argument("--database", help="the database's name (default: from the latest deployment)")
     parser.add_argument("--server", help="the SQL server's address (default: from the latest deployment)")
     parser.add_argument("--minutes-ago", type=int, default=10, help="how far back to restore (default 10)")
     parser.add_argument("--keep", action="store_true", help="keep the restored copy to look at")

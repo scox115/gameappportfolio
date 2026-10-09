@@ -106,6 +106,23 @@ How it works day to day:
 - **Roll back staging:** run **Roll back the API** and choose `staging`.
 - **Turn staging off:** delete the `STAGING_ENABLED` variable (deploys go straight to production again), then `az group delete --name rg-card-arena-staging`.
 
+## Shared portfolio base (optional)
+
+Runs the game's API and database on the base every portfolio app shares: one Container Apps environment, one Log Analytics workspace and one SQL server with a free database per app, in `rg-portfolio-shared` in `centralus`. See [ADR 0040](adr/0040-shared-portfolio-base.md).
+
+1. Create the shared base (same subscription):
+
+   ```powershell
+   .\infra\setup-shared.ps1 -SubscriptionId <subscription id>
+   ```
+
+   It creates `rg-portfolio-shared` and the `portfolio-sql-admins` group (you, the deploy app and the API's identities), gives the deploy app Contributor on that group, deploys `infra/shared.bicep`, and sets the repository variable `AZURE_SHARED_RESOURCE_GROUP`. Nothing about the game changes yet.
+2. In **Actions**, run **Move to the shared base** for `staging`, typing `move` to confirm. The game is down for a few minutes while the database is copied to `cardarena-staging` on the shared server and the API is deployed into the shared environment. Check the staging site.
+3. Run it again for `production`. Its database becomes `cardarena`.
+4. Once both work, delete what the game no longer uses: the old SQL server and Container Apps environment (with its Log Analytics workspace) in `rg-card-arena` and `rg-card-arena-staging`. The move leaves the old databases untouched until then.
+
+If the move fails, the new database is deleted and the deploy that follows puts the game back where it was; the run's log says which step failed. Running the workflow again after a successful move only redeploys.
+
 ## Scaling out
 
 The API runs on up to three replicas by default. Container Apps adds one for every 50 concurrent requests, which includes each open live connection, and removes them again when things are quiet, down to zero. Replicas share the duel lobby, live messages and the outbox through the database ([ADR 0027](adr/0027-scale-out.md)), so there is nothing to set up.

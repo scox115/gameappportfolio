@@ -85,7 +85,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Lint the deploy scripts
-        run: shellcheck infra/blue-green.sh infra/environment-outputs.sh
+        run: shellcheck infra/blue-green.sh infra/environment-outputs.sh infra/shared-base.sh
 
       - name: Test the deploy scripts and restore drill logic
         run: python3 -m unittest discover --start-directory infra/tests --verbose
@@ -96,8 +96,10 @@ jobs:
       - name: Check the ops dashboard's queries
         run: dotnet run infra/ops-dashboard/check-workbook.cs -- infra/ops-dashboard/workbook.json
 
-      - name: Build and lint the Bicep template
-        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+      - name: Build and lint the Bicep templates
+        run: |
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          az bicep build --file infra/shared.bicep --stdout > /dev/null
 
   # Plays the game in Chromium: the published Blazor client against the real API
   # (in-memory database, no RabbitMQ), started by the tests themselves.

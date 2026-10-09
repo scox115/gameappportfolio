@@ -30,8 +30,9 @@ def database(migrations=("001_Initial", "002_Shop"), **tables):
 class FakeAzure:
     """Records az calls and answers the few the drill makes."""
 
-    def __init__(self, earliest="2026-09-30T08:00:00Z", fail_restore=False):
+    def __init__(self, earliest="2026-09-30T08:00:00Z", fail_restore=False, outputs=None):
         self.calls = []
+        self.outputs = outputs or {"sqlServer": {"value": SERVER}}
         self.earliest = earliest
         self.fail_restore = fail_restore
 
@@ -39,7 +40,7 @@ class FakeAzure:
         self.calls.append(args)
         command = " ".join(args[:4])
         if command.startswith("deployment group list"):
-            return SERVER
+            return self.outputs
         if command.startswith("sql db show"):
             return {"earliestRestoreDate": self.earliest}
         if command.startswith("sql db restore") and self.fail_restore:
@@ -91,6 +92,22 @@ class RestoreDrillTests(unittest.TestCase):
 
             with open(summary, encoding="utf-8") as handle:
                 self.assertIn("Restore drill passed", handle.read())
+
+    def test_on_the_shared_base_the_drill_works_where_the_database_is(self):
+        self.azure.outputs = {"sqlServer": {"value": "sql-portfolio-xyz.database.windows.net"},
+                              "sqlResourceGroup": {"value": "rg-portfolio-shared"},
+                              "databaseName": {"value": "cardarena"}}
+        self.databases = {"cardarena": database(), "cardarena-drill-202610071230": database()}
+
+        code, report, _ = self.run_drill()
+
+        self.assertEqual(code, 0)
+        restore = self.azure.ran("sql db restore")[0]
+        self.assertEqual(self.azure.option(restore, "--resource-group"), "rg-portfolio-shared")
+        self.assertEqual(self.azure.option(restore, "--server"), "sql-portfolio-xyz")
+        self.assertEqual(self.azure.option(restore, "--name"), "cardarena")
+        for call in self.azure.ran("sql"):
+            self.assertEqual(self.azure.option(call, "--resource-group"), "rg-portfolio-shared")
 
     def test_a_good_backup_passes_and_the_copy_is_deleted(self):
         code, report, _ = self.run_drill()
