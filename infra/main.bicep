@@ -9,6 +9,10 @@
 //
 // The managed identity and the SQL admin group are created once by infra/setup.ps1, because
 // creating Entra groups needs directory permissions the deploy pipeline shouldn't have.
+//
+// With sharedResourceGroup set, the API runs in the shared portfolio base's Container Apps environment
+// and its database lives on the shared SQL server (infra/shared.bicep), instead of the game having its
+// own. See docs/adr/0040-shared-portfolio-base.md.
 
 targetScope = 'resourceGroup'
 
@@ -86,10 +90,26 @@ param environmentName string = 'production'
 @maxValue(10)
 param maxReplicas int = 3
 
+@description('Resource group of the shared portfolio base (infra/shared.bicep). Leave empty to give the game its own Container Apps environment and SQL server.')
+param sharedResourceGroup string = ''
+
+@description('The shared base\'s Container Apps environment (its "environmentName" output).')
+param sharedEnvironmentName string = ''
+
+@description('The shared base\'s SQL server (its "sqlServerName" output).')
+param sharedSqlServerName string = ''
+
+@description('The game\'s database on the shared SQL server.')
+param sharedDatabaseName string = ''
+
+@description('The shared base\'s region (its "location" output), where the API and its database run.')
+param sharedLocation string = ''
+
 var suffix = uniqueString(resourceGroup().id)
 var tags = { app: 'kings-of-the-card-arena', environment: environmentName }
 var isStaging = environmentName == 'staging'
-var databaseName = 'GameDb'
+var useSharedBase = !empty(sharedResourceGroup)
+var databaseName = useSharedBase ? sharedDatabaseName : 'GameDb'
 var usePrivateRegistry = !empty(registryUsername)
 var featureFlagStoreEnabled = toLower(appConfiguration) == 'true'
 var emailEnabled = toLower(emailRecovery) == 'true'
@@ -317,8 +337,25 @@ resource apiWritesBlobs 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 }
 
 // --- Database ---
+// On the shared SQL server when the game runs on the shared base, otherwise on a server of its own.
 
-resource sqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = {
+resource sharedSqlServer 'Microsoft.Sql/servers@2023-08-01-preview' existing = if (useSharedBase) {
+  name: sharedSqlServerName
+  scope: resourceGroup(sharedResourceGroup)
+}
+
+module sharedDatabase 'modules/database.bicep' = if (useSharedBase) {
+  name: 'card-arena-database-${environmentName}'
+  scope: resourceGroup(sharedResourceGroup)
+  params: {
+    serverName: sharedSqlServerName
+    databaseName: databaseName
+    location: sharedLocation
+    tags: tags
+  }
+}
+
+resource sqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = if (!useSharedBase) {
   // The region is part of the name, so moving the database never collides with a server left behind elsewhere.
   name: 'sql-${appName}-${uniqueString(resourceGroup().id, sqlLocation)}'
   location: sqlLocation
@@ -339,7 +376,7 @@ resource sqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = {
 }
 
 // Container Apps on the Consumption plan have no fixed outbound address, so allow Azure services.
-resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-preview' = {
+resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-preview' = if (!useSharedBase) {
   parent: sqlServer
   name: 'AllowAllWindowsAzureIps'
   properties: {
@@ -348,7 +385,7 @@ resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-prev
   }
 }
 
-resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
+resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = if (!useSharedBase) {
   parent: sqlServer
   name: databaseName
   location: sqlLocation
@@ -371,6 +408,9 @@ resource database 'Microsoft.Sql/servers/databases@2023-08-01-preview' = {
     requestedBackupStorageRedundancy: 'Local'
   }
 }
+
+var sqlServerAddress = useSharedBase ? sharedSqlServer!.properties.fullyQualifiedDomainName : sqlServer!.properties.fullyQualifiedDomainName
+var databaseId = useSharedBase ? sharedDatabase!.outputs.id : database!.id
 
 // --- Client ---
 
@@ -396,7 +436,12 @@ resource clientDomain 'Microsoft.Web/staticSites/customDomains@2023-12-01' = if 
 
 // --- API ---
 
-resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
+resource sharedEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = if (useSharedBase) {
+  name: sharedEnvironmentName
+  scope: resourceGroup(sharedResourceGroup)
+}
+
+resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = if (!useSharedBase) {
   name: 'cae-${appName}-${suffix}'
   location: location
   tags: tags
@@ -411,19 +456,23 @@ resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   }
 }
 
-var sqlConnectionString = 'Server=tcp:${sqlServer.properties.fullyQualifiedDomainName},1433;Database=${databaseName};Authentication=Active Directory Managed Identity;User Id=${apiIdentity.properties.clientId};Encrypt=True;Connect Timeout=60'
+// A container app runs in its environment's region, which for the shared base is the database's.
+var apiLocation = useSharedBase ? sharedLocation : location
+var environmentId = useSharedBase ? sharedEnvironment.id : environment.id
+
+var sqlConnectionString = 'Server=tcp:${sqlServerAddress},1433;Database=${databaseName};Authentication=Active Directory Managed Identity;User Id=${apiIdentity.properties.clientId};Encrypt=True;Connect Timeout=60'
 
 resource api 'Microsoft.App/containerApps@2024-03-01' = {
   name: 'ca-${appName}-api'
-  location: location
+  location: apiLocation
   tags: tags
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: { '${apiIdentity.id}': {} }
   }
-  dependsOn: [apiReadsSecrets, apiWritesBlobs, apiReadsFlags, allowAzureServices, database]
+  dependsOn: [apiReadsSecrets, apiWritesBlobs, apiReadsFlags, allowAzureServices, database, sharedDatabase]
   properties: {
-    managedEnvironmentId: environment.id
+    managedEnvironmentId: environmentId
     configuration: {
       // Blue-green: each deploy adds a revision beside the live one. Traffic stays pinned to the live
       // revision by name until the new one passes its smoke test (see docs/adr/0016-blue-green-deploys.md).
@@ -571,7 +620,7 @@ resource opsDashboard 'Microsoft.Insights/workbooks@2023-06-01' = {
     serializedData: replace(replace(replace(loadTextContent('ops-dashboard/workbook.json'),
       '__APP_INSIGHTS_ID__', appInsights.id),
       '__API_ID__', api.id),
-      '__DATABASE_ID__', database.id)
+      '__DATABASE_ID__', databaseId)
   }
 }
 
@@ -743,7 +792,9 @@ output clientUrl string = 'https://${client.properties.defaultHostname}'
 output gameUrl string = gameUrl
 output staticWebAppName string = client.name
 output apiContainerAppName string = api.name
-output sqlServer string = sqlServer.properties.fullyQualifiedDomainName
+output sqlServer string = sqlServerAddress
+output sqlResourceGroup string = useSharedBase ? sharedResourceGroup : resourceGroup().name
+output databaseName string = databaseName
 output storageAccount string = storage.name
 // Browser telemetry (wwwroot/js/telemetry.js). Not a secret: a connection string only lets a browser
 // send telemetry, and every page using the Application Insights JavaScript SDK carries one.

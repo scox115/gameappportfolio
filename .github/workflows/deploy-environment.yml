@@ -85,6 +85,16 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      # Once the game's data has been moved to the shared portfolio base, its API runs in the shared
+      # Container Apps environment and its database lives on the shared SQL server
+      # (docs/adr/0040-shared-portfolio-base.md). Until then it keeps its own.
+      - name: Find the shared base
+        id: shared
+        if: vars.AZURE_SHARED_RESOURCE_GROUP != ''
+        run: bash infra/shared-base.sh "$SHARED_GROUP" "${{ inputs.environment }}" | tee -a "$GITHUB_OUTPUT"
+        env:
+          SHARED_GROUP: ${{ vars.AZURE_SHARED_RESOURCE_GROUP }}
+
       # Blue-green: players stay on this revision until the new one has passed its smoke test.
       - name: Find the API revision players are on
         id: live
@@ -105,7 +115,7 @@ jobs:
       - name: Check whether the infrastructure changed
         id: plan
         run: |
-          fingerprint=$( { cat infra/main.bicep infra/ops-dashboard/workbook.json; printf '%s\n' "$INFRA_INPUTS"; } | sha256sum | cut -c1-12)
+          fingerprint=$( { cat infra/main.bicep infra/modules/*.bicep infra/ops-dashboard/workbook.json; printf '%s\n' "$INFRA_INPUTS"; } | sha256sum | cut -c1-12)
           last=$(az deployment group list --resource-group "$RESOURCE_GROUP" \
             --query "sort_by([?starts_with(name, 'card-arena-') && properties.provisioningState == 'Succeeded'], &properties.timestamp)[-1].name" \
             --output tsv)
@@ -136,12 +146,18 @@ jobs:
             ${{ secrets.RABBITMQ_PASSWORD }}
             ${{ secrets.GHCR_READ_TOKEN }}
             ${{ inputs.environment }}
+            ${{ steps.shared.outputs.ready == 'true' && steps.shared.outputs.server || '' }}
 
       - name: Deploy infrastructure and the API
         if: steps.plan.outputs.full == 'true'
         run: |
           registry_user=""
           if [ -n "$REGISTRY_PASSWORD" ]; then registry_user="$GITHUB_REPOSITORY_OWNER"; fi
+          shared=()
+          if [ "$SHARED_READY" = "true" ]; then
+            shared=(sharedResourceGroup="$SHARED_GROUP" sharedEnvironmentName="$SHARED_ENVIRONMENT"
+                    sharedSqlServerName="$SHARED_SERVER" sharedDatabaseName="$SHARED_DATABASE" sharedLocation="$SHARED_LOCATION")
+          fi
           az deployment group create \
             --name "card-arena-${GITHUB_RUN_NUMBER}-${{ steps.plan.outputs.fingerprint }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
@@ -165,8 +181,15 @@ jobs:
               liveRevision="${{ steps.live.outputs.revision }}" \
               environmentName="${{ inputs.environment }}" \
               maxReplicas="${{ vars.API_MAX_REPLICAS || '3' }}" \
+              "${shared[@]}" \
             --query properties.outputs --output json > outputs.json
         env:
+          SHARED_READY: ${{ steps.shared.outputs.ready }}
+          SHARED_GROUP: ${{ steps.shared.outputs.group }}
+          SHARED_ENVIRONMENT: ${{ steps.shared.outputs.environment }}
+          SHARED_SERVER: ${{ steps.shared.outputs.server }}
+          SHARED_DATABASE: ${{ steps.shared.outputs.database }}
+          SHARED_LOCATION: ${{ steps.shared.outputs.location }}
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
           RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
           REGISTRY_PASSWORD: ${{ secrets.GHCR_READ_TOKEN }}

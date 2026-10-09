@@ -6,7 +6,7 @@ This guide covers what is backed up, how much data and time a recovery can cost,
 
 | What | Protection | Kept for | Data you can lose (RPO) |
 |---|---|---|---|
-| Game database (`GameDb`, Azure SQL) | Automatic point-in-time backups: full weekly, differential every 12 to 24 hours, transaction log every 5 to 10 minutes | 7 days | About 10 minutes |
+| Game database (`GameDb`, or `cardarena` on the [shared base](adr/0040-shared-portfolio-base.md), Azure SQL) | Automatic point-in-time backups: full weekly, differential every 12 to 24 hours, transaction log every 5 to 10 minutes | 7 days | About 10 minutes |
 | A deleted database | Same backups, restorable after the delete | 7 days | About 10 minutes |
 | Player portraits (blob storage) | Soft delete for blobs and containers | 7 days | None, within the 7 days |
 | Secrets (Key Vault) | Soft delete | 7 days | None, within the 7 days |
@@ -35,7 +35,7 @@ To run it by hand, open **Actions > Restore drill > Run workflow**. You can choo
 az sql db delete -g rg-card-arena -s <sql-server-name> -n <copy-name> --yes
 ```
 
-**One-time setup:** the drill signs in to the database as the deploy app, so the app must be in the `card-arena-sql-admins` group. `infra/setup.ps1` adds it. If you ran the setup script before the drill existed, either run it again or run this:
+**One-time setup:** the drill signs in to the database as the deploy app, so the app must be in the `card-arena-sql-admins` group (`portfolio-sql-admins` on the shared base, where `infra/setup-shared.ps1` adds it). `infra/setup.ps1` adds it. On the shared base the drill finds the database on the shared server by itself; in the runbooks below, use `-g rg-portfolio-shared` and the database name `cardarena` instead of `rg-card-arena` and `GameDb`. If you ran the setup script before the drill existed, either run it again or run this:
 
 ```powershell
 az ad group member add --group card-arena-sql-admins --member-id (az ad sp list --display-name card-arena-github-deploy --query "[0].id" --output tsv)
