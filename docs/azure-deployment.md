@@ -119,7 +119,7 @@ Runs the game's API and database on the base every portfolio app shares: one Con
    It creates `rg-portfolio-shared` and the `portfolio-sql-admins` group (you, the deploy app and the API's identities), gives the deploy app Contributor on that group, deploys `infra/shared.bicep`, and sets the repository variable `AZURE_SHARED_RESOURCE_GROUP`. Nothing about the game changes yet.
 2. In **Actions**, run **Move to the shared base** for `staging`, typing `move` to confirm. The game is down for a few minutes while the database is copied to `cardarena-staging` on the shared server and the API is deployed into the shared environment. Check the staging site.
 3. Run it again for `production`. Its database becomes `cardarena`.
-4. Once both work, delete what the game no longer uses: the old SQL server and Container Apps environment (with its Log Analytics workspace) in `rg-card-arena` and `rg-card-arena-staging`. The move leaves the old databases untouched until then.
+4. Once both work, delete what the game no longer uses, the old SQL server and Container Apps environment in `rg-card-arena` and `rg-card-arena-staging`, with `.\infra\remove-old-base.ps1 -SubscriptionId <subscription id>`. It lists what it will delete and asks first. The move leaves the old databases untouched until then, and deleting a server deletes its backups too. The Log Analytics workspace stays, because Application Insights still uses it.
 
 If the move fails, the new database is deleted and the deploy that follows puts the game back where it was; the run's log says which step failed. Running the workflow again after a successful move only redeploys.
 
