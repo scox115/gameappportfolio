@@ -17,7 +17,8 @@ SCRIPT = Path(__file__).resolve().parents[1] / "restore-drill" / "restore_drill.
 spec = importlib.util.spec_from_file_location("restore_drill", SCRIPT)
 drill = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(drill)
-REAL_RECORD_RESULT = drill.record_result  # the tests below stub it out
+REAL_RECORD_RESULT = drill.record_result  # the tests below stub these out
+REAL_INSPECT_DATABASE = drill.inspect_database
 
 NOW = dt.datetime(2026, 10, 7, 12, 30, 45, tzinfo=dt.timezone.utc)
 SERVER = "sql-cardarena-abc.database.windows.net"
@@ -215,6 +216,24 @@ class RestoreDrillTests(unittest.TestCase):
             REAL_RECORD_RESULT(SERVER, "GameDb", "token", True, "Restored")
 
         self.assertIn("::warning::Couldn't record the result", errors.getvalue())
+
+    def test_a_database_that_is_waking_up_is_read_once_it_is_awake(self):
+        waking = subprocess.CompletedProcess([], 1, stdout="", stderr="Database 'GameDb' on server 'x' is not currently available. Error Number:40613")
+        awake = subprocess.CompletedProcess([], 0, stdout='{"migrations": ["001"], "tables": {"dbo.Players": 1}}', stderr="")
+        with mock.patch.object(drill, "database_app", side_effect=[waking, waking, awake]) as app, \
+                mock.patch.object(drill.time, "sleep") as sleep, redirect_stderr(io.StringIO()):
+            result = REAL_INSPECT_DATABASE(SERVER, "GameDb", "token")
+
+        self.assertEqual(result["tables"], {"dbo.Players": 1})
+        self.assertEqual(app.call_count, 3)
+        self.assertEqual(sleep.call_count, 2)
+
+    def test_other_database_errors_are_not_retried(self):
+        denied = subprocess.CompletedProcess([], 1, stdout="", stderr="Login failed for user '<token-identified principal>'.")
+        with mock.patch.object(drill, "database_app", return_value=denied) as app, \
+                mock.patch.object(drill.time, "sleep"), self.assertRaisesRegex(RuntimeError, "Login failed"):
+            REAL_INSPECT_DATABASE(SERVER, "GameDb", "token")
+        self.assertEqual(app.call_count, 1)
 
     def test_a_restore_point_older_than_the_backups_fails_before_touching_anything(self):
         self.azure.earliest = "2026-10-07T12:25:00Z"

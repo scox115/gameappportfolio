@@ -51,12 +51,20 @@ def database_app(token, *args):
                           capture_output=True, text=True, env={**os.environ, "SQL_ACCESS_TOKEN": token})
 
 
-def inspect_database(server_fqdn, database, token):
-    """Migrations and per-table row counts of one database."""
-    result = database_app(token, "inspect", server_fqdn, database)
-    if result.returncode != 0:
-        raise RuntimeError(f"Couldn't read {database}: {result.stderr.strip() or result.stdout.strip()}")
-    return json.loads(result.stdout.strip().splitlines()[-1])
+def inspect_database(server_fqdn, database, token, attempts=10):
+    """Migrations and per-table row counts of one database.
+
+    A serverless database that has paused itself answers "not currently available" (error 40613) while it
+    resumes, which can take a minute or two, so that error is retried for up to about 5 minutes."""
+    for attempt in range(1, attempts + 1):
+        result = database_app(token, "inspect", server_fqdn, database)
+        if result.returncode == 0:
+            return json.loads(result.stdout.strip().splitlines()[-1])
+        output = result.stderr.strip() or result.stdout.strip()
+        if attempt == attempts or ("40613" not in output and "not currently available" not in output):
+            raise RuntimeError(f"Couldn't read {database}: {output}")
+        log(f"{database} is waking up (attempt {attempt} of {attempts}); trying again in 30 seconds.")
+        time.sleep(30)
 
 
 def record_result(server_fqdn, database, token, passed, detail):
