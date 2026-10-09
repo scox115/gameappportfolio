@@ -28,7 +28,7 @@ Kubernetes (AKS) and a container registry were weighed and rejected for apps thi
 
 ## Consequences
 
-- A new app needs only its own resource group, a database module call and the shared resource group's name, not a new environment, workspace and server.
+- A new app needs only its own resource group, a database on the shared server and a deploy workflow, not a new environment, workspace and server. [`templates/new-app`](../../templates/new-app/README.md) sets these up with one script and one workflow file.
 - Apps share the environment's free monthly grant and the subscription's 10 free databases. Heavy use by one app could use up the grant for all of them.
 - Moving the game means a few minutes of downtime per copy, and the API's address changes, which the deploy that follows writes into the client.
 - The game still scales to zero, so the first visit after a quiet spell still waits for the API to start. That is a separate decision from where it runs.

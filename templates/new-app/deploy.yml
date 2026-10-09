@@ -1,0 +1,78 @@
+name: Deploy to Azure
+
+# Template for a portfolio app on the shared base (copy to .github/workflows/deploy.yml in the app's
+# repository). templates/new-app/setup-app.ps1 in scox115/gameappportfolio sets the variables this reads.
+# Builds the repository's Dockerfile, pushes the image to GitHub Container Registry and runs it in the
+# shared Container Apps environment. The first run creates the container app; later runs change only its
+# image, so custom domains and settings made by hand stay as they are.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # sign in to Azure with OIDC
+  packages: write   # push the image to GitHub Container Registry
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  # The port the container listens on (8080 for an ASP.NET Core image).
+  TARGET_PORT: 8080
+
+jobs:
+  deploy:
+    if: vars.AZURE_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push the image
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:$GITHUB_SHA"
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build -t "$image" .
+          docker push "$image"
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to the Container App
+        run: |
+          az extension add --name containerapp --upgrade --yes --only-show-errors
+          registry=()
+          if [ -n "$REGISTRY_PASSWORD" ]; then
+            registry=(--registry-server ghcr.io --registry-username "$GITHUB_REPOSITORY_OWNER" --registry-password "$REGISTRY_PASSWORD")
+          fi
+          if az containerapp show --name "$CONTAINER_APP" --resource-group "$RESOURCE_GROUP" --output none 2>/dev/null; then
+            az containerapp update --name "$CONTAINER_APP" --resource-group "$RESOURCE_GROUP" --image "$IMAGE" --output none
+          else
+            settings=()
+            if [ -n "$SQL_CONNECTION_STRING" ]; then
+              settings=(--env-vars "ConnectionStrings__Default=$SQL_CONNECTION_STRING")
+            fi
+            az containerapp create --name "$CONTAINER_APP" --resource-group "$RESOURCE_GROUP" \
+              --environment "$ENVIRONMENT_ID" --image "$IMAGE" "${registry[@]}" \
+              --user-assigned "$IDENTITY_ID" \
+              --ingress external --target-port "$TARGET_PORT" --cpu 0.5 --memory 1Gi \
+              --min-replicas 0 --max-replicas 3 --tags "app=$CONTAINER_APP" "${settings[@]}" --output none
+          fi
+          fqdn=$(az containerapp show --name "$CONTAINER_APP" --resource-group "$RESOURCE_GROUP" \
+            --query properties.configuration.ingress.fqdn --output tsv)
+          echo "Deployed $IMAGE to https://$fqdn" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          CONTAINER_APP: ${{ vars.AZURE_CONTAINER_APP }}
+          ENVIRONMENT_ID: ${{ vars.AZURE_CONTAINERAPPS_ENVIRONMENT_ID }}
+          IDENTITY_ID: ${{ vars.AZURE_APP_IDENTITY_ID }}
+          SQL_CONNECTION_STRING: ${{ vars.SQL_CONNECTION_STRING }}
+          REGISTRY_PASSWORD: ${{ secrets.GHCR_READ_TOKEN }}
