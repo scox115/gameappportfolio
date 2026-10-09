@@ -64,4 +64,13 @@ public class RecoveryTests(ArenaFixture arena) : BrowserTest(arena)
         await Assertions.Expect(replay.GetByRole(AriaRole.Alert)).ToContainTextAsync("expired or was already used");
         Assert.Empty(await later.EvaluateAsync<string[]>("() => window.__cspViolations ?? []"));
     });
+
+    [Fact]
+    public Task AMangledResetLink_SaysItIsIncomplete_InsteadOfCrashing() => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var page = await NewBrowserAsync();
+        await page.GotoAsync($"{Arena.ClientUrl}/reset-password?user=not-a-guid&token=abc");
+        await Assertions.Expect(page.GetByRole(AriaRole.Alert)).ToContainTextAsync("This link is incomplete");
+        await Assertions.Expect(page.Locator("#blazor-error-ui")).ToBeHiddenAsync();
+    });
 }
