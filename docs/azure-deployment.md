@@ -123,6 +123,8 @@ Runs the game's API and database on the base every portfolio app shares: one Con
 
 If the move fails, the new database is deleted and the deploy that follows puts the game back where it was; the run's log says which step failed. Running the workflow again after a successful move only redeploys.
 
+To put another app on the shared base, use [`templates/new-app`](../templates/new-app/README.md): one setup script and a deploy workflow to copy into the app's repository.
+
 ## Scaling out
 
 The API runs on up to three replicas by default. Container Apps adds one for every 50 concurrent requests, which includes each open live connection, and removes them again when things are quiet, down to zero. Replicas share the duel lobby, live messages and the outbox through the database ([ADR 0027](adr/0027-scale-out.md)), so there is nothing to set up.
