@@ -110,6 +110,9 @@ var tags = { app: 'kings-of-the-card-arena', environment: environmentName }
 var isStaging = environmentName == 'staging'
 var useSharedBase = !empty(sharedResourceGroup)
 var databaseName = useSharedBase ? sharedDatabaseName : 'GameDb'
+// Azure validates the scope of a conditional resource or module even when it is not deployed, and an
+// empty resource group name fails that, so the shared resources fall back to this group when unused.
+var sharedScope = resourceGroup(useSharedBase ? sharedResourceGroup : resourceGroup().name)
 var usePrivateRegistry = !empty(registryUsername)
 var featureFlagStoreEnabled = toLower(appConfiguration) == 'true'
 var emailEnabled = toLower(emailRecovery) == 'true'
@@ -341,12 +344,12 @@ resource apiWritesBlobs 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 
 resource sharedSqlServer 'Microsoft.Sql/servers@2023-08-01-preview' existing = if (useSharedBase) {
   name: sharedSqlServerName
-  scope: resourceGroup(sharedResourceGroup)
+  scope: sharedScope
 }
 
 module sharedDatabase 'modules/database.bicep' = if (useSharedBase) {
   name: 'card-arena-database-${environmentName}'
-  scope: resourceGroup(sharedResourceGroup)
+  scope: sharedScope
   params: {
     serverName: sharedSqlServerName
     databaseName: databaseName
@@ -438,7 +441,7 @@ resource clientDomain 'Microsoft.Web/staticSites/customDomains@2023-12-01' = if 
 
 resource sharedEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = if (useSharedBase) {
   name: sharedEnvironmentName
-  scope: resourceGroup(sharedResourceGroup)
+  scope: sharedScope
 }
 
 resource environment 'Microsoft.App/managedEnvironments@2024-03-01' = if (!useSharedBase) {
