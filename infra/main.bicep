@@ -466,7 +466,8 @@ var environmentId = useSharedBase ? sharedEnvironment.id : environment.id
 var sqlConnectionString = 'Server=tcp:${sqlServerAddress},1433;Database=${databaseName};Authentication=Active Directory Managed Identity;User Id=${apiIdentity.properties.clientId};Encrypt=True;Connect Timeout=60'
 
 resource api 'Microsoft.App/containerApps@2024-03-01' = {
-  name: 'ca-${appName}-api'
+  // Container app names are unique within an environment, so on the shared base staging gets its own.
+  name: useSharedBase && environmentName != 'production' ? 'ca-${appName}-${environmentName}-api' : 'ca-${appName}-api'
   location: apiLocation
   tags: tags
   identity: {

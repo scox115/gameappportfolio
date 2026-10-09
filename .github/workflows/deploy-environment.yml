@@ -99,6 +99,13 @@ jobs:
       - name: Find the API revision players are on
         id: live
         run: |
+          # On the shared base staging's API is ca-cardarena-staging-api, since production's has the
+          # old name and both share one environment. Remove a staging API left with the old name once.
+          if [ "$SHARED_READY" = "true" ] && [ "$ENVIRONMENT" != "production" ] && \
+              [ -n "$(az containerapp list --resource-group "$RESOURCE_GROUP" --query "[?name=='ca-cardarena-api'].name" --output tsv)" ]; then
+            echo "Removing the old ca-cardarena-api so staging and production can share the environment."
+            az containerapp delete --resource-group "$RESOURCE_GROUP" --name ca-cardarena-api --yes
+          fi
           app=$(az containerapp list --resource-group "$RESOURCE_GROUP" \
             --query "[?ends_with(name, '-api')].name | [0]" --output tsv)
           revision=""
@@ -107,6 +114,8 @@ jobs:
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
         env:
           RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          SHARED_READY: ${{ steps.shared.outputs.ready }}
+          ENVIRONMENT: ${{ inputs.environment }}
 
       # Re-applying the Bicep template takes about 3 minutes even when nothing changed. Its inputs
       # (the template, the settings and the secrets) are fingerprinted, and the fingerprint is part of
