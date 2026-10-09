@@ -58,9 +58,11 @@ foreach ($group in $ResourceGroups) {
     }
     foreach ($environment in @(Invoke-Az containerapp env list --resource-group $group --query "[?starts_with(name, 'cae-cardarena-')].name" --output tsv)) {
         if (-not $environment) { continue }
-        $apps = Invoke-Az containerapp list --environment $environment --resource-group $group --query 'length(@)' --output tsv
-        if ([int]$apps -gt 0) {
-            Write-Host "$environment in $group still has $apps container app(s), so it stays." -ForegroundColor Yellow
+        # Counted here rather than with a length(@) query: az is a .cmd file on Windows, and cmd.exe
+        # misreads the parentheses in an argument PowerShell passes without quotes.
+        $apps = @(Invoke-Az containerapp list --environment $environment --resource-group $group --query '[].name' --output tsv | Where-Object { $_ })
+        if ($apps.Count -gt 0) {
+            Write-Host "$environment in $group still has $($apps.Count) container app(s) ($($apps -join ', ')), so it stays." -ForegroundColor Yellow
             continue
         }
         $toDelete += [pscustomobject]@{ Group = $group; Kind = 'Container Apps environment'; Name = $environment }
