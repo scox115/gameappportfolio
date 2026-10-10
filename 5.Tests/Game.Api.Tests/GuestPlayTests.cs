@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Game.Api.Models;
+using Game.Api.Recovery;
 using Game.Api.Workers;
 using Game.Core.Battles;
 using Game.Infrastructure.Data;
@@ -75,6 +76,29 @@ public class GuestPlayTests
         var login = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/login", new { Username = name, Password });
         login.EnsureSuccessStatusCode();
         Assert.Contains(name, await LeaderboardNamesAsync(factory.CreateClient(), "/api/v1/players/leaderboard"));
+    }
+
+    [Fact]
+    public async Task KeepingAGuest_WithAnEmail_SendsAConfirmationLink_AndABadOneChangesNothing()
+    {
+        using var factory = new GameApiFactory();
+        var guest = await StartGuestAsync(factory);
+        var name = $"kept{Guid.NewGuid():N}"[..16];
+
+        var badAddress = await guest.Client.PostAsJsonAsync("/api/v1/players/me/keep",
+            new { Username = name, Password, RecoveryEmail = "kept at example" }, Json);
+        Assert.Equal(HttpStatusCode.BadRequest, badAddress.StatusCode);
+        Assert.Contains("recoveryEmail", await badAddress.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+        Assert.True((await guest.Client.GetFromJsonAsync<PlayerProfileResponse>("/api/v1/players/me", Json))!.IsGuest);
+
+        var kept = await guest.Client.PostAsJsonAsync("/api/v1/players/me/keep",
+            new { Username = name, Password, RecoveryEmail = " kept@example.com " }, Json);
+
+        kept.EnsureSuccessStatusCode();
+        var email = Assert.Single(factory.Email.To("kept@example.com"));
+        Assert.Contains(name, email.Subject + email.PlainText);
+        Assert.Equal(new RecoveryEmailResponse(null, "kept@example.com"),
+            await guest.Client.GetFromJsonAsync<RecoveryEmailResponse>("/api/v1/players/me/recovery-email", Json));
     }
 
     [Fact]

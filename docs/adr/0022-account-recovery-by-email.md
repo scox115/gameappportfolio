@@ -38,7 +38,7 @@ scales to zero and restarts between the email being sent and the link being clic
   so most players set it up without finding the account dialog. A bad address stops the sign-up before
   anything is saved; a confirmation link that fails to send doesn't, since the hero already exists. Heroes
   with no address, confirmed or waiting, see a small note in town until they add one. "Not now" puts it off
-  for a week, and ticking "Don't remind me again" first hides it for good; this browser remembers either. Guests aren't asked: they have no password to reset until they keep the hero.
+  for a week, and ticking "Don't remind me again" first hides it for good; this browser remembers either. Guests aren't asked until they keep the hero, since there's no password to reset before that; the "Keep this hero" form has the same optional field.
 - **Links stay out of telemetry and history.** The reset and confirm pages read the token, then replace the URL
   without it. The browser telemetry strips query strings from every URL it sends.
 

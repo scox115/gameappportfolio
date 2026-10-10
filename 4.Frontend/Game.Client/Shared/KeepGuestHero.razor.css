@@ -10,3 +10,4 @@
 .keep-hero-save { width: 100%; background: #047857; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; }
 .keep-hero-open { width: 100%; background: var(--color-accent); color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
 .keep-hero-error { color: var(--color-danger); font-size: 0.8rem; margin: 8px 0 0; }
+.keep-hero-hint { color: var(--color-text-muted); font-size: 0.75rem; margin: 4px 0 0; }
