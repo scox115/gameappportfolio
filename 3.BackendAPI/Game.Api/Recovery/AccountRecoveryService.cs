@@ -64,6 +64,31 @@ public class AccountRecoveryService(
         return EmailChangeResult.Sent;
     }
 
+    public const string NotAnAddress = "That isn't an email address we can send to.";
+
+    /// <summary>
+    /// The optional address given when a hero is created or a guest is kept: null when there's none to use,
+    /// because it was left blank or email isn't set up here.
+    /// </summary>
+    public string? OptionalAddress(string? address) => _options.Enabled && !string.IsNullOrWhiteSpace(address) ? address : null;
+
+    /// <summary>
+    /// Sends the first confirmation link for an address given with a new or kept hero. The hero is already
+    /// saved, so a link that can't be sent is logged rather than undoing that; the address can be added again
+    /// from the account dialog.
+    /// </summary>
+    public async Task OfferConfirmationAsync(ApplicationUser user, string address)
+    {
+        try
+        {
+            await RequestEmailAsync(user, address);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Couldn't send the email confirmation link to player {PlayerId}.", user.Id);
+        }
+    }
+
     /// <summary>Removes the recovery address, and cancels any confirmation still waiting.</summary>
     public async Task RemoveEmailAsync(ApplicationUser user, CancellationToken cancellationToken = default)
     {

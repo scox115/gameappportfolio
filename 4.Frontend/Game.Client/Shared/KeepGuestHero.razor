@@ -18,6 +18,13 @@
             <label for="keep-password" class="keep-hero-label keep-hero-password-label">Password (at least 8 characters)</label>
             <PasswordInput id="keep-password" @bind-Value="password" autocomplete="new-password"
                    class="keep-hero-input" />
+            @* Optional, and only where email is set up: it's how a forgotten password gets reset *@
+            <FeatureGate Feature="@FeatureFlags.AccountRecovery">
+                <label for="keep-email" class="keep-hero-label keep-hero-password-label">Recovery email (optional)</label>
+                <input id="keep-email" type="email" @bind="recoveryEmail" @bind:event="oninput" autocomplete="email" aria-describedby="keep-email-hint"
+                       class="keep-hero-input" />
+                <p id="keep-email-hint" class="keep-hero-hint">Only used to reset a forgotten password. We'll send a link to confirm it.</p>
+            </FeatureGate>
             <button type="submit" disabled="@(saving || string.IsNullOrWhiteSpace(name) || string.IsNullOrEmpty(password))"
                     class="keep-hero-save">
                 @(saving ? "Saving..." : "Keep my hero")
@@ -41,6 +48,7 @@
     private bool saving;
     private string name = string.Empty;
     private string password = string.Empty;
+    private string recoveryEmail = string.Empty;
     private string message = string.Empty;
 
     private async Task KeepAsync()
@@ -49,7 +57,12 @@
         message = string.Empty;
         try
         {
-            var response = await Http.PostAsJsonAsync("/api/v1/players/me/keep", new { Username = name, Password = password });
+            var response = await Http.PostAsJsonAsync("/api/v1/players/me/keep", new
+            {
+                Username = name,
+                Password = password,
+                RecoveryEmail = string.IsNullOrWhiteSpace(recoveryEmail) ? null : recoveryEmail.Trim()
+            });
             if (response.IsSuccessStatusCode)
             {
                 State.KeptAs(name.Trim());

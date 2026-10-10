@@ -2,7 +2,7 @@ using Microsoft.Playwright;
 
 namespace Game.E2E.Tests;
 
-// One click to try the game as a guest, then keep the hero with a name and password.
+// One click to try the game as a guest, then keep the hero with a name, a password and, optionally, an email.
 public class GuestPlayTests(ArenaFixture arena) : BrowserTest(arena)
 {
     [Fact]
@@ -28,11 +28,16 @@ public class GuestPlayTests(ArenaFixture arena) : BrowserTest(arena)
         await guestBox.GetByRole(AriaRole.Button, new() { Name = "Keep this hero" }).ClickAsync();
         await guestBox.GetByLabel("Hero name").FillAsync(name);
         await guestBox.GetByLabel("Password (at least 8 characters)").FillAsync(Password);
+        var address = $"{name.ToLowerInvariant()}@example.com";
+        await guestBox.GetByLabel("Recovery email (optional)").FillAsync(address);
         await guestBox.GetByRole(AriaRole.Button, new() { Name = "Keep my hero" }).ClickAsync();
 
         await Assertions.Expect(guestBox).ToHaveCountAsync(0);
         await Assertions.Expect(page.GetByText(name).First).ToBeVisibleAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Your account and data" })).ToBeVisibleAsync();
+        // The address is waiting to be confirmed, so there's no reminder to add one.
+        Assert.Contains("/confirm-email?", await Arena.Emails.LatestLinkToAsync(address));
+        await Assertions.Expect(page.GetByText("Add a recovery email so you can reset")).ToBeHiddenAsync();
 
         // The kept hero signs in like any other, from another browser.
         await SignInAsync(name);

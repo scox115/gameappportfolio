@@ -52,7 +52,7 @@ public static class RecoveryEndpoints
             {
                 EmailChangeResult.Sent => Results.Accepted(value: await recovery.GetEmailAsync(account.User, cancellationToken)),
                 EmailChangeResult.TooSoon => Results.Problem("A link was sent a moment ago. Check your inbox, or try again in a couple of minutes.", statusCode: StatusCodes.Status429TooManyRequests),
-                _ => Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(RecoveryEmailRequest.Email)] = ["That isn't an email address we can send to."] }),
+                _ => Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(RecoveryEmailRequest.Email)] = [AccountRecoveryService.NotAnAddress] }),
             };
         }).RequireRateLimiting(RateLimits.Recovery);
 

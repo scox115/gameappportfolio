@@ -5,6 +5,7 @@ using Game.Api.Auth;
 using Game.Api.Models;
 using Game.Api.Moderation;
 using Game.Api.Options;
+using Game.Api.Recovery;
 using Game.Core.Moderation;
 using Game.Infrastructure.Data;
 using Game.Infrastructure.Identity;
@@ -47,7 +48,8 @@ public static class AccountEndpoints
             UserManager<ApplicationUser> userManager,
             AppDbContext dbContext,
             ModerationService moderation,
-            IOptions<AdminOptions> adminOptions) =>
+            IOptions<AdminOptions> adminOptions,
+            AccountRecoveryService recovery) =>
         {
             var account = await userManager.FindByIdAsync(user.GetPlayerId().ToString());
             var player = await dbContext.Players.FindAsync(user.GetPlayerId());
@@ -58,6 +60,13 @@ public static class AccountEndpoints
             if (HeroNames.Problem(username, allowStaffNames: adminOptions.Value.IsAdmin(username)) is { } nameProblem)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(KeepGuestRequest.Username)] = [nameProblem] });
+            }
+
+            // As at sign-up, the recovery email is optional, and ignored where email isn't set up.
+            var recoveryEmail = recovery.OptionalAddress(request.RecoveryEmail);
+            if (recoveryEmail is not null && AccountRecoveryService.Normalize(recoveryEmail) is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(KeepGuestRequest.RecoveryEmail)] = [AccountRecoveryService.NotAnAddress] });
             }
 
             if (await dbContext.Players.AnyAsync(p => p.Username == username && p.Id != player.Id)
@@ -85,6 +94,7 @@ public static class AccountEndpoints
                         .ToDictionary(g => g.Key, g => g.Select(e => e.Description).ToArray()));
             }
 
+            if (recoveryEmail is not null) await recovery.OfferConfirmationAsync(account, recoveryEmail);
             return Results.Ok(PlayerProfileResponse.From(player));
         });
 

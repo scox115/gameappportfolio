@@ -12,4 +12,4 @@ public record RefreshRequest(string RefreshToken);
 public record GuestRequest(Game.Core.Battles.HeroClass? Class = null);
 
 /// <summary>The name and password a guest keeps their hero under.</summary>
-public record KeepGuestRequest(string Username, string Password);
+public record KeepGuestRequest(string Username, string Password, string? RecoveryEmail = null);
