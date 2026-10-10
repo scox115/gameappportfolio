@@ -2,8 +2,20 @@
 @inject HttpClient Http
 @inject GameState State
 @inject IJSRuntime JS
+@inject FeatureFlags Flags
 
 @* "Your account": download everything the game stores about the hero, or delete the hero for good. *@
+@if (remindAboutEmail)
+{
+    @* Without a recovery email a forgotten password can't be reset, so say so once, until it's added or dismissed *@
+    <div role="note" class="email-reminder">
+        <p class="email-reminder-text">🔑 Add a recovery email so you can reset your password if you forget it.</p>
+        <div class="email-reminder-actions">
+            <button @onclick="Open" class="email-reminder-add">Add one</button>
+            <button @onclick="DismissReminderAsync" class="email-reminder-dismiss">Not now</button>
+        </div>
+    </div>
+}
 <button @onclick="Open" class="account-open">
     ⚙️ Your account and data
 </button>
@@ -66,6 +78,38 @@
     private string password = string.Empty;
     private string message = string.Empty;
     private ElementReference closeButton;
+    private bool remindAboutEmail;
+
+    private string ReminderKey => $"recovery-email-reminder-dismissed:{State.PlayerId}";
+
+    protected override async Task OnInitializedAsync() => await CheckRecoveryEmailAsync();
+
+    // Remind only where email is set up, and only heroes with no address, confirmed or waiting.
+    private async Task CheckRecoveryEmailAsync()
+    {
+        remindAboutEmail = false;
+        try
+        {
+            if (!(await Flags.GetAsync()).IsOn(FeatureFlags.AccountRecovery)) return;
+            if (await JS.InvokeAsync<string?>("localStorage.getItem", ReminderKey) is not null) return;
+        }
+        catch (JSException) { /* storage blocked: remind anyway */ }
+        catch (HttpRequestException) { return; }
+
+        try
+        {
+            var current = await Http.GetFromJsonAsync<RecoveryEmailState>("/api/v1/players/me/recovery-email");
+            remindAboutEmail = current is { email: null, pending: null };
+        }
+        catch (HttpRequestException) { }
+    }
+
+    private async Task DismissReminderAsync()
+    {
+        remindAboutEmail = false;
+        try { await JS.InvokeVoidAsync("localStorage.setItem", ReminderKey, "true"); }
+        catch (JSException) { /* private mode: dismissed for this visit */ }
+    }
 
     private void Open()
     {
@@ -75,14 +119,17 @@
         focusOnRender = true; // keyboard and screen-reader users land inside the dialog
     }
 
-    private void Close()
+    private async Task Close()
     {
-        if (!busy) open = false;
+        if (busy) return;
+        open = false;
+        // An address added in the dialog ends the reminder.
+        if (remindAboutEmail) await CheckRecoveryEmailAsync();
     }
 
-    private void KeyDown(KeyboardEventArgs e)
+    private async Task KeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Escape") Close();
+        if (e.Key == "Escape") await Close();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -160,4 +207,6 @@
             deleting = false;
         }
     }
+
+    private sealed record RecoveryEmailState(string? email, string? pending);
 }

@@ -34,6 +34,16 @@
 
     @if (creatingHero)
     {
+        @* Optional, and only where email is set up: it's how a forgotten password gets reset *@
+        <FeatureGate Feature="@FeatureFlags.AccountRecovery">
+            <div class="login-field">
+                <label for="sign-up-email"
+                       class="field-label">Recovery email (optional):</label>
+                <input id="sign-up-email" type="email" @bind="inputRecoveryEmail" @bind:event="oninput" placeholder="you@example.com" autocomplete="email" aria-describedby="sign-up-email-hint"
+                       class="login-input" />
+                <p id="sign-up-email-hint" class="code-hint">Only used to reset a forgotten password. We'll send a link to confirm it.</p>
+            </div>
+        </FeatureGate>
         @* Only new heroes pick a class; returning heroes keep theirs *@
         <ClassPicker @bind-Selected="chosenClass" Heading="Choose your class:" />
         <p class="terms-note">

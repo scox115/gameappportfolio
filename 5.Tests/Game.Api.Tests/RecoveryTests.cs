@@ -207,6 +207,44 @@ public partial class RecoveryTests
         Assert.True((await factory.CreateClient().GetFromJsonAsync<JsonElement>("/api/v1/features")).GetProperty("accountRecovery").GetBoolean());
     }
 
+    [Fact]
+    public async Task AnAddressGivenAtSignUp_GetsAConfirmationLink()
+    {
+        using var factory = new GameApiFactory();
+        var username = $"carol{Guid.NewGuid():N}"[..16];
+
+        var badAddress = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/register",
+            new { Username = username, Password, RecoveryEmail = "carol at example" });
+        var created = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/register",
+            new { Username = username, Password, RecoveryEmail = " carol@example.com " });
+
+        // A bad address stops the sign-up before anything is saved, so the name is still free.
+        Assert.Equal(HttpStatusCode.BadRequest, badAddress.StatusCode);
+        Assert.Contains("recoveryEmail", await badAddress.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var auth = (await created.Content.ReadFromJsonAsync<AuthResponse>())!;
+        var link = LinkIn(Assert.Single(factory.Email.To("carol@example.com")));
+        Assert.Equal(auth.Player.Id, link.User);
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        Assert.Equal(new RecoveryEmailResponse(null, "carol@example.com"),
+            await client.GetFromJsonAsync<RecoveryEmailResponse>("/api/v1/players/me/recovery-email"));
+    }
+
+    [Fact]
+    public async Task WithoutEmailSetUp_AnAddressAtSignUpIsIgnored()
+    {
+        using var factory = new GameApiFactory();
+        using var off = factory.WithWebHostBuilder(b => b.UseSetting("Email:Provider", "None"));
+
+        var created = await off.CreateClient().PostAsJsonAsync("/api/v1/auth/register",
+            new { Username = $"dave{Guid.NewGuid():N}"[..16], Password, RecoveryEmail = "not an address" });
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Empty(factory.Email.Sent);
+    }
+
     [Theory]
     [InlineData("alice@example.com", true)]
     [InlineData("a.b+tag@mail.example.co.uk", true)]

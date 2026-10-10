@@ -5,6 +5,7 @@ using Game.Api.Hubs;
 using Game.Api.Models;
 using Game.Api.Moderation;
 using Game.Api.Options;
+using Game.Api.Recovery;
 using Game.Api.TwoFactor;
 using Game.Core.Entities;
 using Game.Core.Moderation;
@@ -35,7 +36,10 @@ public static class AuthEndpoints
             SessionNotifier notifier,
             AdminRoleSync roleSync,
             ModerationService moderation,
-            IOptions<AdminOptions> adminOptions) =>
+            IOptions<AdminOptions> adminOptions,
+            IOptions<EmailOptions> emailOptions,
+            AccountRecoveryService recovery,
+            ILogger<RegisterRequest> logger) =>
         {
             var username = request.Username?.Trim() ?? string.Empty;
             if (HeroNames.Problem(username, allowStaffNames: adminOptions.Value.IsAdmin(username)) is { } nameProblem)
@@ -43,6 +47,16 @@ public static class AuthEndpoints
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
                     [nameof(RegisterRequest.Username)] = [nameProblem]
+                });
+            }
+
+            // The recovery email is optional, and ignored where email isn't set up.
+            var recoveryEmail = emailOptions.Value.Enabled && !string.IsNullOrWhiteSpace(request.RecoveryEmail) ? request.RecoveryEmail : null;
+            if (recoveryEmail is not null && AccountRecoveryService.Normalize(recoveryEmail) is null)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(RegisterRequest.RecoveryEmail)] = ["That isn't an email address we can send to."]
                 });
             }
 
@@ -75,6 +89,20 @@ public static class AuthEndpoints
                 return result.Errors.Any(e => e.Code == nameof(IdentityErrorDescriber.DuplicateUserName))
                     ? Results.Conflict(new { message = $"The username '{username}' is already taken." })
                     : Results.ValidationProblem(ToValidationErrors(result));
+            }
+
+            // The hero exists now, so a confirmation link that can't be sent mustn't undo the sign-up;
+            // the player can add the address again from the account dialog.
+            if (recoveryEmail is not null)
+            {
+                try
+                {
+                    await recovery.RequestEmailAsync(user, recoveryEmail);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Couldn't send the email confirmation link to new player {PlayerId}.", user.Id);
+                }
             }
 
             var session = await StartSessionAsync(user, player, tokenService, refreshTokens, dbContext, notifier, roleSync);
