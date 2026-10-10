@@ -28,3 +28,4 @@
 .email-reminder-actions { display: flex; gap: 8px; }
 .email-reminder-add { background: var(--color-accent); color: white; border: none; border-radius: 8px; padding: 6px 12px; font-weight: bold; cursor: pointer; }
 .email-reminder-dismiss { background: none; border: none; color: var(--color-text-muted); text-decoration: underline; cursor: pointer; font-size: 0.85rem; }
+.email-reminder-never { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 0.8rem; color: var(--color-text-muted); cursor: pointer; }
