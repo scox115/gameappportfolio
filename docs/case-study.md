@@ -15,7 +15,7 @@ A real-time card battler built as if it were a production service: a .NET 10 API
 | **Stack** | C# / .NET 10, ASP.NET Core Minimal APIs, SignalR, EF Core, Blazor WebAssembly, RabbitMQ, Azure SQL |
 | **Cloud** | Azure Container Apps, Static Web Apps, SQL, Blob Storage, Key Vault, App Configuration, Application Insights; all in Bicep |
 | **Delivery** | GitHub Actions: CI on every pull request, a preview site per pull request, staging then production on every merge, blue-green releases |
-| **Quality** | 480+ automated tests (domain, API, browser with accessibility checks, load), the concurrency tests on a real SQL Server in CI |
+| **Quality** | 600+ automated tests (domain, API, browser with accessibility checks, load), the concurrency tests on a real SQL Server in CI |
 | **Running cost** | Free tiers throughout; the API scales to zero when nobody is playing |
 | **Scale** | About 200 players fighting at once per 0.5 CPU replica, up to three replicas |
 
@@ -98,6 +98,13 @@ flowchart LR
 - **Choice:** the tests that depend on the database engine run on SQLite and on a real SQL Server that CI starts for every pull request, built from the real migrations. A test also fails if the model changed without a migration.
 - **Trade-off:** about ten seconds more per CI run. ([ADR 0028](adr/0028-sql-server-in-ci.md), [ADR 0012](adr/0012-testing-strategy.md))
 
+### 7. Accounts built like a real service's
+
+- **Problem:** a game with gold, ratings and admin tools is worth breaking into, and players should be able to recover, take away or delete what's theirs.
+- **Choice:** access tokens live 15 minutes, and refresh tokens are stored hashed, work once and rotate, so reusing an old one signs that account out everywhere. Two-factor sign-in works with any authenticator app, and a code can't be used twice. The admin tools only open for an account with two-factor on, checked by the API on every request. A recovery email is optional, offered at sign-up and when a guest keeps their hero, and only used once its owner clicks the link sent to it. Reset links are stored hashed and never say whether a hero exists. One click starts a guest hero, and players can download or delete their data from town.
+- **Trade-off:** our own one-time links instead of Identity's built-in tokens, because those depend on keys a container that scales to zero would lose. If the only admin loses both their phone and their recovery codes, it takes a database change to get back in. ([ADR 0005](adr/0005-identity-jwt-refresh-tokens.md), [ADR 0025](adr/0025-two-factor-sign-in.md), [ADR 0022](adr/0022-account-recovery-by-email.md), [ADR 0021](adr/0021-admin-roles-and-audit-log.md), [ADR 0030](adr/0030-guest-play.md), [ADR 0020](adr/0020-account-export-and-deletion.md))
+- **Afterwards:** password reset had tests for every case, but at first players could only add an email from a settings dialog no new player had a reason to open. The sign-up form now asks for it, and town reminds anyone without one.
+
 ## A bug worth telling
 
 While checking scale-out with two real API processes sharing one SQL Server, a duel request failed with an `ArgumentNullException`. The lobby code checked whether a player was still waiting and then loaded their row in a second query; another replica could pair that player in the gap. None of the tests had caught it, because the in-memory database never runs two things at once.
@@ -139,4 +146,5 @@ The fix was one query instead of two. The lasting change was making sure it can'
 | All of the Azure infrastructure | [`infra/main.bicep`](../infra/main.bicep) |
 | The ops dashboard and the check that runs its queries in CI | [`infra/ops-dashboard`](../infra/ops-dashboard) |
 | The release pipeline | [`.github/workflows`](../.github/workflows) |
+| Two-factor, and keeping the admin tools behind it | [`3.BackendAPI/Game.Api/Auth`](../3.BackendAPI/Game.Api/Auth) |
 | Tests that run two replicas against one database | [`5.Tests/Game.Api.Tests/ScaleOutTests.cs`](../5.Tests/Game.Api.Tests/ScaleOutTests.cs) |
