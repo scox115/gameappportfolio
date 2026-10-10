@@ -87,7 +87,7 @@ public class RecoveryTests(ArenaFixture arena) : BrowserTest(arena)
     });
 
     [Fact]
-    public Task AHeroWithNoEmail_IsReminded_UntilTheyDismissIt() => WithScreenshotsOnFailureAsync(async () =>
+    public Task AHeroWithNoEmail_IsReminded_AWeekAfterNotNow_OrNeverIfTheySaySo() => WithScreenshotsOnFailureAsync(async () =>
     {
         var name = NewHeroName("Remind");
         var page = await CreateHeroAsync(name);
@@ -100,14 +100,33 @@ public class RecoveryTests(ArenaFixture arena) : BrowserTest(arena)
 
         await reminder.GetByRole(AriaRole.Button, new() { Name = "Not now" }).ClickAsync();
         await Assertions.Expect(reminder).ToBeHiddenAsync();
-        // Signing in again in the same browser, it stays dismissed.
+        // Signing in again in the same browser, it stays put off.
+        await SignInAgainAsync(page, name);
+        await Assertions.Expect(reminder).ToBeHiddenAsync();
+
+        // A week later it's back.
+        var key = await page.EvaluateAsync<string>("() => Object.keys(localStorage).find(k => k.startsWith('recovery-email-reminder'))");
+        await page.EvaluateAsync("k => localStorage.setItem(k, new Date(Date.now() - 1000).toISOString())", key);
+        await SignInAgainAsync(page, name);
+        await Assertions.Expect(reminder).ToBeVisibleAsync();
+
+        // "Don't remind me again" puts it away for good.
+        await reminder.GetByLabel("Don't remind me again").CheckAsync();
+        await reminder.GetByRole(AriaRole.Button, new() { Name = "Not now" }).ClickAsync();
+        await Assertions.Expect(reminder).ToBeHiddenAsync();
+        Assert.Equal("never", await page.EvaluateAsync<string>("k => localStorage.getItem(k)", key));
+        await SignInAgainAsync(page, name);
+        await Assertions.Expect(reminder).ToBeHiddenAsync();
+    });
+
+    private static async Task SignInAgainAsync(IPage page, string name)
+    {
         await page.GetByRole(AriaRole.Button, new() { Name = "Logout" }).ClickAsync();
         await page.GetByPlaceholder("Enter Character name...").FillAsync(name);
         await page.GetByPlaceholder("At least 8 characters...").FillAsync(Password);
         await page.GetByRole(AriaRole.Button, new() { Name = "Play Game" }).ClickAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Your account and data" })).ToBeVisibleAsync();
-        await Assertions.Expect(reminder).ToBeHiddenAsync();
-    });
+    }
 
     [Fact]
     public Task AMangledResetLink_SaysItIsIncomplete_InsteadOfCrashing() => WithScreenshotsOnFailureAsync(async () =>

@@ -7,13 +7,18 @@
 @* "Your account": download everything the game stores about the hero, or delete the hero for good. *@
 @if (remindAboutEmail)
 {
-    @* Without a recovery email a forgotten password can't be reset, so say so once, until it's added or dismissed *@
+    @* Without a recovery email a forgotten password can't be reset, so say so until it's added. "Not now" puts it
+       off for a week; with "Don't remind me again" ticked, it's gone for good in this browser. *@
     <div role="note" class="email-reminder">
         <p class="email-reminder-text">🔑 Add a recovery email so you can reset your password if you forget it.</p>
         <div class="email-reminder-actions">
             <button @onclick="Open" class="email-reminder-add">Add one</button>
             <button @onclick="DismissReminderAsync" class="email-reminder-dismiss">Not now</button>
         </div>
+        <label class="email-reminder-never">
+            <input type="checkbox" @bind="neverRemind" />
+            Don't remind me again
+        </label>
     </div>
 }
 <button @onclick="Open" class="account-open">
@@ -79,6 +84,11 @@
     private string message = string.Empty;
     private ElementReference closeButton;
     private bool remindAboutEmail;
+    private bool neverRemind;
+
+    // What the browser remembers: "never", or the time (UTC) until which the reminder is put off.
+    private const string Never = "never";
+    private static readonly TimeSpan PutOffFor = TimeSpan.FromDays(7);
 
     private string ReminderKey => $"recovery-email-reminder-dismissed:{State.PlayerId}";
 
@@ -91,7 +101,7 @@
         try
         {
             if (!(await Flags.GetAsync()).IsOn(FeatureFlags.AccountRecovery)) return;
-            if (await JS.InvokeAsync<string?>("localStorage.getItem", ReminderKey) is not null) return;
+            if (IsPutOff(await JS.InvokeAsync<string?>("localStorage.getItem", ReminderKey), DateTimeOffset.UtcNow)) return;
         }
         catch (JSException) { /* storage blocked: remind anyway */ }
         catch (HttpRequestException) { return; }
@@ -107,9 +117,15 @@
     private async Task DismissReminderAsync()
     {
         remindAboutEmail = false;
-        try { await JS.InvokeVoidAsync("localStorage.setItem", ReminderKey, "true"); }
+        var value = neverRemind ? Never : (DateTimeOffset.UtcNow + PutOffFor).ToString("O");
+        try { await JS.InvokeVoidAsync("localStorage.setItem", ReminderKey, value); }
         catch (JSException) { /* private mode: dismissed for this visit */ }
     }
+
+    // Anything else, such as a week that has passed, means remind again.
+    private static bool IsPutOff(string? saved, DateTimeOffset now) =>
+        saved == Never
+        || (DateTimeOffset.TryParse(saved, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var until) && until > now);
 
     private void Open()
     {
