@@ -21,3 +21,10 @@
 .account-delete { width: 100%; background: #b91c1c; color: white; padding: 10px; border: none; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; opacity: 1; }
 .account-delete.is-disabled { opacity: 0.5; }
 .account-error { color: var(--color-danger); font-size: 0.85rem; margin: 10px 0 0; }
+
+/* The reminder to add a recovery email, above the button that opens the dialog. */
+.email-reminder { margin-top: 16px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-page); text-align: left; }
+.email-reminder-text { margin: 0 0 8px; font-size: 0.85rem; color: var(--color-text); }
+.email-reminder-actions { display: flex; gap: 8px; }
+.email-reminder-add { background: var(--color-accent); color: white; border: none; border-radius: 8px; padding: 6px 12px; font-weight: bold; cursor: pointer; }
+.email-reminder-dismiss { background: none; border: none; color: var(--color-text-muted); text-decoration: underline; cursor: pointer; font-size: 0.85rem; }

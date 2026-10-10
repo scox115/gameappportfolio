@@ -34,6 +34,11 @@ scales to zero and restarts between the email being sent and the link being clic
   the resource: no connection string. Locally, `Email:Provider=Log` writes each email to the console. With no
   provider (`None`), the endpoints return 503 and `/api/v1/features` reports `accountRecovery: false`, so the
   client hides the links. The deploy turns it on with the `EMAIL_RECOVERY` repository variable.
+- **Asked for at sign-up, and reminded in town.** Creating a hero has an optional "Recovery email" field,
+  so most players set it up without finding the account dialog. A bad address stops the sign-up before
+  anything is saved; a confirmation link that fails to send doesn't, since the hero already exists. Heroes
+  with no address, confirmed or waiting, see a small note in town until they add one or choose "Not now",
+  which this browser remembers. Guests aren't asked: they have no password to reset until they keep the hero.
 - **Links stay out of telemetry and history.** The reset and confirm pages read the token, then replace the URL
   without it. The browser telemetry strips query strings from every URL it sends.
 

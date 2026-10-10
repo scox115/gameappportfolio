@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Game.Client.Models;
 using Game.Client.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace Game.Client.Shared;
 
@@ -12,9 +13,11 @@ public partial class SignInPanel : IDisposable
 {
     [Inject] private GameState State { get; set; } = default!;
     [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 
     private string inputUsername = string.Empty;
     private string inputPassword = string.Empty;
+    private string inputRecoveryEmail = string.Empty;
     private string chosenClass = "Sorcerer";
     private bool creatingHero; // The sign-in screen is creating a new hero rather than signing in
     private bool startingGuest;
@@ -104,7 +107,13 @@ public partial class SignInPanel : IDisposable
         if (string.IsNullOrWhiteSpace(inputUsername) || string.IsNullOrEmpty(inputPassword)) return;
         try
         {
-            var res = await Http.PostAsJsonAsync("/api/v1/auth/register", new { Username = inputUsername, Password = inputPassword, Class = chosenClass });
+            var res = await Http.PostAsJsonAsync("/api/v1/auth/register", new
+            {
+                Username = inputUsername,
+                Password = inputPassword,
+                Class = chosenClass,
+                RecoveryEmail = string.IsNullOrWhiteSpace(inputRecoveryEmail) ? null : inputRecoveryEmail.Trim()
+            });
             if (res.IsSuccessStatusCode)
             {
                 // Registration signs the new hero straight in.
@@ -138,7 +147,7 @@ public partial class SignInPanel : IDisposable
         if (auth?.player is null) return;
 
         statusMsg = string.Empty;
-        inputPassword = inputTwoFactorCode = string.Empty;
+        inputPassword = inputTwoFactorCode = inputRecoveryEmail = string.Empty;
         askForTwoFactorCode = false;
         creatingHero = false;
         State.UpdateClass(auth.player.@class);
@@ -146,6 +155,9 @@ public partial class SignInPanel : IDisposable
         State.UpdateCosmetics(auth.player.frame, auth.player.cardSkin);
         State.UpdateGuest(auth.player.isGuest);
         State.UpdateRoles(auth.roles);
+        // The town opens at the top, not wherever the form had been scrolled to.
+        try { await JS.InvokeVoidAsync("scrollTo", 0, 0); }
+        catch (JSException) { }
     }
 
     private static async Task<string?> ReadProblemDetail(HttpResponseMessage res) => (await ReadProblem(res))?.detail;
