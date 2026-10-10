@@ -11,7 +11,7 @@ public class AdminTests(ArenaFixture arena) : BrowserTest(arena)
     {
         var cheaterName = NewHeroName("Cheat");
         var cheater = await CreateHeroAsync(cheaterName);
-        var admin = await CreateHeroAsync(ApiHost.AdminNames[0]);
+        var admin = await CreateAdminAsync(ApiHost.AdminNames[0]);
 
         await admin.GetByRole(AriaRole.Link, new() { Name = "Admin tools" }).ClickAsync();
         await Assertions.Expect(admin.GetByRole(AriaRole.Heading, new() { Name = "Admin tools", Level = 1 })).ToBeVisibleAsync();
@@ -66,5 +66,16 @@ public class AdminTests(ArenaFixture arena) : BrowserTest(arena)
 
         await page.GotoAsync($"{Arena.ClientUrl}/admin");
         await Assertions.Expect(page.GetByText("These tools are for admins.")).ToBeVisibleAsync();
+    });
+
+    [Fact]
+    public Task AnAdminWithoutTwoFactor_IsToldToTurnItOn() => WithScreenshotsOnFailureAsync(async () =>
+    {
+        var admin = await CreateHeroAsync(ApiHost.AdminNames[3]);
+
+        await admin.GetByRole(AriaRole.Link, new() { Name = "Admin tools" }).ClickAsync();
+
+        await Assertions.Expect(admin.GetByRole(AriaRole.Heading, new() { Name = "Turn on two-factor sign-in first" })).ToBeVisibleAsync();
+        await Assertions.Expect(admin.GetByRole(AriaRole.Heading, new() { Name = "Reports" })).ToHaveCountAsync(0);
     });
 }

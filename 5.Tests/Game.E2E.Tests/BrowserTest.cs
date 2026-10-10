@@ -49,6 +49,14 @@ public abstract class BrowserTest(ArenaFixture arena) : IAsyncLifetime
         return page;
     }
 
+    /// <summary>An admin hero with two-factor sign-in on, which the admin tools need.</summary>
+    protected async Task<IPage> CreateAdminAsync(string name)
+    {
+        var page = await CreateHeroAsync(name);
+        await Arena.TurnOnTwoFactorAsync(name);
+        return page;
+    }
+
     protected async Task<IPage> SignInAsync(string name)
     {
         var page = await NewBrowserAsync();

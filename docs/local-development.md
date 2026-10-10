@@ -166,7 +166,7 @@ dotnet test 5.Tests/Game.Api.Tests
 | `AntiCheat:RecoveryRequestsPerHour` | `10` per IP address | inherited | no |
 | `AntiCheat:GuestsPerHour` | `20` guest heroes per IP address | inherited | no |
 | `AntiCheat:ReportsPerHour` | `10` reports of other heroes per player | inherited | no |
-| `Admin:Usernames` | empty (no admins) | empty; set it with user-secrets to try the admin tools, e.g. `dotnet user-secrets set "Admin:Usernames" "MyHero" --project 3.BackendAPI/Game.Api` | no; set by the Azure deployment from `ADMIN_USERNAMES` |
+| `Admin:Usernames` | empty (no admins) | empty; set it with user-secrets to try the admin tools, e.g. `dotnet user-secrets set "Admin:Usernames" "MyHero" --project 3.BackendAPI/Game.Api`, then turn on two-factor sign-in for that hero, which the admin tools need | no; set by the Azure deployment from `ADMIN_USERNAMES` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | none (no export) | `http://localhost:4317` (the dashboard container) | no |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | none (no export) | none | set by the Azure deployment |
 | `ForwardedHeaders:TrustAllProxies` | `false` | `false` | `true` only behind Container Apps' ingress |

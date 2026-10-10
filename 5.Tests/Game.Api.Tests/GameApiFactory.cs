@@ -5,6 +5,8 @@ using Game.Core.Battles;
 using Game.Core.Interfaces;
 using Game.Core.Moderation;
 using Game.Infrastructure.Data;
+using Game.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -63,6 +65,18 @@ public class GameApiFactory : WebApplicationFactory<Program>
 
     /// <summary>Stands in for Azure AI Content Safety: allows every portrait unless a test says otherwise.</summary>
     public FakePortraitScreen Portraits { get; } = new();
+
+    /// <summary>
+    /// Turns on two-factor sign-in straight in the database, for tests that need an admin and aren't about
+    /// setting two-factor up (TwoFactorTests covers that).
+    /// </summary>
+    public async Task TurnOnTwoFactorAsync(Guid playerId)
+    {
+        using var scope = Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var result = await users.SetTwoFactorEnabledAsync((await users.FindByIdAsync(playerId.ToString()))!, true);
+        if (!result.Succeeded) throw new InvalidOperationException(string.Join(" ", result.Errors.Select(e => e.Description)));
+    }
 
     /// <summary>Tops up a player's gold, for tests that need more than a new hero starts with.</summary>
     public async Task GiveGoldAsync(Guid playerId, int amount)

@@ -9,6 +9,8 @@ using Game.Api.Models;
 using Game.Api.Options;
 using Game.Core.Admin;
 using Game.Infrastructure.Data;
+using Game.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -50,10 +52,34 @@ public class AdminTests
         Assert.Equal([GameRoles.Admin], boss.Roles);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(boss.AccessToken);
         Assert.Equal(GameRoles.Admin, token.Claims.Single(c => c.Type == TokenService.RoleClaim).Value);
+        await factory.TurnOnTwoFactorAsync(boss.Id);
         Assert.Equal(HttpStatusCode.OK, (await boss.Client.GetAsync("/api/v1/admin/players")).StatusCode);
 
         var grant = (await AuditAsync(boss.Client)).Single();
         Assert.Equal((AdminAction.GrantAdmin, AuditLogEntry.ConfigurationActor, boss.Id), (grant.Action, grant.ActorName, grant.TargetId));
+    }
+
+    [Fact]
+    public async Task AdminTools_NeedTwoFactorSignInOn_AndCloseAsSoonAsItIsOff()
+    {
+        using var factory = new GameApiFactory();
+        var name = NewName("boss");
+        SetAdmins(factory, name);
+        var boss = await SignUpAsync(factory, username: name);
+
+        // The role alone isn't enough.
+        Assert.Equal([GameRoles.Admin], boss.Roles);
+        Assert.Equal(HttpStatusCode.Forbidden, (await boss.Client.GetAsync("/api/v1/admin/players")).StatusCode);
+
+        // Turning two-factor on opens the tools without signing in again, and turning it off shuts them at once.
+        await factory.TurnOnTwoFactorAsync(boss.Id);
+        Assert.Equal(HttpStatusCode.OK, (await boss.Client.GetAsync("/api/v1/admin/players")).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            await users.SetTwoFactorEnabledAsync((await users.FindByIdAsync(boss.Id.ToString()))!, false);
+        }
+        Assert.Equal(HttpStatusCode.Forbidden, (await boss.Client.GetAsync("/api/v1/admin/players")).StatusCode);
     }
 
     [Fact]
@@ -177,6 +203,7 @@ public class AdminTests
         SetAdmins(factory, $"{first},{second}");
         var boss = await SignUpAsync(factory, username: first);
         var other = await SignUpAsync(factory, username: second);
+        await factory.TurnOnTwoFactorAsync(boss.Id);
 
         var self = await boss.Client.PostAsJsonAsync($"/api/v1/admin/players/{boss.Id}/suspend", new { Reason = "Testing." });
         var colleague = await boss.Client.PostAsJsonAsync($"/api/v1/admin/players/{other.Id}/suspend", new { Reason = "Testing." });
@@ -259,7 +286,9 @@ public class AdminTests
     {
         var name = NewName("boss");
         SetAdmins(factory, name);
-        return await SignUpAsync(factory, username: name);
+        var admin = await SignUpAsync(factory, username: name);
+        await factory.TurnOnTwoFactorAsync(admin.Id);
+        return admin;
     }
 
     private static async Task<Hero> SignUpAsync(GameApiFactory factory, string prefix = "hero", string? username = null)

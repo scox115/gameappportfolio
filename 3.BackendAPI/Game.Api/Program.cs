@@ -41,6 +41,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -261,8 +262,11 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
         };
     });
 
+// Admins also need two-factor sign-in on (docs/adr/0025-two-factor-sign-in.md).
 builder.Services.AddAuthorizationBuilder()
-    .AddPolicy(GameRoles.AdminPolicy, policy => policy.RequireAuthenticatedUser().RequireRole(GameRoles.Admin));
+    .AddPolicy(GameRoles.AdminPolicy, policy => policy.RequireAuthenticatedUser().RequireRole(GameRoles.Admin)
+        .AddRequirements(new TwoFactorRequirement()));
+builder.Services.AddScoped<IAuthorizationHandler, TwoFactorRequirementHandler>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 // --- 🛡️ ANTI-CHEAT ---

@@ -30,4 +30,5 @@ A hero's account holds gold, upgrades and rating, and admins' accounts can suspe
 - Players who want it get a second step. Nothing changes for anyone else.
 - The authenticator key is stored as it is (the API must be able to read it to check codes). Azure SQL encrypts the database at rest. Wrapping the key with ASP.NET Core Data Protection would also need a key ring kept outside the container, so it is left for when there is one.
 - A lost phone plus lost recovery codes needs an admin, which is deliberate. Self-service recovery by email would weaken the second step to "has the inbox".
-- Admins aren't forced to use two-factor yet. Requiring it for the Admin role is a small follow-up once the owner has set it up.
+- **Admins must have it on.** Since 2026-10-10 the `Admin` policy also requires two-factor sign-in on the account. The check reads the account on each admin request rather than the token, so turning it on opens the admin tools at once, and turning it off (by the admin, or by another admin for a lost phone) closes them at once. An admin without it sees "Turn on two-factor sign-in first" on the admin page instead of the tools.
+- If the only admin loses both their phone and their recovery codes, no admin is left to turn it off for them, so it takes a database change. Having a second admin avoids that.
