@@ -238,7 +238,9 @@ public class ModerationTests
     {
         var name = NewName("boss");
         factory.Services.GetRequiredService<IOptions<AdminOptions>>().Value.Usernames = name;
-        return await SignUpAsync(factory, name);
+        var admin = await SignUpAsync(factory, name);
+        await factory.TurnOnTwoFactorAsync(admin.Id);
+        return admin;
     }
 
     private static async Task<Hero> SignUpAsync(GameApiFactory factory, string? username = null)

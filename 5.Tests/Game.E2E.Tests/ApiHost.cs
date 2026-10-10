@@ -7,6 +7,8 @@ using Game.Core.Entities;
 using Game.Core.Interfaces;
 using Game.Core.Seasons;
 using Game.Infrastructure.Data;
+using Game.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +35,7 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
     public string BaseUrl { get; }
 
     /// <summary>Heroes created with these names are admins (one per test, since names are unique).</summary>
-    public static readonly string[] AdminNames = ["RefereeFlow", "RefereeAxe", "RefereeJudge"];
+    public static readonly string[] AdminNames = ["RefereeFlow", "RefereeAxe", "RefereeJudge", "RefereeNew"];
 
     /// <summary>Every email the API "sent", in order; tests open the links in them.</summary>
     public Mailbox Emails { get; } = new();
@@ -85,6 +87,18 @@ public sealed class ApiHost : WebApplicationFactory<global::Program>
             RemoveAll<IEmailSender>(services);
             services.AddSingleton<IEmailSender>(Emails);
         });
+    }
+
+    /// <summary>
+    /// Turns on two-factor sign-in straight in the database, so an admin can use the admin tools in tests that
+    /// aren't about setting two-factor up.
+    /// </summary>
+    public async Task TurnOnTwoFactorAsync(string username)
+    {
+        using var scope = Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var result = await users.SetTwoFactorEnabledAsync((await users.FindByNameAsync(username))!, true);
+        if (!result.Succeeded) throw new InvalidOperationException(string.Join(" ", result.Errors.Select(e => e.Description)));
     }
 
     /// <summary>Puts a hero at the top of the leaderboard, so a test can find them there among every other test's heroes.</summary>

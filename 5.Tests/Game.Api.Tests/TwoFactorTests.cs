@@ -185,6 +185,7 @@ public class TwoFactorTests
         var adminName = "boss" + Guid.NewGuid().ToString("N")[..8];
         factory.Services.GetRequiredService<IOptions<AdminOptions>>().Value.Usernames = adminName;
         var admin = await SignUpAsync(factory, adminName);
+        await factory.TurnOnTwoFactorAsync(admin.Id);
 
         var detail = await admin.Client.GetFromJsonAsync<AdminPlayerDetail>($"/api/v1/admin/players/{hero.Id}", Json);
         Assert.True(detail!.TwoFactorEnabled);

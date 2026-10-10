@@ -160,7 +160,7 @@ public class AccessibilityTests(ArenaFixture arena) : BrowserTest(arena)
     {
         var player = NewHeroName("Seen");
         await CreateHeroAsync(player);
-        var page = await CreateHeroAsync(ApiHost.AdminNames[1]);
+        var page = await CreateAdminAsync(ApiHost.AdminNames[1]);
 
         await page.GetByRole(AriaRole.Link, new() { Name = "Admin tools" }).ClickAsync();
         await page.GetByPlaceholder("Part of a hero's name").FillAsync(player); // the list shows the first 50 only

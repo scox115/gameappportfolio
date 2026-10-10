@@ -19,6 +19,22 @@
     {
         <p>These tools are for admins. Sign in with an admin account from the <a href="">town</a> first.</p>
     }
+    else if (twoFactorOn is null)
+    {
+        <p class="admin-muted">Loading…</p>
+    }
+    else if (twoFactorOn == false)
+    {
+        @* The API refuses admin requests until two-factor is on; say how to turn it on rather than fail. *@
+        <section aria-labelledby="two-factor-needed-title" class="admin-two-factor-needed">
+            <h2 id="two-factor-needed-title">Turn on two-factor sign-in first</h2>
+            <p>
+                Admin tools can suspend players and change their gold, so they need two-factor sign-in on your account.
+                In <a href="">town</a>, open <b>⚙️ Your account and data</b>, set up two-factor sign-in with an
+                authenticator app, then come back here.
+            </p>
+        </section>
+    }
     else
     {
         <section aria-labelledby="reports-title">
@@ -255,9 +271,15 @@
     private bool failed;
     private string message = string.Empty;
 
+    // Null until the account's two-factor status has loaded.
+    private bool? twoFactorOn;
+
     protected override async Task OnInitializedAsync()
     {
         if (!State.IsAdmin) return;
+        var status = await Http.GetFromJsonAsync<TwoFactorStatusDto>("/api/v1/players/me/two-factor");
+        twoFactorOn = status?.enabled == true;
+        if (twoFactorOn != true) return;
         await LoadAuditAsync();
         await LoadReportsAsync();
         await SearchAsync();
@@ -377,4 +399,6 @@
     private record ReportQueueDto(Guid targetId, string targetName, string? avatarUrl, string reason, int reports,
         DateTime firstReportedAt, DateTime lastReportedAt, List<string> notes);
     private record ProblemDto(string? detail);
+
+    private sealed record TwoFactorStatusDto(bool enabled);
 }

@@ -164,7 +164,8 @@ The API checks the store for changes at most every two minutes while players are
 
 Add a repository variable `ADMIN_USERNAMES` with your hero's name (separate several with commas) and run
 **Deploy to Azure**. The next time that hero signs in, an **Admin tools** link appears in town: search players,
-suspend or reinstate them, correct gold, and read the audit log of every admin action. Take a name out of the
+suspend or reinstate them, correct gold, and read the audit log of every admin action. The tools only open once
+that hero has two-factor sign-in on (**⚙️ Your account and data** in town), so set that up first. Take a name out of the
 variable and deploy again to remove that admin; it applies at their next sign-in. See
 [ADR 0021](adr/0021-admin-roles-and-audit-log.md).
 

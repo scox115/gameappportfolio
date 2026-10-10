@@ -27,7 +27,7 @@ public class ModerationTests(ArenaFixture arena) : BrowserTest(arena)
         await Assertions.Expect(dialog).ToHaveCountAsync(0);
 
         // The admin finds it in the report queue and renames the hero.
-        var admin = await CreateHeroAsync(ApiHost.AdminNames[2]);
+        var admin = await CreateAdminAsync(ApiHost.AdminNames[2]);
         await admin.GetByRole(AriaRole.Link, new() { Name = "Admin tools" }).ClickAsync();
         var queue = admin.Locator("section", new() { Has = admin.GetByRole(AriaRole.Heading, new() { Name = "Reports" }) });
         await Assertions.Expect(queue.GetByText("“It's a slur in my language.”")).ToBeVisibleAsync();

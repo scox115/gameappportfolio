@@ -23,6 +23,8 @@ public sealed class ArenaFixture : IAsyncLifetime
 
     public ApiHost.Mailbox Emails => _api!.Emails;
 
+    public Task TurnOnTwoFactorAsync(string username) => _api!.TurnOnTwoFactorAsync(username);
+
     public Task SetRatingAsync(string username, int rating) => _api!.SetRatingAsync(username, rating);
 
     public Task RecordMatchAsync(string username, int rating) => _api!.RecordMatchAsync(username, rating);
